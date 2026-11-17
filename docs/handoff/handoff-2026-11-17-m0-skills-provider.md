@@ -90,3 +90,9 @@
 1. 技能包（启用单位、多包并集）的 UI 与 `packs` 写入路由；
 2. 安装/卸载写盘（装 = 写 `~/.dsh/skills` 或 `<项目>/.dsh/skills`，卸 = 移入归档目录）；
 3. 目录字符预算与冲突/重名提示。
+
+## 后续变更（2026-11-17 12:5x 补记）
+
+- 本文件原名 `HANDOVER.md`，已移入 `docs/handoff/` 并按命名约定改名。
+- 文中“bundle `@local/dsh-zhiyin-proto` v0.2.0”为当时状态；现版本锁定 `0.1.0`，profile 仍用 `link:` 指向 `prototype/`，改动靠重启 DSH 加载。
+- 定位澄清：织音是技能管理插件，安装新建技能目录、卸载移入归档目录；启停与观测不碰技能文件（见 `docs/agents/decision-log.md` DEC-005）。
