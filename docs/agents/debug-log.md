@@ -16,4 +16,29 @@ description: >
 
 ***
 
-（尚无。遇阻塞级或反复复现的 bug 时按上格式追加。）
+## BUG-003: 停用只在模型面生效，/ 菜单仍能选到被停用的技能
+
+- **日期**：2026-11-17
+- **现象**：`加载 ~/.agents/skills` 关掉后统计显示「模型可用 96 / 仅内部可用 64」，会话里的技能目录也确实不再注入那 64 个（`skill` 工具对 `zuiti` 直接报 not available for model invocation），但输入框的 `/` 菜单里仍然能选到 `zuiti` 等被停用技能。
+- **根因**：两条读取路径用的不是同一个技能注册表实例。模型目录（`dsh-tool-skill` 注入）读的是它自己 ctx 上的 `skills`；而用户面走宿主 Remote `SessionSkillCatalog.list`，它取的是 `agentPresets.serviceFor(live, 'skills')`（预设装配那一份），冷会话则退回宿主层 `this.ctx.get('skills')`。织音只把策略 provider 挂在 Agent 自己 ctx 的那一份上，所以用户面那条路看不到停用。
+- **修复**：`registryInstances` 收集同一个 Agent 能拿到的全部技能注册表实例（Agent 层 / 预设层 `agentPresets.serviceFor(agent,'skills')` / 宿主层 `ctx.get('skills')`），逐个挂同一份策略 provider（按技能名停用，语义不变，不复制正文、不改技能文件），诊断记 `layers` 数；`forceInvalidate` 与 `invalidateAll` 同步遍历这三个实例。新增诊断路由 `GET /zhiyin/probe`，摊开模型面与用户面两条读取路径的真实结果（各注册表实例的层表、`sessionSkillCatalog.list` 返回的技能名与其中仍可见的停用项）。
+- **验证限制**：假 ctx 冒烟测试通过（三个注册表都收到 `zhiyin` provider，事件 `provider-registered layers:3`）；真机要重启后看 `/zhiyin/probe` 的 `catalog` 段与 `/` 菜单。
+- **教训**：「停用生效了吗」要分别验模型面与用户面，两条路的注册表实例可能不是同一个；控制类插件不能只挂自己顺手拿到的那个 service。
+
+## BUG-002: 启动窗口内重复注册策略 provider，诊断刷屏
+
+- **日期**：2026-11-17
+- **现象**：`zhiyin-proto/events.ndjson` 中出现 573 条 `provider-register-failed: a skill provider named "zhiyin" is already registered in this scope`，每 2 秒一条，直到某个作用域被重建后才出现一条 `provider-registered`。
+- **根因**：轮询循环对每个 Agent 都调 `registerProvider`，但键用的是 session id；热重载/作用域重建后，同一个作用域里还留着上一轮的 provider，新实例拿不到它的 disposer，于是每轮重试都抛「同名已注册」。
+- **修复**：`registerFor` 捕获该错误时视作「已生效」——记入 `providers` 停止重试，只留一条 `provider-already-registered` 诊断；并记 `entry.force`：拿不到 `control.invalidate` 时，用一次「即注册即撤销」的 runtime 技能推动 registry 换 revision（`forceInvalidate`），保证开关仍能让目录刷新。
+- **验证限制**：假 ctx 通过了「同名已注册」路径（事件只剩一条）；真实热重载场景要等宿主重启后观察。
+- **教训**：注册类 API 的失败要么重试要么降级，不能每轮盲目重试并写诊断——诊断文件会被自己刷爆。
+
+## BUG-001: 观测只读到全局层，用户级技能全员消失
+
+- **日期**：2026-11-17
+- **现象**：宿主重启后 `GET /zhiyin/state` 返回 `total=14`（全是 bundled 内置），而此前同一台机器上是 175；设置页会把 161 个用户级技能当成不存在。
+- **根因**：`collectState` 调 `ctx.skills.snapshot({ cwd })` 时故意不带 `scope`。注册是按调用上下文的作用域分层（`dsh-skill` 用 `scopeOf(this.ctx)` 定位层），读取同样要用 Agent 自己的 scope key 才会合并「全局层 + 该 Agent 作用域链」；不带 scope 只剩全局层，用户级技能在预设/Agent 层里，于是一个都看不到。
+- **修复**：新增 `viewForAgent`，**从技能注册表自己的层表反查 scope key**（`skills.layers.scoped`，遍历所有 key 各读一次快照，取条目最多的那份）——不要自己 import `@deepseek-ai/dsh-scope` 求 key：第三方插件拿到的是另一份模块实例，模块私有 Symbol 不同，`scopeOf` 恒为 undefined（实测：宿主里 `scopedScopes` 一直是 0）。响应新增 `scopedScopes` 与 `scopeDebug`（每个 key 的条目数、各层 provider 名），`scopes > 0` 而 `scopedScopes === 0` 时写入 `scope-key-unavailable` 失败项便于现场定位。同时把列表里 `provider === 'zhiyin'` 的影子候选回填原始 `known` 元数据（来源、描述），并新增 `shadowed` 标记。
+- **验证限制**：用**真 `SkillRegistry` + 真 `createScope`** 复现：同一作用域里注册「原生 provider（user-dsh/user-agents）」+「织音影子 provider」后，`snapshot({scope})` 得到 `alpha[zhiyin model=false]`、`beta[skill-filesystem]`，而 `snapshot({})` 为空 —— 精确复现了宿主里「只读到 14 条内置、用户级全丢」的现象，并验证影子候选确实压住同名原生候选。层表反查在真注册表上取到正确 key（`discovered key === key`），且 `layers` 通过 cordis 的 traced service 代理可读。仍未在真实宿主里跑通：等下一次完全重启。
+- **教训**：分层注册表「注册在哪一层」和「读哪一层」必须是同一个 scope key；先前的「不带 scope 才拿得到原生结果」是错的——影子候选可以在拿到结果后按 provider 名回填。
