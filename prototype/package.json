@@ -1,0 +1,36 @@
+{
+  "name": "@local/dsh-zhiyin-proto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "织音：把技能包编译成模型此刻看得见的技能目录，并给出成本与冲突",
+  "exports": {
+    ".": "./index.js",
+    "./consumer": "./consumer.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "consumer.js",
+    "paths.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "dependencies": {
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-skill": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.3"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

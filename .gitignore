@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────
+# 织音（ZhiYin）· DSH 插件原型仓库忽略规则
+# 生成：git-manager 技能（新建文件，未覆盖任何既有文件）
+# 栈：根目录无 package.json；Node ESM 包位于 prototype/（package-lock.json 入库）
+# ─────────────────────────────────────────────────────────────
+
+# 依赖目录（不带前导斜杠，任意层级生效，覆盖 prototype/node_modules）
+node_modules/
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 构建产物
+dist/
+build/
+*.tsbuildinfo
+
+# 覆盖率与测试产物
+coverage/
+*.lcov
+.nyc_output/
+
+# 缓存与工具产物
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.npm/
+.node_repl_history
+*.tgz
+.yarn-integrity
+.codegraph/
+
+# 本地环境与密钥（示例文件保持可追踪）
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+
+# 临时文件
+.tmp/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# DSH 运行时产物：会话附件图片，不入库
+.dsh-file-attachment/
+
+# 操作系统临时文件
+.DS_Store
+Thumbs.db
+desktop.ini

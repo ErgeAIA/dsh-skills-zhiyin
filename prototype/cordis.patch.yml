@@ -1,0 +1,8 @@
+# 织音 · 原型
+#
+# 只挂宿主半边：设置页 + 只读观测路由。
+# 预设与消费者那套已废弃——读完 @michengai/dsh-skills-manager 的实现后确认：
+# 要用「按 Agent 注册的策略 provider」做启停，不需要改预设、不需要替换消费者。
+- insert:
+    - id: zhiyin
+      name: '@local/dsh-zhiyin-proto'
