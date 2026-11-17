@@ -17,8 +17,8 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（首次提交 `1e3b33d` 已推送到私有仓库 https://github.com/ErgeAIA/dsh-skills-zhiyin）
-- **阶段**：原型期 P0——技能启停已实现，待真机验证；文档与仓库布局已收敛
+- **当前分支**：main（技能停用修复走 fix/skill-disable-ui → 提交 b555e53 → 合并 e85668f → 已推送 origin，分支已删）
+- **阶段**：原型期 P0——技能启停（含模型面 + / 菜单面）已真机验证通过；下一步技能包
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
