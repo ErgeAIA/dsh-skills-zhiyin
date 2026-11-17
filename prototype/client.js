@@ -34,7 +34,15 @@ window.__ModuleLoader__.load({
         complete: '观测完整',
         incomplete: '观测不完整（已列出确认到的部分）',
         search: '按名称或描述搜索',
-        onlyModel: '只看模型可用',
+        filterHint: '点一下只列这一类，再点一下回到全部',
+        linkBadge: '软链',
+        linkBadgeTitle: '符号链接，实体在 ',
+        statBundled: '内置技能',
+        sourceBundled: '内置',
+        sourceCustom: '自定义目录',
+        skillsMaster: '启用技能',
+        skillsMasterHint: '关掉 = 一键全部停用：模型目录为空、/ 菜单也选不到；重新打开会恢复各技能自己的开关状态',
+        reasonAllOff: '全部停用',
         empty: '没有匹配的技能',
         modelBadge: '模型',
         userBadge: '用户',
@@ -72,7 +80,15 @@ window.__ModuleLoader__.load({
         complete: 'Observation complete',
         incomplete: 'Observation incomplete (confirmed subset listed)',
         search: 'Search name or description',
-        onlyModel: 'Model-invocable only',
+        filterHint: 'Click a card to list that group; click again for all',
+        linkBadge: 'link',
+        linkBadgeTitle: 'Symbolic link, real path: ',
+        statBundled: 'Bundled',
+        sourceBundled: 'bundled',
+        sourceCustom: 'custom dir',
+        skillsMaster: 'Skills on',
+        skillsMasterHint: 'Off = disable every skill at once (empty model catalog, nothing in the / menu); turning it back on restores each skill own switch',
+        reasonAllOff: 'all disabled',
         empty: 'No matching skills',
         modelBadge: 'model',
         userBadge: 'user',
@@ -96,6 +112,49 @@ window.__ModuleLoader__.load({
       title: { fontSize: 20, fontWeight: 600, margin: 0 },
       subtitle: { opacity: 0.6, fontSize: 13 },
       row: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 14 },
+      switchRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        cursor: 'pointer',
+        fontSize: 12.5,
+        flex: '0 0 auto',
+        userSelect: 'none',
+      },
+      track: {
+        width: 32,
+        height: 18,
+        borderRadius: 999,
+        background: 'rgba(128,128,128,0.35)',
+        position: 'relative',
+        transition: 'background 120ms',
+        flex: '0 0 auto',
+      },
+      trackOn: { background: 'rgba(96,165,250,0.9)' },
+      knob: {
+        position: 'absolute',
+        top: 2,
+        left: 2,
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
+        background: '#fff',
+        transition: 'left 120ms',
+      },
+      knobOn: { left: 16 },
+      help: {
+        width: 15,
+        height: 15,
+        borderRadius: '50%',
+        border: '1px solid currentColor',
+        fontSize: 10,
+        lineHeight: '13px',
+        textAlign: 'center',
+        opacity: 0.55,
+        cursor: 'help',
+        flex: '0 0 auto',
+        userSelect: 'none',
+      },
       pill: (on) => ({
         fontSize: 12,
         padding: '2px 10px',
@@ -115,6 +174,7 @@ window.__ModuleLoader__.load({
         borderRadius: 10,
         padding: '10px 12px',
       },
+      cardActive: { borderColor: 'rgba(96,165,250,0.85)' },
       statLabel: { fontSize: 12, opacity: 0.6 },
       statValue: { fontSize: 22, fontWeight: 600, marginTop: 2 },
       bar: {
@@ -152,13 +212,21 @@ window.__ModuleLoader__.load({
         borderRadius: 8,
         padding: '6px 10px',
         display: 'flex',
-        alignItems: 'baseline',
+        alignItems: 'center',
         gap: 10,
         minHeight: 40,
       },
-      itemMain: { flex: '1 1 auto', minWidth: 0 },
+      itemMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
       itemHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
-      name: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5 },
+      name: {
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: 12.5,
+        flex: '0 1 auto',
+        minWidth: 0,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      },
       badge: (on) => ({
         fontSize: 10.5,
         padding: '0 5px',
@@ -171,15 +239,52 @@ window.__ModuleLoader__.load({
       desc: {
         fontSize: 11.5,
         opacity: 0.58,
-        marginTop: 2,
         lineHeight: 1.35,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
       },
-      meta: { fontSize: 11, opacity: 0.45, flex: '0 0 auto' },
+      meta: {
+        fontSize: 11,
+        opacity: 0.45,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      },
       itemOff: { opacity: 0.55 },
       switch: { flex: '0 0 auto', cursor: 'pointer', width: 16, height: 16, accentColor: 'currentColor' },
+    }
+
+    function Switch({ label, hint, checked, disabled, onChange }) {
+      return h(
+        'label',
+        { style: css.switchRow, title: hint ?? undefined },
+        h(
+          'span',
+          { style: { ...css.track, ...(checked ? css.trackOn : null) } },
+          h('span', { style: { ...css.knob, ...(checked ? css.knobOn : null) } }),
+        ),
+        h('span', null, label),
+        h('input', { type: 'checkbox', checked, disabled, onChange, style: { display: 'none' } }),
+        hint
+          ? h(
+              'span',
+              {
+                style: css.help,
+                title: hint,
+                onClick: (event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                },
+                onMouseDown: (event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                },
+              },
+              '?',
+            )
+          : null,
+      )
     }
 
     function Page({ close, t }) {
@@ -192,7 +297,7 @@ window.__ModuleLoader__.load({
       )
       const [state, setState] = React.useState({ loading: true, data: null, error: null })
       const [query, setQuery] = React.useState('')
-      const [onlyModel, setOnlyModel] = React.useState(false)
+      const [filter, setFilter] = React.useState('all')
       const [busy, setBusy] = React.useState(false)
 
       const load = React.useCallback(() => {
@@ -242,24 +347,62 @@ window.__ModuleLoader__.load({
       }, [load])
 
       const data = state.data
+
+      // 「此刻 DSH 的技能世界」：总开关关掉时，~/.agents/skills 整组不属于它。
+      const scoped = React.useMemo(() => {
+        const all = data?.skills ?? []
+        if (data?.agentsRoot === false) return all.filter((skill) => skill.source !== 'user-agents')
+        return all
+      }, [data])
+
+      // 统计卡的数字按同一口径算，保证「四张卡相加 = 技能总数」。
+      const counts = React.useMemo(() => {
+        let model = 0
+        let user = 0
+        let both = 0
+        let neither = 0
+        for (const skill of scoped) {
+          const m = skill.model === true
+          const u = skill.user === true
+          if (m) model += 1
+          if (u) user += 1
+          if (m && u) both += 1
+          if (!m && !u) neither += 1
+        }
+        const bundled = scoped.filter((skill) => skill.source === 'bundled').length
+        return { total: scoped.length, model, user, both, neither, bundled }
+      }, [scoped])
+
       const skills = React.useMemo(() => {
-        if (!data) return []
         const needle = query.trim().toLowerCase()
-        return data.skills.filter((skill) => {
-          if (onlyModel && !skill.model) return false
+        return scoped.filter((skill) => {
+          if (filter === 'model' && !skill.model) return false
+          if (filter === 'user' && !(skill.user && !skill.model)) return false
+          if (filter === 'internal' && (skill.model || skill.user)) return false
+          if (filter === 'bundled' && skill.source !== 'bundled') return false
           if (needle === '') return true
           return (
             skill.name.toLowerCase().includes(needle) ||
             (skill.description ?? '').toLowerCase().includes(needle)
           )
         })
-      }, [data, query, onlyModel])
+      }, [scoped, query, filter])
 
       const pct = data ? Math.round((data.catalogChars / data.budgetChars) * 100) : 0
+      const sourceLabel = (skill) => {
+        const root = skill.root
+          ? skill.root.replace(/^[A-Za-z]:\\Users\\[^\\]+\\/, '~/').replace(/\\/g, '/')
+          : null
+        if (root) return root
+        if (skill.source === 'bundled') return say('sourceBundled', '内置')
+        if (skill.source === 'custom') return say('sourceCustom', '自定义目录')
+        return skill.source
+      }
       const reasonLabel = (reason) => {
         if (reason === 'manual') return say('reasonManual', '手动停用')
         if (reason === 'pack') return say('reasonPack', '技能包停用')
         if (reason === 'agents-root') return say('reasonAgents', 'agents 开关关闭')
+        if (reason === 'all-off') return say('reasonAllOff', '全部停用')
         return ''
       }
 
@@ -300,7 +443,7 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { style: css.grid },
-              statCards(data, say),
+              statCards(data, counts, say, filter, setFilter),
               h(
                 'div',
                 { style: css.card },
@@ -325,35 +468,26 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { style: { ...css.row, justifyContent: 'space-between' } },
-              h(
-                'label',
-                { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 6 } },
-                h('input', {
-                  type: 'checkbox',
-                  style: css.switch,
-                  checked: data.agentsRoot !== false,
-                  disabled: busy,
-                  title: say('agentsRootHint', '关掉后 DSH 只看 ~/.dsh/skills 与项目技能'),
-                  onChange: () => write('/zhiyin/settings', { agentsRoot: data.agentsRoot === false }),
-                }),
-                say('agentsRoot', '加载 ~/.agents/skills'),
-              ),
               h('input', {
                 style: css.input,
                 value: query,
                 placeholder: say('search', '按名称或描述搜索'),
                 onChange: (event) => setQuery(event.target.value),
               }),
-              h(
-                'label',
-                { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 6 } },
-                h('input', {
-                  type: 'checkbox',
-                  checked: onlyModel,
-                  onChange: (event) => setOnlyModel(event.target.checked),
-                }),
-                say('onlyModel', '只看模型可用'),
-              ),
+              h(Switch, {
+                label: say('agentsRoot', '启用 .agents 技能目录'),
+                hint: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
+                checked: data.agentsRoot !== false,
+                disabled: busy,
+                onChange: () => write('/zhiyin/settings', { agentsRoot: data.agentsRoot === false }),
+              }),
+              h(Switch, {
+                label: say('skillsMaster', '启用技能'),
+                hint: say('skillsMasterHint', '关掉 = 一键全部停用：模型目录为空、/ 菜单也选不到；重新打开会恢复各技能自己的开关状态'),
+                checked: data.allOff !== true,
+                disabled: busy,
+                onChange: () => write('/zhiyin/settings', { allOff: data.allOff !== true }),
+              }),
               h(
                 'button',
                 { type: 'button', style: css.btn, onClick: load, disabled: state.loading },
@@ -393,8 +527,11 @@ window.__ModuleLoader__.load({
                       }),
                       h(
                         'div',
-                        { style: css.itemHead },
-                        h('span', { style: css.name }, skill.name),
+                        { style: css.itemMain },
+                        h(
+                          'div',
+                          { style: css.itemHead },
+                          h('span', { style: css.name }, skill.name),
                         skill.enabled === false
                           ? h('span', { style: css.badge(true) }, say('disabledBadge', '已停用'))
                           : null,
@@ -403,16 +540,32 @@ window.__ModuleLoader__.load({
                         !skill.model && !skill.user
                           ? h('span', { style: css.badge(true) }, say('internalBadge', '内部'))
                           : null,
+                        skill.linkTarget
+                          ? h(
+                              'span',
+                              {
+                                style: css.badge(false),
+                                title: `${say('linkBadgeTitle', '符号链接，实体在')}${skill.linkTarget}`,
+                              },
+                              say('linkBadge', '软链'),
+                            )
+                          : null,
                         h(
                           'span',
                           { style: { ...css.hint, marginLeft: 'auto' } },
-                          `${skill.source} · ${skill.provider}`,
+                          sourceLabel(skill),
                         ),
                       ),
-                      skill.description
-                        ? h('div', { style: css.desc }, skill.description)
-                        : null,
-                      skill.path ? h('div', { style: css.meta }, skill.path) : null,
+                        skill.description
+                          ? h('div', { style: css.desc }, skill.description)
+                          : null,
+                        h(
+                          'div',
+                          { style: css.meta, title: skill.linkTarget ?? skill.logicalPath ?? skill.path ?? '' },
+                          skill.logicalPath ?? skill.path ?? '',
+                          skill.linkTarget ? `  →  ${skill.linkTarget}` : '',
+                        ),
+                      ),
                     ),
                   ),
             )
@@ -422,21 +575,42 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function statCards(data, say) {
+    function statCards(data, counts, say, filter, setFilter) {
       const items = [
-        { key: 'statTotal', label: '技能总数', value: data.counts.total },
-        { key: 'statModel', label: '模型可用', value: data.counts.model },
-        { key: 'statUser', label: '仅用户可用', value: data.counts.user },
-        { key: 'statNeither', label: '仅内部可用', value: data.counts.neither },
+        { key: 'statTotal', label: '技能总数', value: counts.total, filter: 'all' },
+        { key: 'statModel', label: '模型可用', value: counts.model, filter: 'model' },
+        {
+          key: 'statUser',
+          label: '仅用户可用',
+          value: Math.max(0, counts.user - counts.both),
+          filter: 'user',
+        },
+        { key: 'statNeither', label: '仅内部可用', value: counts.neither, filter: 'internal' },
+        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled' },
       ]
-      return items.map((item) =>
-        h(
-          'div',
-          { key: item.key, style: css.card },
+      return items.map((item) => {
+        const active = filter === item.filter
+        return h(
+          'button',
+          {
+            key: item.key,
+            type: 'button',
+            title: say('filterHint', '点一下只列这一类，再点一下回到全部'),
+            onClick: () => setFilter(active ? 'all' : item.filter),
+            style: {
+              ...css.card,
+              ...(active ? css.cardActive : null),
+              cursor: 'pointer',
+              textAlign: 'left',
+              color: 'inherit',
+              background: active ? 'rgba(96,165,250,0.12)' : 'transparent',
+              font: 'inherit',
+            },
+          },
           h('div', { style: css.statLabel }, say(item.key, item.label)),
           h('div', { style: css.statValue }, String(item.value)),
-        ),
-      )
+        )
+      })
     }
 
     function NavIcon({ size, active }) {

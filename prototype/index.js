@@ -12,6 +12,7 @@
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { stateDir } from './paths.js'
@@ -27,6 +28,7 @@ const PROVIDER_NAME = 'zhiyin'
 const EMPTY_STATE = {
   v: 1,
   agentsRoot: true,
+  allOff: false,
   disabled: {},
   packs: [],
   known: {},
@@ -36,6 +38,8 @@ let cache = null
 /** agentSessionId -> { skills, dispose, invalidate } */
 const providers = new Map()
 const registrations = new Set()
+/** 已经因为“同名 provider 已存在”而放弃重试的作用域 key */
+const duplicates = new Set()
 
 export function apply(ctx) {
   ctx.effect(() =>
@@ -43,6 +47,16 @@ export function apply(ctx) {
       kind: 'exact',
       path: '/zhiyin/state',
       resource: async () => json(await collectState(ctx)),
+    }),
+  )
+
+  // 诊断：把「模型面」和「用户面（/ 菜单）」两条读取路径的真实结果摊开，
+  // 用来判断我们的策略 provider 到底挂在哪个注册表实例、哪一层。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/probe',
+      resource: async () => json(await uiProbe(ctx)),
     }),
   )
 
@@ -66,9 +80,10 @@ export function apply(ctx) {
   post(ctx, '/zhiyin/settings', async (body) => {
     const state = readState()
     if (typeof body?.agentsRoot === 'boolean') state.agentsRoot = body.agentsRoot
+    if (typeof body?.allOff === 'boolean') state.allOff = body.allOff
     saveState(state)
     invalidateAll()
-    return { status: 200, body: { ok: true, agentsRoot: state.agentsRoot } }
+    return { status: 200, body: { ok: true, agentsRoot: state.agentsRoot, allOff: state.allOff === true } }
   })
 
   // 新出现的 Agent 及时挂上策略 provider（轮询足够便宜，且不依赖内部事件名）。
@@ -199,6 +214,8 @@ function note(event, detail) {
 
 /** 这个技能此刻是否应当被隐藏，以及原因。 */
 function hiddenReason(state, skillName, source) {
+  // 一键全部关掉：优先级最高，压过技能包与单个开关。
+  if (state.allOff === true) return 'all-off'
   if (state.agentsRoot === false && source === 'user-agents') return 'agents-root'
   const packs = (state.packs ?? []).filter(
     (pack) => Array.isArray(pack?.members) && pack.members.includes(skillName),
@@ -223,14 +240,16 @@ function ensureProviders(ctx) {
   const live = new Set()
   for (const agent of agents) {
     live.add(agentKey(agent))
-    registerFor(agent)
+    registerFor(ctx, agent)
   }
   for (const [key, entry] of providers) {
     if (live.has(key)) continue
-    try {
-      entry.dispose?.()
-    } catch {
-      /* 已随作用域释放 */
+    for (const dispose of entry.disposers ?? []) {
+      try {
+        dispose()
+      } catch {
+        /* 已随作用域释放 */
+      }
     }
     providers.delete(key)
     registrations.delete(entry)
@@ -238,38 +257,206 @@ function ensureProviders(ctx) {
   return agents.length
 }
 
-function registerFor(agent) {
+/**
+ * 挂策略 provider。
+ *
+ * 同一个 Agent 可能对应不止一个技能注册表实例（Agent 自己那一层，加上预设装配
+ * 出来的那一份；冷会话还会读宿主层那份），而「哪个实例在读」决定了停用能不能
+ * 生效。所以每个能拿到的实例都挂一份，名字、语义完全一样（按技能名停用），
+ * 不复制正文、不改技能文件。
+ */
+function registerFor(ctx, agent) {
   const key = agentKey(agent)
   if (providers.has(key)) return
-  let skills
-  try {
-    skills = agent?.ctx?.get?.('skills')
-  } catch {
-    skills = undefined
-  }
-  if (!skills || typeof skills.registerProvider !== 'function') return
-  const entry = { skills, dispose: null, invalidate: null }
-  try {
-    entry.dispose = skills.registerProvider((control) => {
-      entry.invalidate = () => {
-        try {
-          control.invalidate()
-        } catch {
-          /* 注册已释放 */
+  const services = registryInstances(ctx, agent)
+  if (services.length === 0) return
+  const entry = { agent, services: [], disposers: [], invalidates: [], force: null }
+  let registered = 0
+  let duplicates2 = 0
+  for (const service of services) {
+    try {
+      const dispose = service.registerProvider((control) => {
+        entry.invalidates.push(() => {
+          try {
+            control.invalidate()
+          } catch {
+            /* 注册已释放 */
+          }
+        })
+        return {
+          name: PROVIDER_NAME,
+          list: async () => shadowCandidates(),
+          get: async () => undefined,
         }
+      })
+      entry.services.push(service)
+      if (typeof dispose === 'function') entry.disposers.push(dispose)
+      registered += 1
+    } catch (error) {
+      const message = String(error?.message ?? error)
+      if (message.includes('is already registered')) {
+        // 热重载后残留的同名 provider：那个实例已经有织音在管，视作已生效，
+        // 不再每 2 秒重试一次（并把这条诊断压到一条）。
+        duplicates2 += 1
+      } else {
+        note('provider-register-failed', { error: message })
       }
-      return {
-        name: PROVIDER_NAME,
-        list: async () => shadowCandidates(),
-        get: async () => undefined,
-      }
-    })
-    providers.set(key, entry)
-    registrations.add(entry)
-    note('provider-registered', { agents: registrations.size })
-  } catch (error) {
-    note('provider-register-failed', { error: String(error?.message ?? error) })
+    }
   }
+  if (registered === 0 && duplicates2 === 0) return
+  entry.force = () => forceInvalidate(ctx, agent)
+  providers.set(key, entry)
+  registrations.add(entry)
+  if (registered === 0 && !duplicates.has(key)) {
+    duplicates.add(key)
+    note('provider-already-registered', { key })
+    return
+  }
+  note('provider-registered', { agents: registrations.size, layers: registered, duplicates: duplicates2 })
+}
+
+/**
+ * 兜底失效：注册是热重载残留的（拿不到 control.invalidate），用一次
+ * 即注册即撤销的 runtime 技能推动 registry 换 revision，让消费者重算目录。
+ */
+function forceInvalidate(ctx, agent) {
+  for (const skills of registryInstances(ctx, agent)) {
+    if (typeof skills.register !== 'function') continue
+    try {
+      const undo = skills.register({
+        name: 'zhiyin-invalidate-probe',
+        description: 'internal',
+        invocation: { modelInvocable: false, userInvocable: false },
+      })
+      if (typeof undo === 'function') undo()
+    } catch {
+      /* 推不动就算了，目录最迟在下次 revision 变化时刷新 */
+    }
+  }
+}
+
+function skillsOf(agent) {
+  try {
+    return agent?.ctx?.get?.('skills')
+  } catch {
+    return undefined
+  }
+}
+
+function safeGetService(ctx, name) {
+  try {
+    const service = ctx?.get?.(name)
+    return service ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * 一个 Agent 可能被不止一个技能注册表实例看到：
+ *   1. Agent 自己 ctx 上的那一份；
+ *   2. 预设装配出来的那一份（`agentPresets.serviceFor(agent, 'skills')`）——
+ *      / 菜单走的就是它（见 dsh-api-session-controller 的 SessionSkillCatalog.list：
+ *      `scoped ?? this.ctx.get('skills')`）；
+ *   3. 宿主层那一份，冷会话（还没有 live agent）读的是它。
+ * 停用要在「谁在读」的那个实例里生效，所以三个都挂。
+ */
+function registryInstances(ctx, agent) {
+  const out = []
+  const push = (service) => {
+    if (service && typeof service.registerProvider === 'function' && !out.includes(service)) out.push(service)
+  }
+  push(skillsOf(agent))
+  try {
+    const presets = safeGetService(ctx, 'agentPresets')
+    if (presets && typeof presets.serviceFor === 'function') push(presets.serviceFor(agent, 'skills'))
+  } catch {
+    /* 预设服务不可用就只挂能拿到的那些 */
+  }
+  push(safeGetService(ctx, 'skills'))
+  return out
+}
+
+function describeRegistry(service) {
+  if (!service) return { present: false }
+  try {
+    return { present: true, layers: layerReport(service) }
+  } catch {
+    return { present: true, layers: [] }
+  }
+}
+
+/** 摊开两条读取路径的真实结果：模型面（skills.list，scope=agent）与用户面（sessionSkillCatalog.list）。 */
+async function uiProbe(ctx) {
+  const agents = typeof ctx.agents?.list === 'function' ? ctx.agents.list() : []
+  const presets = safeGetService(ctx, 'agentPresets')
+  const hostSkills = safeGetService(ctx, 'skills')
+  const catalog = safeGetService(ctx, 'sessionSkillCatalog')
+  const out = { at: new Date().toISOString(), agents: [], catalog: [] }
+  for (const agent of agents) {
+    const sessionId = agentKey(agent)
+    const agentSkills = skillsOf(agent)
+    const presetSkills = (() => {
+      try {
+        return presets && typeof presets.serviceFor === 'function' ? presets.serviceFor(agent, 'skills') : undefined
+      } catch {
+        return undefined
+      }
+    })()
+    let sameHandle = null
+    try {
+      const handle = ctx.agents?.get?.(sessionId)
+      sameHandle = handle === agent
+    } catch {
+      sameHandle = null
+    }
+    out.agents.push({
+      sessionId,
+      sameHandle,
+      registries: {
+        agent: describeRegistry(agentSkills),
+        preset: describeRegistry(presetSkills),
+        host: describeRegistry(hostSkills),
+        presetIsAgent: presetSkills === agentSkills,
+      },
+    })
+  }
+  if (catalog && typeof catalog.list === 'function') {
+    for (const agent of agents) {
+      const sessionId = agentKey(agent)
+      try {
+        const value = await catalog.list({ sessionId }, new AbortController().signal)
+        const items = Array.isArray(value) ? value : (value?.skills ?? value?.items ?? [])
+        const names = items.map((item) => item?.name).filter((name) => typeof name === 'string')
+        const state = readState()
+        const disabledVisible = names.filter((name) => hiddenReason(state, name, state.known?.[name]?.source) !== null)
+        out.catalog.push({ sessionId, count: names.length, disabledVisible: disabledVisible.slice(0, 20) })
+      } catch (error) {
+        out.catalog.push({ sessionId, error: String(error?.message ?? error) })
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * 技能的逻辑位置与真实位置。
+ *
+ * ~/.dsh/skills 里的条目多数是指向 ~/.agents/skills 的符号链接，DSH 会把路径解析成
+ * 真实路径展示 —— 于是用户看到「满屏都是 .agents/skills」，误以为开关没生效。
+ * 这里同时给出逻辑根（用户安装到哪一层）和链接目标，页面据此区分。
+ */
+function locationOf(source, skillName, realPath) {
+  const home = homedir()
+  const roots = {
+    'user-dsh': join(home, '.dsh', 'skills'),
+    'user-agents': join(home, '.agents', 'skills'),
+  }
+  const root = roots[source]
+  if (!root) return { root: null, logicalPath: realPath ?? null, linkTarget: null }
+  const logicalPath = join(root, skillName, 'SKILL.md')
+  const linked = typeof realPath === 'string' && realPath.length > 0 && realPath !== logicalPath
+  return { root, logicalPath, linkTarget: linked ? realPath : null }
 }
 
 function shadowCandidates() {
@@ -299,20 +486,88 @@ function shadowCandidates() {
 export const __test = { hiddenReason, shadowCandidates, agentKey }
 
 function invalidateAll() {
-  const state = readState()
   for (const entry of registrations) {
-    if (typeof entry.invalidate === 'function') {
-      try {
-        entry.invalidate()
-      } catch {
-        /* 单个注册失效不影响其它 */
+    try {
+      if (Array.isArray(entry.invalidates) && entry.invalidates.length > 0) {
+        for (const invalidate of entry.invalidates) invalidate()
+      } else if (typeof entry.force === 'function') {
+        entry.force()
       }
+    } catch {
+      /* 单个注册失效不影响其它 */
     }
   }
-  void state
 }
 
 /* ------------------------------------------------------------- collection */
+
+/**
+ * 取一个 Agent 角度看得到的技能目录。
+ *
+ * 读取作用域 = Agent 自己那一层（我们的策略 provider 也注册在那里）。scope key
+ * 是模块私有 Symbol 标记的对象：第三方插件自己 import 一份 dsh-scope 拿不到同一个
+ * Symbol（scopeOf 会算成 undefined），所以改成从技能注册表自己的层表里反查 key。
+ * 层表可能有多个 key（预设层 / Agent 层），全部试一遍，取条目最多的那份。
+ */
+function scopeKeysFor(skills) {
+  const keys = []
+  try {
+    const scoped = skills?.layers?.scoped
+    if (scoped !== undefined && typeof scoped.keys === 'function') {
+      for (const key of scoped.keys()) if (!keys.includes(key)) keys.push(key)
+    }
+  } catch {
+    /* 读不到就只剩全局层 */
+  }
+  return keys
+}
+
+/** 诊断用：列出各层里已注册的 provider 名，便于判断 key 反查是否命中。 */
+function layerReport(skills) {
+  const out = []
+  try {
+    const scoped = skills?.layers?.scoped
+    if (scoped !== undefined && typeof scoped.keys === 'function') {
+      for (const key of scoped.keys()) {
+        let names = []
+        try {
+          names = [...scoped.get(key).providers.keys()]
+        } catch {
+          names = []
+        }
+        out.push({ scoped: true, names })
+      }
+    }
+  } catch {
+    /* 诊断失败不影响主流程 */
+  }
+  try {
+    out.push({ scoped: false, names: [...skills.layers.global.providers.keys()] })
+  } catch {
+    /* 同上 */
+  }
+  return out
+}
+
+async function viewForAgent(ctx, agent) {
+  const cwd = ctx.workingDirectory.get(agent.session)
+  const skills = skillsOf(agent)
+  const keys = scopeKeysFor(skills)
+  const reads = []
+  let best = null
+  for (const scope of [...keys, undefined]) {
+    let snapshot
+    try {
+      snapshot = await ctx.skills.snapshot(scope === undefined ? { cwd } : { cwd, scope })
+    } catch (error) {
+      if (scope === undefined) throw error
+      continue
+    }
+    reads.push({ global: scope === undefined, count: snapshot.skills.length })
+    if (!best || snapshot.skills.length > best.skills.length) best = snapshot
+  }
+  return { snapshot: best, scoped: keys.length > 0, layers: layerReport(skills), reads }
+}
 
 async function collectState(ctx) {
   ensureProviders(ctx)
@@ -334,19 +589,23 @@ async function collectState(ctx) {
     }
   }
 
+  let scopedScopes = 0
+  const scopeDebug = []
   for (const agent of ctx.agents.list()) {
     try {
-      const cwd = ctx.workingDirectory.get(agent.session)
-      // 不带 scope：只读全局层，拿到的是原生文件系统 provider 的结果，
-      // 不会被我们自己注册的影子候选遮蔽。
-      const snapshot = await ctx.skills.snapshot({ cwd })
+      const view = await viewForAgent(ctx, agent)
       scopes += 1
-      complete = complete && snapshot.complete
-      for (const skill of snapshot.skills) noteSkill(skill)
+      scopeDebug.push({ agent: agentKey(agent), scoped: view.scoped, reads: view.reads, layers: view.layers })
+      if (view.scoped) scopedScopes += 1
+      complete = complete && view.snapshot.complete
+      for (const skill of view.snapshot.skills) noteSkill(skill)
     } catch (error) {
       complete = false
       failures.push(String(error?.message ?? error))
     }
+  }
+  if (scopes > 0 && scopedScopes === 0) {
+    failures.push('scope-key-unavailable: 只读到全局层，用户级技能未纳入统计')
   }
 
   if (scopes === 0) {
@@ -368,15 +627,22 @@ async function collectState(ctx) {
   const skills = [...byName.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((skill) => {
-      const reason = hiddenReason(readState(), skill.name, skill.source)
+      const meta = readState().known?.[skill.name]
+      // 停用中的技能，列表里看到的是我们自己的影子候选 —— 展示信息回填原始元数据，
+      // 免得设置页把来源写成 zhiyin、描述写成占位串。
+      const shadowed = skill.provider === PROVIDER_NAME
+      const source = shadowed ? (meta?.source ?? skill.source) : skill.source
+      const reason = hiddenReason(readState(), skill.name, source)
       return {
         name: skill.name,
-        description: skill.description,
+        description: shadowed && meta?.description ? meta.description : skill.description,
         whenToUse: skill.whenToUse ?? null,
-        model: skill.invocation.modelInvocable && reason === null,
-        user: skill.invocation.userInvocable && reason === null,
-        source: skill.source,
+        model: !shadowed && skill.invocation.modelInvocable && reason === null,
+        user: !shadowed && skill.invocation.userInvocable && reason === null,
+        source,
         provider: skill.provider,
+        shadowed,
+        ...locationOf(source, skill.name, skill.path),
         path: skill.path ?? null,
         resourceKind: skill.resourceBase?.kind ?? null,
         enabled: reason === null,
@@ -395,12 +661,15 @@ async function collectState(ctx) {
     at: new Date().toISOString(),
     complete,
     scopes,
+    scopedScopes,
+    scopeDebug,
     failures,
     budgetChars: BUDGET_CHARS,
     descriptionMaxLength: DESCRIPTION_MAX_LENGTH,
     catalogChars,
     skills,
     agentsRoot: current.agentsRoot !== false,
+    allOff: current.allOff === true,
     managedScopes: registrations.size,
     takeover: { visible: registrations.size > 0 },
     counts: {
