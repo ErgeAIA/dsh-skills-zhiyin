@@ -18,11 +18,20 @@ description: >
 ## 当前状态
 
 - **当前分支**：main（技能停用修复走 fix/skill-disable-ui → 提交 b555e53 → 合并 e85668f → 已推送 origin，分支已删）
-- **阶段**：原型期 P0——技能启停（含模型面 + / 菜单面）已真机验证通过；下一步技能包
+- **阶段**：原型期 P1——启停（模型面 + / 菜单面）、技能包、导入 txt、安装/卸载已实现并脚本冒烟通过；进入 UI 精修
+- **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能列表、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-18 23:0x 技能包导入 txt
+- **最后更新**：2026-11-18 23:4x UI 精修第一轮（可读性）
+  - 技能行：checkbox → 无文字开关图标（32×18 轨道），行高 40→56，行内 gap 10→12，加浅底与 10px 圆角
+  - 「卸载」文字按钮 → ⤓ 图标按钮（css.iconBtn），技能包「删除」同样改图标
+  - 路径行从行内移除，改挂整行 title（悬停可见），减少每行一行噪声
+  - 描述从单行截断改 2 行 clamp、字号 11.5→12、透明度 .58→.62
+  - 统计卡网格 minmax 150→104px、间距 10→8、卡内 padding 10/12→8/10，六张卡一行放下
+  - 工具栏 columnGap/rowGap 分离，搜索框 flex 基线放宽，控件拥挤时换行而不是挤压
+  - node --check client.js exit 0
+  - 上一轮：技能包导入 txt
   - POST /zhiyin/pack 新增 action=import：接受 path 或 text，解析 AI Vault 导出的技能包 txt（目录名 | 来源 | owner/repo | 分支 | 子目录，# 注释忽略），包名取 # 行 "Skill Pack: xxx"，可用 name 覆盖，按名去重
   - 页面技能包工具条新增「导入 txt」：弹窗可填绝对路径或直接粘贴内容，可选包名
   - 冒烟：真实 mattpocock.txt → 26 个成员、包名 mattpocock；粘贴去重生效；只有注释 → 400
