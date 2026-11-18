@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-19 00:1x UI 精修第二轮（去边框 / 降噪 / 主题一致）
+- **最后更新**：2026-11-19 00:3x UI 精修第三轮（开关可读性 / 全图标化）
+  - 开关：32×18 → 36×20，knob 14 → 16 加投影；开态改用品牌色 var(--zhiyin-accent, #e0743c)，关态淡灰轨道，两态对比明显
+  - 品牌色来源：夜灯主题未暴露稳定 accent token（dsh-dream-skin 只有 --dsh-dream-skin-* 填充变量），故用 CSS 变量 + 橙色兜底，使用者可用 --zhiyin-accent 覆盖
+  - 新增内联 SVG 图标组件 Icon（users/archive/close/plus/install/import/refresh），8 处文字按钮改图标按钮，全部带 title
+  - 「卸载」由 ⤓ 字符改 archive 图标，按钮 28×28、无边框、浅底；管理成员改 users 图标（原先会换行）
+  - border 计数仍为 0；node --check 双半边 exit 0
+  - 上一轮：UI 精修第二轮（去边框 / 降噪 / 主题一致）
   - 全局去边框：卡片、按钮、图标按钮、输入框、文本域、弹窗、分段控件、徽标、pill、帮助圆点全部改底色，border 计数归零
   - 高亮色去蓝（rgba(96,165,250)→中性 rgba(128,128,128,…)），跟随宿主暖色主题
   - 行内三枚徽标 →「已停用」淡橙胶囊 + 一行 meta 文本（模型 · 用户／仅模型／仅用户／内部）+ 软链 ⛓ 小字
