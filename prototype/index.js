@@ -86,6 +86,60 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, agentsRoot: state.agentsRoot, allOff: state.allOff === true } }
   })
 
+  post(ctx, '/zhiyin/pack', async (body) => {
+    const state = readState()
+    const packs = Array.isArray(state.packs) ? state.packs : (state.packs = [])
+    const action = typeof body?.action === 'string' ? body.action : ''
+    const id = typeof body?.id === 'string' ? body.id : ''
+    const index = packs.findIndex((pack) => pack.id === id)
+
+    if (action === 'create') {
+      const name = typeof body?.name === 'string' ? body.name.trim() : ''
+      if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+      const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+      packs.push({ id: newId, name, enabled: true, members: [], order: packs.length })
+      saveState(state)
+      invalidateAll()
+      return { status: 200, body: { ok: true, id: newId } }
+    }
+
+    if (index < 0) return { status: 404, body: { ok: false, error: 'pack not found' } }
+    const pack = packs[index]
+
+    if (action === 'rename') {
+      const name = typeof body?.name === 'string' ? body.name.trim() : ''
+      if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+      pack.name = name
+    } else if (action === 'toggle') {
+      pack.enabled = body?.enabled === true
+    } else if (action === 'copy') {
+      const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+      packs.push({ id: newId, name: (pack.name || '未命名') + ' 副本', enabled: false, members: [...(pack.members ?? [])], order: packs.length })
+      saveState(state)
+      invalidateAll()
+      return { status: 200, body: { ok: true, id: newId } }
+    } else if (action === 'delete') {
+      packs.splice(index, 1)
+    } else if (action === 'members') {
+      const members = Array.isArray(body?.members) ? body.members : null
+      if (!members) return { status: 400, body: { ok: false, error: 'members must be an array' } }
+      pack.members = members.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim())
+    } else if (action === 'reorder') {
+      const ids = Array.isArray(body?.ids) ? body.ids : []
+      for (let i = 0; i < ids.length; i += 1) {
+        const target = packs.find((candidate) => candidate.id === ids[i])
+        if (target) target.order = i
+      }
+      packs.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    } else {
+      return { status: 400, body: { ok: false, error: 'unknown action: ' + action } }
+    }
+
+    saveState(state)
+    invalidateAll()
+    return { status: 200, body: { ok: true, packs: packs.length } }
+  })
+
   // 新出现的 Agent 及时挂上策略 provider（轮询足够便宜，且不依赖内部事件名）。
   const timer = setInterval(() => {
     try {
