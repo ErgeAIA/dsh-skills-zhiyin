@@ -216,7 +216,7 @@ window.__ModuleLoader__.load({
       head: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
       title: { fontSize: 20, fontWeight: 600, margin: 0 },
       subtitle: { opacity: 0.6, fontSize: 13 },
-      row: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 14 },
+      row: { display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginTop: 14 },
       switchRow: {
         display: 'flex',
         alignItems: 'center',
@@ -270,18 +270,18 @@ window.__ModuleLoader__.load({
       hint: { fontSize: 12, opacity: 0.6 },
       grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: 10,
-        marginTop: 18,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(104px, 1fr))',
+        gap: 8,
+        marginTop: 16,
       },
       card: {
         border: '1px solid rgba(128,128,128,0.28)',
         borderRadius: 10,
-        padding: '10px 12px',
+        padding: '8px 10px',
       },
       cardActive: { borderColor: 'rgba(96,165,250,0.85)' },
       statLabel: { fontSize: 12, opacity: 0.6 },
-      statValue: { fontSize: 22, fontWeight: 600, marginTop: 2 },
+      statValue: { fontSize: 20, fontWeight: 600, marginTop: 2 },
       bar: {
         height: 6,
         borderRadius: 999,
@@ -295,8 +295,8 @@ window.__ModuleLoader__.load({
         background: pct > 100 ? '#d9534f' : pct > 80 ? '#e0a33e' : '#4a9d6a',
       }),
       input: {
-        flex: '1 1 220px',
-        minWidth: 180,
+        flex: '1 1 200px',
+        minWidth: 160,
         padding: '6px 10px',
         borderRadius: 8,
         border: '1px solid rgba(128,128,128,0.35)',
@@ -323,21 +323,37 @@ window.__ModuleLoader__.load({
         color: 'inherit',
         cursor: 'pointer',
       },
-      list: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 },
+      list: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 },
       item: {
-        border: '1px solid rgba(128,128,128,0.18)',
-        borderRadius: 8,
-        padding: '6px 10px',
+        border: '1px solid rgba(128,128,128,0.16)',
+        borderRadius: 10,
+        padding: '10px 12px',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        minHeight: 40,
+        gap: 12,
+        minHeight: 56,
+        background: 'rgba(128,128,128,0.035)',
+      },
+      iconBtn: {
+        flex: '0 0 auto',
+        width: 24,
+        height: 24,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 6,
+        border: '1px solid rgba(128,128,128,0.3)',
+        background: 'transparent',
+        color: 'inherit',
+        cursor: 'pointer',
+        fontSize: 13,
+        opacity: 0.7,
       },
       itemMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
       itemHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
       name: {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 12.5,
+        fontSize: 13,
         flex: '0 1 auto',
         minWidth: 0,
         whiteSpace: 'nowrap',
@@ -354,12 +370,13 @@ window.__ModuleLoader__.load({
         flex: '0 0 auto',
       }),
       desc: {
-        fontSize: 11.5,
-        opacity: 0.58,
-        lineHeight: 1.35,
-        whiteSpace: 'nowrap',
+        fontSize: 12,
+        opacity: 0.6,
+        lineHeight: 1.45,
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
         overflow: 'hidden',
-        textOverflow: 'ellipsis',
       },
       meta: {
         fontSize: 11,
@@ -401,6 +418,19 @@ window.__ModuleLoader__.load({
               '?',
             )
           : null,
+      )
+    }
+
+    function Toggle({ checked, disabled, title, onChange }) {
+      return h(
+        'label',
+        { style: { flex: '0 0 auto', cursor: 'pointer', display: 'inline-flex' }, title: title ?? undefined },
+        h(
+          'span',
+          { style: { ...css.track, ...(checked ? css.trackOn : null) } },
+          h('span', { style: { ...css.knob, ...(checked ? css.knobOn : null) } }),
+        ),
+        h('input', { type: 'checkbox', checked, disabled, onChange, style: { display: 'none' } }),
       )
     }
 
@@ -665,11 +695,10 @@ window.__ModuleLoader__.load({
                 h(
                   'div',
                   { key: pack.id, style: css.item },
-                  h('input', {
-                    type: 'checkbox',
-                    style: css.switch,
+                  h(Toggle, {
                     checked: pack.enabled !== false,
                     disabled: busy,
+                    title: pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中'),
                     onChange: () => write('/zhiyin/pack', { action: 'toggle', id: pack.id, enabled: pack.enabled === false }),
                   }),
                   h(
@@ -702,7 +731,7 @@ window.__ModuleLoader__.load({
                   ),
                   h(
                     'button',
-                    { type: 'button', style: css.btn, onClick: () => write('/zhiyin/pack', { action: 'delete', id: pack.id }), disabled: busy },
+                    { type: 'button', style: css.iconBtn, title: say('packDelete', '删除技能包'), onClick: () => write('/zhiyin/pack', { action: 'delete', id: pack.id }), disabled: busy },
                     '×',
                   ),
                 ),
@@ -722,10 +751,9 @@ window.__ModuleLoader__.load({
                       {
                         key: skill.name,
                         style: skill.enabled === false ? { ...css.item, ...css.itemOff } : css.item,
+                        title: skill.linkTarget ?? skill.logicalPath ?? skill.path ?? undefined,
                       },
-                      h('input', {
-                        type: 'checkbox',
-                        style: css.switch,
+                      h(Toggle, {
                         checked: skill.enabled !== false,
                         disabled: busy,
                         title: skill.hiddenReason
@@ -745,7 +773,7 @@ window.__ModuleLoader__.load({
                             {
                               type: 'button',
                               title: say('uninstallHint', '移入归档目录，可恢复'),
-                              style: css.btn,
+                              style: css.iconBtn,
                               disabled: busy,
                               onClick: () => {
                                 if (window.confirm(say('uninstallAsk', '卸载并把技能移入归档目录？') + ' ' + skill.name)) {
@@ -753,7 +781,7 @@ window.__ModuleLoader__.load({
                                 }
                               },
                             },
-                            say('uninstall', '卸载'),
+                            '⤓',
                           )
                         : null,
                       h(
@@ -790,12 +818,6 @@ window.__ModuleLoader__.load({
                         skill.description
                           ? h('div', { style: css.desc }, skill.description)
                           : null,
-                        h(
-                          'div',
-                          { style: css.meta, title: skill.linkTarget ?? skill.logicalPath ?? skill.path ?? '' },
-                          skill.logicalPath ?? skill.path ?? '',
-                          skill.linkTarget ? `  →  ${skill.linkTarget}` : '',
-                        ),
                       ),
                     ),
                   ),
