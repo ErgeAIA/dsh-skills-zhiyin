@@ -49,6 +49,15 @@ window.__ModuleLoader__.load({
         selectNone: '全不选',
         save: '保存',
         cancel: '取消',
+        install: '安装技能',
+        installHint: '填一个含 SKILL.md 的文件夹绝对路径；安装只新建目录，不会改写已有技能',
+        installPath: '文件夹路径，如 D:\skills\my-skill',
+        installName: '技能名（留空则用文件夹名）',
+        installUser: '用户目录 ~/.dsh/skills',
+        installProject: '项目 .dsh/skills',
+        uninstall: '卸载',
+        uninstallAsk: '卸载并把技能移入归档目录？',
+        uninstallHint: '移入归档目录，可恢复',
         linkBadgeTitle: '符号链接，实体在 ',
         statBundled: '内置技能',
         sourceBundled: '内置',
@@ -108,6 +117,15 @@ window.__ModuleLoader__.load({
         selectNone: 'None',
         save: 'Save',
         cancel: 'Cancel',
+        install: 'Install',
+        installHint: 'Absolute path to a folder containing SKILL.md; install only creates a new directory',
+        installPath: 'Folder path, e.g. D:\skills\my-skill',
+        installName: 'Skill name (blank = folder name)',
+        installUser: 'User ~/.dsh/skills',
+        installProject: 'Project .dsh/skills',
+        uninstall: 'Uninstall',
+        uninstallAsk: 'Move this skill into the archive directory?',
+        uninstallHint: 'Moves into the archive directory; recoverable',
         linkBadgeTitle: 'Symbolic link, real path: ',
         statBundled: 'Bundled',
         sourceBundled: 'bundled',
@@ -379,6 +397,10 @@ window.__ModuleLoader__.load({
       const [draftMembers, setDraftMembers] = React.useState([])
       const [memberQuery, setMemberQuery] = React.useState('')
       const [creating, setCreating] = React.useState(false)
+      const [installing, setInstalling] = React.useState(false)
+      const [installPath, setInstallPath] = React.useState('')
+      const [installName, setInstallName] = React.useState('')
+      const [installTarget, setInstallTarget] = React.useState('user')
       const [draftName, setDraftName] = React.useState('')
 
       const load = React.useCallback(() => {
@@ -580,6 +602,21 @@ window.__ModuleLoader__.load({
               }),
               h(
                 'button',
+                {
+                  type: 'button',
+                  style: css.btn,
+                  disabled: busy,
+                  onClick: () => {
+                    setInstallPath('')
+                    setInstallName('')
+                    setInstallTarget('user')
+                    setInstalling(true)
+                  },
+                },
+                say('install', '安装技能'),
+              ),
+              h(
+                'button',
                 { type: 'button', style: css.btn, onClick: load, disabled: state.loading },
                 state.loading ? say('loading', '正在观测…') : say('refresh', '重新观测'),
               ),
@@ -671,6 +708,23 @@ window.__ModuleLoader__.load({
                             source: skill.source,
                           }),
                       }),
+                      skill.source === 'user-dsh' || skill.source === 'user-agents'
+                        ? h(
+                            'button',
+                            {
+                              type: 'button',
+                              title: say('uninstallHint', '移入归档目录，可恢复'),
+                              style: css.btn,
+                              disabled: busy,
+                              onClick: () => {
+                                if (window.confirm(say('uninstallAsk', '卸载并把技能移入归档目录？') + ' ' + skill.name)) {
+                                  write('/zhiyin/uninstall', { name: skill.name })
+                                }
+                              },
+                            },
+                            say('uninstall', '卸载'),
+                          )
+                        : null,
                       h(
                         'div',
                         { style: css.itemMain },
@@ -826,7 +880,74 @@ window.__ModuleLoader__.load({
             )
           : null,
 
-        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '技能包已接入；组合与安装卸载在下一版。')),
+        installing
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: css.modal },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('install', '安装技能'))),
+                h('p', { style: css.hint }, say('installHint', '填一个含 SKILL.md 的文件夹绝对路径；安装只新建目录，不会改写已有技能')),
+                h('input', {
+                  style: css.input,
+                  value: installPath,
+                  placeholder: say('installPath', '文件夹路径，如 D:\\skills\\my-skill'),
+                  onChange: (event) => setInstallPath(event.target.value),
+                }),
+                h('input', {
+                  style: css.input,
+                  value: installName,
+                  placeholder: say('installName', '技能名（留空则用文件夹名）'),
+                  onChange: (event) => setInstallName(event.target.value),
+                }),
+                h(
+                  'div',
+                  { style: { display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' } },
+                  h('label', { style: { display: 'flex', gap: 5, alignItems: 'center' } },
+                    h('input', {
+                      type: 'radio',
+                      checked: installTarget === 'user',
+                      onChange: () => setInstallTarget('user'),
+                    }),
+                    say('installUser', '用户目录 ~/.dsh/skills'),
+                  ),
+                  h('label', { style: { display: 'flex', gap: 5, alignItems: 'center' } },
+                    h('input', {
+                      type: 'radio',
+                      checked: installTarget === 'project',
+                      onChange: () => setInstallTarget('project'),
+                    }),
+                    say('installProject', '项目 .dsh/skills'),
+                  ),
+                ),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setInstalling(false) }, say('cancel', '取消')),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.btn,
+                      disabled: busy || installPath.trim() === '',
+                      onClick: () => {
+                        write('/zhiyin/install', {
+                          path: installPath.trim(),
+                          name: installName.trim(),
+                          target: installTarget,
+                        })
+                        setInstalling(false)
+                      },
+                    },
+                    say('install', '安装技能'),
+                  ),
+                ),
+              ),
+            )
+          : null,
+
+        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '技能包与安装卸载已接入；组合在下一版。')),
       )
     }
 

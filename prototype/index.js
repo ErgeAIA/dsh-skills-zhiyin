@@ -11,9 +11,9 @@
  * 为什么不走 Remote：Typert 的客户端装配是构建期固定清单、生成器不随
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
-import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 import { stateDir } from './paths.js'
 
@@ -140,6 +140,67 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, packs: packs.length } }
   })
 
+  post(ctx, '/zhiyin/install', async (body) => {
+    const source = typeof body?.path === 'string' ? body.path.trim() : ''
+    if (!source) return { status: 400, body: { ok: false, error: 'path is required' } }
+    let stat
+    try {
+      stat = statSync(source)
+    } catch (error) {
+      return { status: 404, body: { ok: false, error: 'source not found' } }
+    }
+    if (!stat.isDirectory()) return { status: 400, body: { ok: false, error: 'source must be a directory' } }
+    if (!existsSync(join(source, 'SKILL.md'))) {
+      return { status: 400, body: { ok: false, error: 'source has no SKILL.md' } }
+    }
+    const name = (typeof body?.name === 'string' && body.name.trim()) || basename(source).replace(/[\\/]+$/, '')
+    if (!/^[a-z0-9][a-z0-9._-]*$/i.test(name)) {
+      return { status: 400, body: { ok: false, error: 'invalid skill name: ' + name } }
+    }
+    const root = installRoot(ctx, body?.target)
+    if (!root) return { status: 400, body: { ok: false, error: 'target root unavailable' } }
+    const dest = join(root, name)
+    if (existsSync(dest)) {
+      return { status: 409, body: { ok: false, error: 'already exists: ' + dest } }
+    }
+    try {
+      mkdirSync(root, { recursive: true })
+      cpSync(source, dest, { recursive: true, errorOnExist: true, force: false })
+    } catch (error) {
+      return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
+    }
+    note('skill-installed', { name, dest })
+    invalidateAll()
+    return { status: 200, body: { ok: true, name, dest } }
+  })
+
+  post(ctx, '/zhiyin/uninstall', async (body) => {
+    const name = typeof body?.name === 'string' ? body.name.trim() : ''
+    if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+    const roots = [installRoot(ctx, 'user'), installRoot(ctx, 'project')].filter(Boolean)
+    let from = null
+    for (const root of roots) {
+      const candidate = join(root, name)
+      if (existsSync(candidate)) {
+        from = candidate
+        break
+      }
+    }
+    if (!from) return { status: 404, body: { ok: false, error: 'skill not found in managed roots' } }
+    const archiveRoot = join(stateDir(), 'archive')
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const to = join(archiveRoot, stamp + '-' + name)
+    try {
+      mkdirSync(archiveRoot, { recursive: true })
+      renameSync(from, to)
+    } catch (error) {
+      return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
+    }
+    note('skill-archived', { name, from, to })
+    invalidateAll()
+    return { status: 200, body: { ok: true, name, to } }
+  })
+
   // 新出现的 Agent 及时挂上策略 provider（轮询足够便宜，且不依赖内部事件名）。
   const timer = setInterval(() => {
     try {
@@ -150,6 +211,20 @@ export function apply(ctx) {
   }, 2000)
   if (typeof timer?.unref === 'function') timer.unref()
   ctx.effect(() => () => clearInterval(timer))
+}
+
+function installRoot(ctx, target) {
+  if (target !== 'project') return join(homedir(), '.dsh', 'skills')
+  const agents = typeof ctx.agents?.list === 'function' ? ctx.agents.list() : []
+  for (const agent of agents) {
+    try {
+      const cwd = ctx.workingDirectory?.get?.(agent)
+      if (typeof cwd === 'string' && cwd.length > 0) return join(cwd, '.dsh', 'skills')
+    } catch {
+      /* 拿不到工作目录就继续找下一个 */
+    }
+  }
+  return null
 }
 
 function post(ctx, path, run) {
