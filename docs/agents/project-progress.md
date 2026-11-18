@@ -23,7 +23,15 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-18 23:4x UI 精修第一轮（可读性）
+- **最后更新**：2026-11-19 00:1x UI 精修第二轮（去边框 / 降噪 / 主题一致）
+  - 全局去边框：卡片、按钮、图标按钮、输入框、文本域、弹窗、分段控件、徽标、pill、帮助圆点全部改底色，border 计数归零
+  - 高亮色去蓝（rgba(96,165,250)→中性 rgba(128,128,128,…)），跟随宿主暖色主题
+  - 行内三枚徽标 →「已停用」淡橙胶囊 + 一行 meta 文本（模型 · 用户／仅模型／仅用户／内部）+ 软链 ⛓ 小字
+  - 预算从第六张卡拆成横贯整行的细条（标签／数字／4px 进度条／观测完整度）
+  - 搜索框常驻，占位随 tab 变（技能包时搜包名或成员）
+  - 统计卡网格 104 → 118px（少一张卡后一行仍放满）
+  - node --check exit 0；border 计数 0；蓝色引用 0
+  - 上一轮：UI 精修第一轮（可读性）
   - 技能行：checkbox → 无文字开关图标（32×18 轨道），行高 40→56，行内 gap 10→12，加浅底与 10px 圆角
   - 「卸载」文字按钮 → ⤓ 图标按钮（css.iconBtn），技能包「删除」同样改图标
   - 路径行从行内移除，改挂整行 title（悬停可见），减少每行一行噪声
