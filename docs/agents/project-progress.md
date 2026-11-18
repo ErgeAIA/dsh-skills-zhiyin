@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-19 00:3x UI 精修第三轮（开关可读性 / 全图标化）
+- **最后更新**：2026-11-19 00:5x UI 精修第四轮（tuyi 审查 P0/P1 修复）
+  - P0：技能包删除从 close（×）改 trash 图标 + window.confirm（文案「删除技能包？包内技能不会被卸载。」）；close 会被读成「关闭面板」
+  - P1：安装技能图标只在「技能列表」页出现，导入 txt 只在「技能包」页出现——两者同为「从外部引入」，16px 下轮廓相近且原先同排并置
+  - P1：8 个图标按钮补 aria-label（原先只有 title，屏幕阅读器读不到名字）
+  - 保留：卸载用 archive（槽位是「动作·可恢复」，字面即归档，语义正确；不用 trash 以免读成删除）
+  - 未做：开关开态增加非颜色区分（P2 建议 knob 加内描边/对勾），因用户要求「任何图标、文字徽章都不要带边框」，暂缓
+  - border 计数 0；node --check 双半边 exit 0
+  - 上一轮：UI 精修第三轮（开关可读性 / 全图标化）
   - 开关：32×18 → 36×20，knob 14 → 16 加投影；开态改用品牌色 var(--zhiyin-accent, #e0743c)，关态淡灰轨道，两态对比明显
   - 品牌色来源：夜灯主题未暴露稳定 accent token（dsh-dream-skin 只有 --dsh-dream-skin-* 填充变量），故用 CSS 变量 + 橙色兜底，使用者可用 --zhiyin-accent 覆盖
   - 新增内联 SVG 图标组件 Icon（users/archive/close/plus/install/import/refresh），8 处文字按钮改图标按钮，全部带 title
