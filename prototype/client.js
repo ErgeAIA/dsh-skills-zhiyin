@@ -36,6 +36,19 @@ window.__ModuleLoader__.load({
         search: '按名称或描述搜索',
         filterHint: '点一下只列这一类，再点一下回到全部',
         linkBadge: '软链',
+        tabList: '技能列表',
+        tabPacks: '技能包',
+        packNew: '+ 新建技能包',
+        packMembers: '管理成员',
+        packMembersTitle: '选择成员',
+        packEmpty: '还没有成员',
+        packOn: '启用中',
+        packOff: '已停用',
+        packNamePlaceholder: '技能包名称',
+        selectAll: '全选',
+        selectNone: '全不选',
+        save: '保存',
+        cancel: '取消',
         linkBadgeTitle: '符号链接，实体在 ',
         statBundled: '内置技能',
         sourceBundled: '内置',
@@ -82,6 +95,19 @@ window.__ModuleLoader__.load({
         search: 'Search name or description',
         filterHint: 'Click a card to list that group; click again for all',
         linkBadge: 'link',
+        tabList: 'Skills',
+        tabPacks: 'Packs',
+        packNew: 'New pack',
+        packMembers: 'Members',
+        packMembersTitle: 'Pick members',
+        packEmpty: 'No members yet',
+        packOn: 'on',
+        packOff: 'off',
+        packNamePlaceholder: 'Pack name',
+        selectAll: 'All',
+        selectNone: 'None',
+        save: 'Save',
+        cancel: 'Cancel',
         linkBadgeTitle: 'Symbolic link, real path: ',
         statBundled: 'Bundled',
         sourceBundled: 'bundled',
@@ -108,6 +134,55 @@ window.__ModuleLoader__.load({
 
     const css = {
       page: { padding: '4px 0 48px', color: 'inherit' },
+      overlay: {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.55)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 40,
+      },
+      modal: {
+        width: 560,
+        maxWidth: '92vw',
+        maxHeight: '76vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--vscode-editorWidget-background, #252526)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 8,
+        boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
+        padding: 14,
+        gap: 10,
+      },
+      modalHead: { display: 'flex', alignItems: 'center', gap: 8 },
+      modalTitle: { fontSize: 13, fontWeight: 600, flex: '1 1 auto', minWidth: 0 },
+      modalBody: {
+        flex: '1 1 auto',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        minHeight: 120,
+      },
+      modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
+      seg: {
+        display: 'inline-flex',
+        border: '1px solid rgba(255,255,255,0.14)',
+        borderRadius: 6,
+        overflow: 'hidden',
+      },
+      segBtn: {
+        border: 'none',
+        background: 'transparent',
+        color: 'inherit',
+        fontSize: 12,
+        padding: '3px 10px',
+        cursor: 'pointer',
+        opacity: 0.7,
+      },
+      segBtnOn: { background: 'rgba(96,165,250,0.18)', opacity: 1, fontWeight: 600 },
       head: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
       title: { fontSize: 20, fontWeight: 600, margin: 0 },
       subtitle: { opacity: 0.6, fontSize: 13 },
@@ -299,6 +374,12 @@ window.__ModuleLoader__.load({
       const [query, setQuery] = React.useState('')
       const [filter, setFilter] = React.useState('all')
       const [busy, setBusy] = React.useState(false)
+      const [tab, setTab] = React.useState('list')
+      const [editing, setEditing] = React.useState(null)
+      const [draftMembers, setDraftMembers] = React.useState([])
+      const [memberQuery, setMemberQuery] = React.useState('')
+      const [creating, setCreating] = React.useState(false)
+      const [draftName, setDraftName] = React.useState('')
 
       const load = React.useCallback(() => {
         setState((previous) => ({ ...previous, loading: true, error: null }))
@@ -468,12 +549,21 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               { style: { ...css.row, justifyContent: 'space-between' } },
-              h('input', {
+              h(
+                'div',
+                { style: css.seg },
+                h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, say('tabList', '技能列表')),
+                h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, say('tabPacks', '技能包')),
+              ),
+              tab === 'packs'
+                ? h('button', { type: 'button', style: css.btn, onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, say('packNew', '+ 新建技能包'))
+                : null,
+              tab === 'list' ? h('input', {
                 style: css.input,
                 value: query,
                 placeholder: say('search', '按名称或描述搜索'),
                 onChange: (event) => setQuery(event.target.value),
-              }),
+              }) : null,
               h(Switch, {
                 label: say('agentsRoot', '启用 .agents 技能目录'),
                 hint: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
@@ -496,7 +586,63 @@ window.__ModuleLoader__.load({
             )
           : null,
 
-        data
+        data && tab === 'packs'
+          ? h(
+              'div',
+              { style: css.list },
+              (data.packs ?? []).length === 0
+                ? h('div', { style: css.hint }, say('packEmptyHint', '还没有技能包；点右上角新建，再把技能勾进来'))
+                : null,
+              (data.packs ?? []).map((pack) =>
+                h(
+                  'div',
+                  { key: pack.id, style: css.item },
+                  h('input', {
+                    type: 'checkbox',
+                    style: css.switch,
+                    checked: pack.enabled !== false,
+                    disabled: busy,
+                    onChange: () => write('/zhiyin/pack', { action: 'toggle', id: pack.id, enabled: pack.enabled === false }),
+                  }),
+                  h(
+                    'div',
+                    { style: css.itemMain },
+                    h(
+                      'div',
+                      { style: css.itemHead },
+                      h('span', { style: css.name }, pack.name),
+                      h('span', { style: css.badge(true) }, `${pack.members?.length ?? 0} 个技能`),
+                      h('span', { style: { ...css.hint, marginLeft: 'auto' } }, pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中')),
+                    ),
+                    pack.members?.length
+                      ? h('div', { style: css.desc }, pack.members.join(' · '))
+                      : h('div', { style: css.desc }, say('packEmpty', '还没有成员')),
+                  ),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.btn,
+                      disabled: busy,
+                      onClick: () => {
+                        setDraftMembers(pack.members ?? [])
+                        setMemberQuery('')
+                        setEditing(pack.id)
+                      },
+                    },
+                    say('packMembers', '管理成员'),
+                  ),
+                  h(
+                    'button',
+                    { type: 'button', style: css.btn, onClick: () => write('/zhiyin/pack', { action: 'delete', id: pack.id }), disabled: busy },
+                    '×',
+                  ),
+                ),
+              ),
+            )
+          : null,
+
+        data && tab === 'list'
           ? h(
               'div',
               { style: css.list },
@@ -571,7 +717,116 @@ window.__ModuleLoader__.load({
             )
           : h('p', { style: { ...css.hint, marginTop: 12 } }, say('loading', '正在观测…')),
 
-        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '技能包与组合在下一版接入。')),
+        editing
+          ? (function renderEditor() {
+              const pack = (data.packs ?? []).find((candidate) => candidate.id === editing)
+              if (!pack) return null
+              const needle = memberQuery.trim().toLowerCase()
+              const pool = scoped.filter(
+                (skill) => needle === '' || skill.name.toLowerCase().includes(needle),
+              )
+              return h(
+                'div',
+                { style: css.overlay },
+                h(
+                  'div',
+                  { style: css.modal },
+                  h(
+                    'div',
+                    { style: css.modalHead },
+                    h('span', { style: css.modalTitle }, pack.name + ' · ' + say('packMembersTitle', '选择成员')),
+                    h('button', { type: 'button', style: css.btn, onClick: () => setEditing(null) }, '×'),
+                  ),
+                  h('input', {
+                    style: css.input,
+                    value: memberQuery,
+                    placeholder: say('search', '按名称搜索'),
+                    onChange: (event) => setMemberQuery(event.target.value),
+                  }),
+                  h(
+                    'div',
+                    { style: css.modalBody },
+                    pool.map((skill) =>
+                      h(
+                        'label',
+                        { key: skill.name, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' } },
+                        h('input', {
+                          type: 'checkbox',
+                          style: css.switch,
+                          checked: draftMembers.includes(skill.name),
+                          onChange: () =>
+                            setDraftMembers((previous) =>
+                              previous.includes(skill.name)
+                                ? previous.filter((name) => name !== skill.name)
+                                : [...previous, skill.name],
+                            ),
+                        }),
+                        h('span', { style: css.name }, skill.name),
+                        h('span', { style: { ...css.hint, marginLeft: 'auto' } }, sourceLabel(skill)),
+                      ),
+                    ),
+                  ),
+                  h(
+                    'div',
+                    { style: css.modalFoot },
+                    h('button', { type: 'button', style: css.btn, onClick: () => setDraftMembers(pool.map((skill) => skill.name)) }, say('selectAll', '全选')),
+                    h('button', { type: 'button', style: css.btn, onClick: () => setDraftMembers([]) }, say('selectNone', '全不选')),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: css.btn,
+                        disabled: busy,
+                        onClick: () => {
+                          write('/zhiyin/pack', { action: 'members', id: editing, members: draftMembers })
+                          setEditing(null)
+                        },
+                      },
+                      say('save', '保存'),
+                    ),
+                  ),
+                ),
+              )
+            })()
+          : null,
+
+        creating
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: css.modal },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packNew', '新建技能包'))),
+                h('input', {
+                  style: css.input,
+                  value: draftName,
+                  placeholder: say('packNamePlaceholder', '技能包名称'),
+                  onChange: (event) => setDraftName(event.target.value),
+                }),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setCreating(false) }, say('cancel', '取消')),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.btn,
+                      disabled: busy || draftName.trim() === '',
+                      onClick: () => {
+                        write('/zhiyin/pack', { action: 'create', name: draftName.trim() })
+                        setCreating(false)
+                      },
+                    },
+                    say('save', '保存'),
+                  ),
+                ),
+              ),
+            )
+          : null,
+
+        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '技能包已接入；组合与安装卸载在下一版。')),
       )
     }
 
