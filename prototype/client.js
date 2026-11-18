@@ -46,6 +46,11 @@ window.__ModuleLoader__.load({
         packOff: '已停用',
         packNamePlaceholder: '技能包名称',
         packImport: '导入 txt',
+        searchPacks: '搜技能包名或成员',
+        metaBoth: '模型 · 用户',
+        metaModel: '仅模型',
+        metaUser: '仅用户',
+        metaInternal: '内部',
         importTitle: '导入技能包',
         importHint: '一行一个技能：目录名 | 来源 | owner/repo | 分支 | 子目录；# 开头的行会被忽略',
         importPathPlaceholder: 'txt 文件绝对路径',
@@ -120,6 +125,11 @@ window.__ModuleLoader__.load({
         packOff: 'off',
         packNamePlaceholder: 'Pack name',
         packImport: 'Import txt',
+        searchPacks: 'Search packs or members',
+        metaBoth: 'model · user',
+        metaModel: 'model only',
+        metaUser: 'user only',
+        metaInternal: 'internal',
         importTitle: 'Import pack',
         importHint: 'One skill per line: name | source | owner/repo | branch | subdir; lines starting with # are ignored',
         importPathPlaceholder: 'Absolute path to the txt file',
@@ -180,8 +190,8 @@ window.__ModuleLoader__.load({
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--vscode-editorWidget-background, #252526)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        borderRadius: 8,
+        border: 'none',
+        borderRadius: 10,
         boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
         padding: 14,
         gap: 10,
@@ -199,8 +209,8 @@ window.__ModuleLoader__.load({
       modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
       seg: {
         display: 'inline-flex',
-        border: '1px solid rgba(255,255,255,0.14)',
-        borderRadius: 6,
+        borderRadius: 8,
+        background: 'rgba(128,128,128,0.12)',
         overflow: 'hidden',
       },
       segBtn: {
@@ -212,7 +222,7 @@ window.__ModuleLoader__.load({
         cursor: 'pointer',
         opacity: 0.7,
       },
-      segBtnOn: { background: 'rgba(96,165,250,0.18)', opacity: 1, fontWeight: 600 },
+      segBtnOn: { background: 'rgba(128,128,128,0.26)', opacity: 1, fontWeight: 600 },
       head: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
       title: { fontSize: 20, fontWeight: 600, margin: 0 },
       subtitle: { opacity: 0.6, fontSize: 13 },
@@ -235,7 +245,7 @@ window.__ModuleLoader__.load({
         transition: 'background 120ms',
         flex: '0 0 auto',
       },
-      trackOn: { background: 'rgba(96,165,250,0.9)' },
+      trackOn: { background: 'rgba(128,128,128,0.85)' },
       knob: {
         position: 'absolute',
         top: 2,
@@ -251,7 +261,7 @@ window.__ModuleLoader__.load({
         width: 15,
         height: 15,
         borderRadius: '50%',
-        border: '1px solid currentColor',
+        background: 'rgba(128,128,128,0.18)',
         fontSize: 10,
         lineHeight: '13px',
         textAlign: 'center',
@@ -264,22 +274,22 @@ window.__ModuleLoader__.load({
         fontSize: 12,
         padding: '2px 10px',
         borderRadius: 999,
-        border: '1px solid currentColor',
+        background: 'rgba(128,128,128,0.18)',
         opacity: on ? 1 : 0.55,
       }),
       hint: { fontSize: 12, opacity: 0.6 },
       grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(104px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(118px, 1fr))',
         gap: 8,
         marginTop: 16,
       },
       card: {
-        border: '1px solid rgba(128,128,128,0.28)',
         borderRadius: 10,
         padding: '8px 10px',
+        background: 'rgba(128,128,128,0.07)',
       },
-      cardActive: { borderColor: 'rgba(96,165,250,0.85)' },
+      cardActive: { background: 'rgba(128,128,128,0.2)' },
       statLabel: { fontSize: 12, opacity: 0.6 },
       statValue: { fontSize: 20, fontWeight: 600, marginTop: 2 },
       bar: {
@@ -294,13 +304,37 @@ window.__ModuleLoader__.load({
         width: `${Math.min(100, pct)}%`,
         background: pct > 100 ? '#d9534f' : pct > 80 ? '#e0a33e' : '#4a9d6a',
       }),
+      budgetRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 12,
+        padding: '0 2px',
+      },
+      budgetLabel: { fontSize: 11.5, opacity: 0.55, flex: '0 0 auto' },
+      budgetNum: { fontSize: 12, fontWeight: 600, flex: '0 0 auto' },
+      budgetCap: { fontSize: 11, opacity: 0.45, fontWeight: 400 },
+      budgetTrack: {
+        flex: '1 1 auto',
+        height: 4,
+        borderRadius: 999,
+        background: 'rgba(128,128,128,0.18)',
+        overflow: 'hidden',
+        minWidth: 80,
+      },
+      budgetFill: (pct) => ({
+        display: 'block',
+        height: '100%',
+        width: `${Math.min(100, pct)}%`,
+        background: pct > 100 ? '#d9534f' : pct > 80 ? '#e0a33e' : 'rgba(128,128,128,0.55)',
+      }),
       input: {
         flex: '1 1 200px',
         minWidth: 160,
         padding: '6px 10px',
         borderRadius: 8,
-        border: '1px solid rgba(128,128,128,0.35)',
-        background: 'transparent',
+        border: 'none',
+        background: 'rgba(128,128,128,0.12)',
         color: 'inherit',
       },
       textarea: {
@@ -308,8 +342,8 @@ window.__ModuleLoader__.load({
         minHeight: 120,
         padding: '6px 10px',
         borderRadius: 8,
-        border: '1px solid rgba(128,128,128,0.35)',
-        background: 'transparent',
+        border: 'none',
+        background: 'rgba(128,128,128,0.12)',
         color: 'inherit',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSize: 12,
@@ -318,14 +352,13 @@ window.__ModuleLoader__.load({
       btn: {
         padding: '6px 12px',
         borderRadius: 8,
-        border: '1px solid rgba(128,128,128,0.35)',
-        background: 'transparent',
+        border: 'none',
+        background: 'rgba(128,128,128,0.14)',
         color: 'inherit',
         cursor: 'pointer',
       },
       list: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 },
       item: {
-        border: '1px solid rgba(128,128,128,0.16)',
         borderRadius: 10,
         padding: '10px 12px',
         display: 'flex',
@@ -342,7 +375,6 @@ window.__ModuleLoader__.load({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 6,
-        border: '1px solid rgba(128,128,128,0.3)',
         background: 'transparent',
         color: 'inherit',
         cursor: 'pointer',
@@ -362,13 +394,24 @@ window.__ModuleLoader__.load({
       },
       badge: (on) => ({
         fontSize: 10.5,
-        padding: '0 5px',
+        padding: '0 6px',
         borderRadius: 999,
-        border: '1px solid currentColor',
-        opacity: on ? 0.9 : 0.3,
-        lineHeight: '16px',
+        border: 'none',
+        background: 'rgba(128,128,128,0.16)',
+        opacity: on ? 0.95 : 0.3,
+        lineHeight: '17px',
         flex: '0 0 auto',
       }),
+      badgeWarn: {
+        fontSize: 10.5,
+        padding: '0 6px',
+        borderRadius: 999,
+        border: 'none',
+        background: 'rgba(200,120,60,0.22)',
+        lineHeight: '17px',
+        flex: '0 0 auto',
+      },
+      metaText: { fontSize: 10.5, opacity: 0.5, flex: '0 0 auto', letterSpacing: '0.02em' },
       desc: {
         fontSize: 12,
         opacity: 0.6,
@@ -605,22 +648,19 @@ window.__ModuleLoader__.load({
               'div',
               { style: css.grid },
               statCards(data, counts, say, filter, setFilter),
-              h(
-                'div',
-                { style: css.card },
-                h('div', { style: css.statLabel }, say('budget', '目录字符数')),
-                h(
-                  'div',
-                  { style: css.statValue },
-                  String(data.catalogChars),
-                  h('span', { style: { fontSize: 12, opacity: 0.55, marginLeft: 6 } }, `/ ${data.budgetChars}`),
-                ),
-                h('div', { style: css.bar }, h('div', { style: css.barFill(pct) })),
-                h(
-                  'div',
-                  { style: { ...css.statLabel, marginTop: 6 } },
-                  data.complete ? say('complete', '观测完整') : say('incomplete', '观测不完整（已列出确认到的部分）'),
-                ),
+            )
+          : null,
+
+        data
+          ? h(
+              'div',
+              { style: css.budgetRow },
+              h('span', { style: css.budgetLabel }, say('budget', '目录字符数')),
+              h('span', { style: css.budgetNum }, String(data.catalogChars),
+                h('span', { style: css.budgetCap }, ` / ${data.budgetChars}`)),
+              h('span', { style: css.budgetTrack }, h('span', { style: css.budgetFill(pct) })),
+              h('span', { style: { ...css.metaText, marginLeft: 8 } },
+                data.complete ? say('complete', '观测完整') : say('incomplete', '观测不完整'),
               ),
             )
           : null,
@@ -641,12 +681,15 @@ window.__ModuleLoader__.load({
                     h('button', { type: 'button', style: css.btn, onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, say('packImport', '导入 txt')),
                   )
                 : null,
-              tab === 'list' ? h('input', {
+              h('input', {
                 style: css.input,
                 value: query,
-                placeholder: say('search', '按名称或描述搜索'),
+                placeholder:
+                  tab === 'list'
+                    ? say('search', '按名称或描述搜索')
+                    : say('searchPacks', '搜技能包名或成员'),
                 onChange: (event) => setQuery(event.target.value),
-              }) : null,
+              }),
               h(Switch, {
                 label: say('agentsRoot', '启用 .agents 技能目录'),
                 hint: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
@@ -792,21 +835,27 @@ window.__ModuleLoader__.load({
                           { style: css.itemHead },
                           h('span', { style: css.name }, skill.name),
                         skill.enabled === false
-                          ? h('span', { style: css.badge(true) }, say('disabledBadge', '已停用'))
+                          ? h('span', { style: css.badgeWarn }, say('disabledBadge', '已停用'))
                           : null,
-                        h('span', { style: css.badge(skill.model) }, say('modelBadge', '模型')),
-                        h('span', { style: css.badge(skill.user) }, say('userBadge', '用户')),
-                        !skill.model && !skill.user
-                          ? h('span', { style: css.badge(true) }, say('internalBadge', '内部'))
-                          : null,
+                        h(
+                          'span',
+                          { style: css.metaText },
+                          skill.model && skill.user
+                            ? say('metaBoth', '模型 · 用户')
+                            : skill.model
+                              ? say('metaModel', '仅模型')
+                              : skill.user
+                                ? say('metaUser', '仅用户')
+                                : say('metaInternal', '内部'),
+                        ),
                         skill.linkTarget
                           ? h(
                               'span',
                               {
-                                style: css.badge(false),
+                                style: { ...css.metaText, opacity: 0.32 },
                                 title: `${say('linkBadgeTitle', '符号链接，实体在')}${skill.linkTarget}`,
                               },
-                              say('linkBadge', '软链'),
+                              '⛓',
                             )
                           : null,
                         h(
@@ -1086,7 +1135,7 @@ window.__ModuleLoader__.load({
               cursor: 'pointer',
               textAlign: 'left',
               color: 'inherit',
-              background: active ? 'rgba(96,165,250,0.12)' : 'transparent',
+              background: active ? 'rgba(128,128,128,0.18)' : 'transparent',
               font: 'inherit',
             },
           },
