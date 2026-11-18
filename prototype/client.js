@@ -237,26 +237,27 @@ window.__ModuleLoader__.load({
         userSelect: 'none',
       },
       track: {
-        width: 32,
-        height: 18,
+        width: 36,
+        height: 20,
         borderRadius: 999,
-        background: 'rgba(128,128,128,0.35)',
+        background: 'rgba(128,128,128,0.22)',
         position: 'relative',
         transition: 'background 120ms',
         flex: '0 0 auto',
       },
-      trackOn: { background: 'rgba(128,128,128,0.85)' },
+      trackOn: { background: 'var(--zhiyin-accent, #e0743c)' },
       knob: {
         position: 'absolute',
         top: 2,
         left: 2,
-        width: 14,
-        height: 14,
+        width: 16,
+        height: 16,
         borderRadius: '50%',
         background: '#fff',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
         transition: 'left 120ms',
       },
-      knobOn: { left: 16 },
+      knobOn: { left: 18 },
       help: {
         width: 15,
         height: 15,
@@ -369,13 +370,14 @@ window.__ModuleLoader__.load({
       },
       iconBtn: {
         flex: '0 0 auto',
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 6,
-        background: 'transparent',
+        borderRadius: 8,
+        border: 'none',
+        background: 'rgba(128,128,128,0.10)',
         color: 'inherit',
         cursor: 'pointer',
         fontSize: 13,
@@ -432,7 +434,66 @@ window.__ModuleLoader__.load({
       switch: { flex: '0 0 auto', cursor: 'pointer', width: 16, height: 16, accentColor: 'currentColor' },
     }
 
-    function Switch({ label, hint, checked, disabled, onChange }) {
+    const ICONS = {
+  users: [
+    ['path', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'],
+    ['circle', { cx: 9, cy: 7, r: 4 }],
+    ['path', 'M22 21v-2a4 4 0 0 0-3-3.87'],
+    ['path', 'M16 3.13a4 4 0 0 1 0 7.75'],
+  ],
+  archive: [
+    ['rect', { x: 3, y: 4, width: 18, height: 5, rx: 1 }],
+    ['path', 'M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9'],
+    ['path', 'M10 13h4'],
+  ],
+  close: [
+    ['path', 'M18 6 6 18'],
+    ['path', 'm6 6 12 12'],
+  ],
+  plus: [
+    ['path', 'M12 5v14'],
+    ['path', 'M5 12h14'],
+  ],
+  install: [
+    ['path', 'M12 3v11'],
+    ['path', 'm7 9 5 5 5-5'],
+    ['path', 'M4 21h16'],
+  ],
+  import: [
+    ['path', 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z'],
+    ['path', 'M14 3v5h5'],
+    ['path', 'M12 12v5'],
+    ['path', 'm9.5 14.5 2.5 2.5 2.5-2.5'],
+  ],
+  refresh: [
+    ['path', 'M21 12a9 9 0 1 1-3-6.7'],
+    ['path', 'M21 3v6h-6'],
+  ],
+}
+
+function Icon({ name, size = 15 }) {
+  const shapes = ICONS[name] ?? []
+  return h(
+    'svg',
+    {
+      width: size,
+      height: size,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.7,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      style: { flex: '0 0 auto', display: 'block' },
+      'aria-hidden': 'true',
+    },
+    shapes.map(([tag, spec], index) =>
+      tag === 'circle' ? h('circle', { key: index, ...spec }) : h('path', { key: index, d: spec }),
+    ),
+  )
+}
+
+function Switch({ label, hint, checked, disabled, onChange }) {
       return h(
         'label',
         { style: css.switchRow, title: hint ?? undefined },
@@ -677,8 +738,8 @@ window.__ModuleLoader__.load({
               ),
               tab === 'packs'
                 ? h('span', { style: { display: 'inline-flex', gap: 6 } },
-                    h('button', { type: 'button', style: css.btn, onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, say('packNew', '+ 新建技能包')),
-                    h('button', { type: 'button', style: css.btn, onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, say('packImport', '导入 txt')),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('packNew', '新建技能包'), onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 })),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('packImport', '导入 txt 技能包'), onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, h(Icon, { name: 'import', size: 14 })),
                   )
                 : null,
               h('input', {
@@ -708,7 +769,8 @@ window.__ModuleLoader__.load({
                 'button',
                 {
                   type: 'button',
-                  style: css.btn,
+                  style: css.iconBtn,
+                  title: say('install', '安装技能'),
                   disabled: busy,
                   onClick: () => {
                     setInstallPath('')
@@ -717,12 +779,12 @@ window.__ModuleLoader__.load({
                     setInstalling(true)
                   },
                 },
-                say('install', '安装技能'),
+                h(Icon, { name: 'install', size: 14 }),
               ),
               h(
                 'button',
-                { type: 'button', style: css.btn, onClick: load, disabled: state.loading },
-                state.loading ? say('loading', '正在观测…') : say('refresh', '重新观测'),
+                { type: 'button', style: css.iconBtn, title: say('refresh', '重新观测'), onClick: load, disabled: state.loading },
+                state.loading ? say('loading', '观测中') : h(Icon, { name: 'refresh', size: 14 }),
               ),
             )
           : null,
@@ -762,7 +824,8 @@ window.__ModuleLoader__.load({
                     'button',
                     {
                       type: 'button',
-                      style: css.btn,
+                      style: css.iconBtn,
+                      title: say('packMembers', '管理成员'),
                       disabled: busy,
                       onClick: () => {
                         setDraftMembers(pack.members ?? [])
@@ -770,12 +833,12 @@ window.__ModuleLoader__.load({
                         setEditing(pack.id)
                       },
                     },
-                    say('packMembers', '管理成员'),
+                    h(Icon, { name: 'users', size: 14 }),
                   ),
                   h(
                     'button',
                     { type: 'button', style: css.iconBtn, title: say('packDelete', '删除技能包'), onClick: () => write('/zhiyin/pack', { action: 'delete', id: pack.id }), disabled: busy },
-                    '×',
+                    h(Icon, { name: 'close', size: 13 }),
                   ),
                 ),
               ),
@@ -824,7 +887,7 @@ window.__ModuleLoader__.load({
                                 }
                               },
                             },
-                            '⤓',
+                            h(Icon, { name: 'archive', size: 15 }),
                           )
                         : null,
                       h(
@@ -891,7 +954,7 @@ window.__ModuleLoader__.load({
                     'div',
                     { style: css.modalHead },
                     h('span', { style: css.modalTitle }, pack.name + ' · ' + say('packMembersTitle', '选择成员')),
-                    h('button', { type: 'button', style: css.btn, onClick: () => setEditing(null) }, '×'),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), onClick: () => setEditing(null) }, h(Icon, { name: 'close', size: 13 }),),
                   ),
                   h('input', {
                     style: css.input,
