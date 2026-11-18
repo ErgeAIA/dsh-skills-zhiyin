@@ -42,6 +42,7 @@ window.__ModuleLoader__.load({
         packMembers: '管理成员',
         packMembersTitle: '选择成员',
         packEmpty: '还没有成员',
+        packDeleteAsk: '删除技能包？包内技能不会被卸载。',
         packOn: '启用中',
         packOff: '已停用',
         packNamePlaceholder: '技能包名称',
@@ -121,6 +122,7 @@ window.__ModuleLoader__.load({
         packMembers: 'Members',
         packMembersTitle: 'Pick members',
         packEmpty: 'No members yet',
+        packDeleteAsk: 'Delete this pack? Its skills stay installed.',
         packOn: 'on',
         packOff: 'off',
         packNamePlaceholder: 'Pack name',
@@ -450,6 +452,13 @@ window.__ModuleLoader__.load({
     ['path', 'M18 6 6 18'],
     ['path', 'm6 6 12 12'],
   ],
+  trash: [
+    ['path', 'M4 7h16'],
+    ['path', 'M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2'],
+    ['path', 'M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12'],
+    ['path', 'M10 11v5'],
+    ['path', 'M14 11v5'],
+  ],
   plus: [
     ['path', 'M12 5v14'],
     ['path', 'M5 12h14'],
@@ -738,8 +747,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               ),
               tab === 'packs'
                 ? h('span', { style: { display: 'inline-flex', gap: 6 } },
-                    h('button', { type: 'button', style: css.iconBtn, title: say('packNew', '新建技能包'), onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 })),
-                    h('button', { type: 'button', style: css.iconBtn, title: say('packImport', '导入 txt 技能包'), onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, h(Icon, { name: 'import', size: 14 })),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('packNew', '新建技能包'), 'aria-label': say('packNew', '新建技能包'), onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 })),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('packImport', '导入 txt 技能包'), 'aria-label': say('packImport', '导入 txt 技能包'), onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, h(Icon, { name: 'import', size: 14 })),
                   )
                 : null,
               h('input', {
@@ -765,25 +774,28 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 disabled: busy,
                 onChange: () => write('/zhiyin/settings', { allOff: data.allOff !== true }),
               }),
+              tab === 'list'
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.iconBtn,
+                      title: say('install', '安装技能'),
+                      'aria-label': say('install', '安装技能'),
+                      disabled: busy,
+                      onClick: () => {
+                        setInstallPath('')
+                        setInstallName('')
+                        setInstallTarget('user')
+                        setInstalling(true)
+                      },
+                    },
+                    h(Icon, { name: 'install', size: 14 }),
+                  )
+                : null,
               h(
                 'button',
-                {
-                  type: 'button',
-                  style: css.iconBtn,
-                  title: say('install', '安装技能'),
-                  disabled: busy,
-                  onClick: () => {
-                    setInstallPath('')
-                    setInstallName('')
-                    setInstallTarget('user')
-                    setInstalling(true)
-                  },
-                },
-                h(Icon, { name: 'install', size: 14 }),
-              ),
-              h(
-                'button',
-                { type: 'button', style: css.iconBtn, title: say('refresh', '重新观测'), onClick: load, disabled: state.loading },
+                { type: 'button', style: css.iconBtn, title: say('refresh', '重新观测'), 'aria-label': say('refresh', '重新观测'), onClick: load, disabled: state.loading },
                 state.loading ? say('loading', '观测中') : h(Icon, { name: 'refresh', size: 14 }),
               ),
             )
@@ -826,6 +838,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       type: 'button',
                       style: css.iconBtn,
                       title: say('packMembers', '管理成员'),
+                      'aria-label': say('packMembers', '管理成员'),
                       disabled: busy,
                       onClick: () => {
                         setDraftMembers(pack.members ?? [])
@@ -837,8 +850,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   ),
                   h(
                     'button',
-                    { type: 'button', style: css.iconBtn, title: say('packDelete', '删除技能包'), onClick: () => write('/zhiyin/pack', { action: 'delete', id: pack.id }), disabled: busy },
-                    h(Icon, { name: 'close', size: 13 }),
+                    {
+                      type: 'button',
+                      style: css.iconBtn,
+                      title: say('packDelete', '删除技能包'),
+                      'aria-label': say('packDelete', '删除技能包'),
+                      disabled: busy,
+                      onClick: () => {
+                        if (window.confirm(say('packDeleteAsk', '删除技能包？包内技能不会被卸载。') + ' ' + pack.name)) {
+                          write('/zhiyin/pack', { action: 'delete', id: pack.id })
+                        }
+                      },
+                    },
+                    h(Icon, { name: 'trash', size: 13 }),
                   ),
                 ),
               ),
@@ -879,6 +903,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                             {
                               type: 'button',
                               title: say('uninstallHint', '移入归档目录，可恢复'),
+                              'aria-label': say('uninstall', '卸载'),
                               style: css.iconBtn,
                               disabled: busy,
                               onClick: () => {
@@ -954,7 +979,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     'div',
                     { style: css.modalHead },
                     h('span', { style: css.modalTitle }, pack.name + ' · ' + say('packMembersTitle', '选择成员')),
-                    h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), onClick: () => setEditing(null) }, h(Icon, { name: 'close', size: 13 }),),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setEditing(null) }, h(Icon, { name: 'close', size: 13 }),),
                   ),
                   h('input', {
                     style: css.input,
