@@ -11,7 +11,7 @@ YOU MUST 改码前先读 docs/prd/ZhiYin-PRD-v0.2.md 与 docs/agents/decision-lo
 YOU MUST 每次会话更新 docs/agents/project-progress.md
 YOU MUST 改 AGENTS.md 前先读、改后追加 docs/agents/agents-changelog.md
 YOU MUST 改某领域代码前先读 docs/agents/experience/<领域>/（存在时）
-YOU MUST 每次只推进一个阶段，完成即停，等用户验证
+YOU MUST 按任务需要连续推进多个阶段，每完成一个功能自行 review（语法、假 ctx 冒烟、真机数据），不需要 UI 验收时不要停下来等；最后整体交付给用户验收
 YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/skills），同名冲突先问用户
 禁止自行宣称已修复，修复结果须由用户验证
 禁止整文件重写既有文件，只做最小精确补丁
@@ -45,7 +45,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 
 | 观察到的现象 | 要求 Agent 的行为 |
 | ------------ | ----------------- |
-| 仓库目录布局固定 | 根目录只留 AGENTS.md、README.md、CHANGELOG.md、.gitignore 与 docs/、prototype/；新文档进 docs/ 对应子目录（prd、adr、design、handoff、agents），不再散落根目录 |
+| 仓库目录布局固定 | 根目录只留 AGENTS.md、README.md、CHANGELOG.md、PRODUCT.md、DESIGN.md、.gitignore、.impeccable/ 与 docs/、prototype/；其他新文档进 docs/ 对应子目录（prd、adr、design、handoff、agents），不再散落根目录 |
 | 会话文档体系固定 | 进度写 docs/agents/project-progress.md；决策写 docs/agents/decision-log.md；两者只追加不删历史 |
 | bug 追加 docs/agents/debug-log.md | 格式 BUG-NNN；只追加不删历史 |
 | 交接写 docs/handoff | 命名 handoff-YYYY-MM-DD-*.md |
@@ -59,13 +59,14 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | 启停只写本地状态 | 写 <profile>/zhiyin-proto/state.json 与 events.ndjson；启停不改动技能文件 |
 | 安装卸载写盘边界 | 安装新建技能目录；卸载移入归档目录；两者都是用户显式动作，不得由启停或轮询触发 |
 | 停用机制唯一 | 按 Agent 注册策略 provider，modelInvocable 与 userInvocable 双置 false；启用项不列，落回原生 provider |
-| 读原生目录快照 | 用 ctx.skills.snapshot({ cwd }) 且不带 scope，只读全局层，避免被自己的影子候选遮蔽 |
+| 读原生目录快照 | 用 viewForAgent：从技能注册表层表反查该 Agent 的 scope key，带 scope 读快照并与全局层比较取条目多者；不带 scope 只读全局层会丢掉用户级技能 |
 | provider.list 有硬约束 | 只读内存快照，禁止在 list 内调用 ctx.skills.list/snapshot（会自锁） |
 | 第三方插件无 Typert Remote | 宿主与页面通信用同源 HTTP 路由 `ctx.webServer.register`，前端 fetch |
 | Git 分支纪律 | 一个任务一个分支，合并后收口并删除子分支；删分支前先核实合并状态并告知结论 |
 
 ## References
 
+- 设计前先读产品真相 → 见 PRODUCT.md：平台、用户、定位、红线与设计原则
 - 查产品口径与功能边界 → 见 docs/prd/ZhiYin-PRD-v0.2.md：PRD v0.2，含技能包与目录预算定义
 - 查需求演进留档 → 见 docs/prd/ZhiYin-PRD-v0.1.md：旧版 PRD，已被 v0.2 取代
 - 查架构取舍与被否方案 → 见 docs/adr/ZhiYin-M0-ADR.md：M0 架构决策记录与实测证据

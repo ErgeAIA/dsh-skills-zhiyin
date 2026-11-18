@@ -30,6 +30,13 @@ description: >
 - **决策**：定位改为“技能管理插件，管安装、卸载、启停与技能包编组”。写盘边界三处：安装新建技能目录、卸载移入归档目录（不直接删除）、自身状态文件。启停与观测仍不碰技能文件；安装前先确认目标根、同名冲突先问用户。开发期版本锁定 0.1.0。
 - **验证**：AGENTS.md Permissions 与 Conventions、README 定位段与已知限制段同步改写；agents-changelog.md 已留痕。
 
+## DEC-005: 技能包状态形状与写路由
+
+- **日期**：2026-11-18
+- **背景**：技能包是启用单位，需要能被新建、改名、复制、删除、整组开关、编辑成员，且成员可跨来源（user-dsh / user-agents / custom）。
+- **决策**：状态存 `state.packs = [{ id, name, enabled, members: [name], order }]`，`id` 用时间戳+随机后缀，不随改名变化；所有写操作走一条 `POST /zhiyin/pack`，用 `action` 区分（create/rename/toggle/copy/delete/members/reorder）。成员只存技能名，不存路径，改名或换源不影响；一个技能可同时属于多个包（多对多），任一所属包启用即视为可用。
+- **验证**：假 ctx 冒烟跑通七个动作与 state 回读；hiddenReason 六条规则（包关/包开/包开+手动停用/allOff 压过包/two packs one on/不在包）全部通过。
+
 ## DEC-004: 停用改用「按 Agent 注册策略 provider」
 
 - **日期**：2026-11-17（源自 ZhiYin-M0-ADR.md 与 HANDOVER.md，初始化时从既有文档迁入）

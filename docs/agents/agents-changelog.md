@@ -33,3 +33,7 @@ description: >
 - <Conventions「插件仍在开发阶段：不升 version」> → update → 「version 锁定 0.1.0，开发期不升版」
 - <Conventions「停用只写本地状态」> → update → 拆为「启停只写本地状态」与「安装卸载写盘边界」两行
 - <References 指向根目录 ZhiYin-PRD-v0.2.md / ZhiYin-M0-ADR.md / ZhiYin-UI-决议.md / HANDOVER.md> → update → 改指 docs/prd/、docs/adr/、docs/design/、docs/handoff/handoff-2026-11-17-m0-skills-provider.md，并补一条 PRD v0.1 留档指针
+- <Conventions「读原生目录快照：用 ctx.skills.snapshot({ cwd }) 且不带 scope，只读全局层」> → update → 「用 viewForAgent：从技能注册表层表反查该 Agent 的 scope key，带 scope 读快照并与全局层比较取条目多者」；原因：BUG-001 实测证明不带 scope 只能读到全局层，用户级 161 个技能全丢
+- <Conventions「仓库目录布局固定：根目录只留 AGENTS.md、README.md、CHANGELOG.md、.gitignore 与 docs/、prototype/」> → update → 允许根目录放 PRODUCT.md、DESIGN.md 与 .impeccable/（impeccable 要求产物落在项目根，且 contract 文件必须能被工具按固定路径读到）
+- <References 无产品真相指针> → update → 新增「设计前先读产品真相 → 见 PRODUCT.md」
+- <Permissions「每次只推进一个阶段，完成即停，等用户验证」> → update → 「按任务需要连续推进多个阶段，每完成一个功能自行 review（语法、假 ctx 冒烟、真机数据），不需要 UI 验收时不要停下来等；最后整体交付验收」；原因：用户 2026-11-18 指出一步一停进度太慢
