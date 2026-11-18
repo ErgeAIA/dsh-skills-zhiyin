@@ -45,6 +45,12 @@ window.__ModuleLoader__.load({
         packOn: '启用中',
         packOff: '已停用',
         packNamePlaceholder: '技能包名称',
+        packImport: '导入 txt',
+        importTitle: '导入技能包',
+        importHint: '一行一个技能：目录名 | 来源 | owner/repo | 分支 | 子目录；# 开头的行会被忽略',
+        importPathPlaceholder: 'txt 文件绝对路径',
+        importTextPlaceholder: '或把 txt 内容粘到这里',
+        importRun: '导入',
         selectAll: '全选',
         selectNone: '全不选',
         save: '保存',
@@ -113,6 +119,12 @@ window.__ModuleLoader__.load({
         packOn: 'on',
         packOff: 'off',
         packNamePlaceholder: 'Pack name',
+        packImport: 'Import txt',
+        importTitle: 'Import pack',
+        importHint: 'One skill per line: name | source | owner/repo | branch | subdir; lines starting with # are ignored',
+        importPathPlaceholder: 'Absolute path to the txt file',
+        importTextPlaceholder: 'Or paste the txt content here',
+        importRun: 'Import',
         selectAll: 'All',
         selectNone: 'None',
         save: 'Save',
@@ -291,6 +303,18 @@ window.__ModuleLoader__.load({
         background: 'transparent',
         color: 'inherit',
       },
+      textarea: {
+        flex: '1 1 auto',
+        minHeight: 120,
+        padding: '6px 10px',
+        borderRadius: 8,
+        border: '1px solid rgba(128,128,128,0.35)',
+        background: 'transparent',
+        color: 'inherit',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: 12,
+        resize: 'vertical',
+      },
       btn: {
         padding: '6px 12px',
         borderRadius: 8,
@@ -397,6 +421,10 @@ window.__ModuleLoader__.load({
       const [draftMembers, setDraftMembers] = React.useState([])
       const [memberQuery, setMemberQuery] = React.useState('')
       const [creating, setCreating] = React.useState(false)
+  const [importing, setImporting] = React.useState(false)
+  const [importText, setImportText] = React.useState('')
+  const [importPath, setImportPath] = React.useState('')
+  const [importName, setImportName] = React.useState('')
       const [installing, setInstalling] = React.useState(false)
       const [installPath, setInstallPath] = React.useState('')
       const [installName, setInstallName] = React.useState('')
@@ -578,7 +606,10 @@ window.__ModuleLoader__.load({
                 h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, say('tabPacks', '技能包')),
               ),
               tab === 'packs'
-                ? h('button', { type: 'button', style: css.btn, onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, say('packNew', '+ 新建技能包'))
+                ? h('span', { style: { display: 'inline-flex', gap: 6 } },
+                    h('button', { type: 'button', style: css.btn, onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, say('packNew', '+ 新建技能包')),
+                    h('button', { type: 'button', style: css.btn, onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, say('packImport', '导入 txt')),
+                  )
                 : null,
               tab === 'list' ? h('input', {
                 style: css.input,
@@ -947,7 +978,61 @@ window.__ModuleLoader__.load({
             )
           : null,
 
-        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '技能包与安装卸载已接入；组合在下一版。')),
+        importing
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: css.modal },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('importTitle', '导入技能包'))),
+                h('div', { style: css.hint }, say('importHint', '支持 AI Vault 导出的技能包 txt：每行「目录名 | 来源 | owner/repo | 分支 | 子目录」，# 开头的行会被忽略。')),
+                h('input', {
+                  style: css.input,
+                  value: importName,
+                  placeholder: say('packNamePlaceholder', '技能包名称（留空用文件里的名字）'),
+                  onChange: (event) => setImportName(event.target.value),
+                }),
+                h('input', {
+                  style: css.input,
+                  value: importPath,
+                  placeholder: say('importPathPlaceholder', 'txt 文件绝对路径，例如 D:\\packs\\mattpocock.txt'),
+                  onChange: (event) => setImportPath(event.target.value),
+                }),
+                h('textarea', {
+                  style: css.textarea,
+                  value: importText,
+                  placeholder: say('importTextPlaceholder', '或者直接把 txt 内容粘到这里'),
+                  onChange: (event) => setImportText(event.target.value),
+                }),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setImporting(false) }, say('cancel', '取消')),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.btn,
+                      disabled: busy || (importPath.trim() === '' && importText.trim() === ''),
+                      onClick: () => {
+                        write('/zhiyin/pack', {
+                          action: 'import',
+                          path: importPath.trim() || undefined,
+                          text: importText.trim() || undefined,
+                          name: importName.trim() || undefined,
+                        })
+                        setImporting(false)
+                      },
+                    },
+                    say('importRun', '导入'),
+                  ),
+                ),
+              ),
+            )
+          : null,
+
+        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '组合在下一版；技能包整组开关即可切换场景。')),
       )
     }
 

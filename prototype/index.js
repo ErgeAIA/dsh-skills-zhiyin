@@ -93,6 +93,38 @@ export function apply(ctx) {
     const id = typeof body?.id === 'string' ? body.id : ''
     const index = packs.findIndex((pack) => pack.id === id)
 
+    if (action === 'import') {
+      let raw = typeof body?.text === 'string' ? body.text : ''
+      if (!raw && typeof body?.path === 'string' && body.path.trim()) {
+        try {
+          raw = readFileSync(body.path.trim(), 'utf8')
+        } catch (error) {
+          return { status: 400, body: { ok: false, error: 'cannot read file: ' + String(error?.message ?? error) } }
+        }
+      }
+      if (!raw.trim()) return { status: 400, body: { ok: false, error: 'text or path is required' } }
+      const names = []
+      let title = ''
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        if (trimmed.startsWith('#')) {
+          const matched = trimmed.match(/Skill Pack:\s*([^|#]+)/i)
+          if (matched) title = matched[1].trim()
+          continue
+        }
+        const first = trimmed.split('|')[0].trim()
+        if (first && !names.includes(first)) names.push(first)
+      }
+      if (names.length === 0) return { status: 400, body: { ok: false, error: 'no skill names found' } }
+      const name = (typeof body?.name === 'string' ? body.name.trim() : '') || title || '导入的技能包'
+      const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+      packs.push({ id: newId, name, enabled: true, members: names, order: packs.length })
+      saveState(state)
+      invalidateAll()
+      return { status: 200, body: { ok: true, id: newId, members: names.length, names } }
+    }
+
     if (action === 'create') {
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
       if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
