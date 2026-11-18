@@ -95,9 +95,10 @@ export function apply(ctx) {
 
     if (action === 'import') {
       let raw = typeof body?.text === 'string' ? body.text : ''
-      if (!raw && typeof body?.path === 'string' && body.path.trim()) {
+      const importPath = cleanPath(body?.path)
+      if (!raw && importPath) {
         try {
-          raw = readFileSync(body.path.trim(), 'utf8')
+          raw = readFileSync(importPath, 'utf8')
         } catch (error) {
           return { status: 400, body: { ok: false, error: 'cannot read file: ' + String(error?.message ?? error) } }
         }
@@ -173,7 +174,7 @@ export function apply(ctx) {
   })
 
   post(ctx, '/zhiyin/install', async (body) => {
-    const source = typeof body?.path === 'string' ? body.path.trim() : ''
+    const source = cleanPath(body?.path)
     if (!source) return { status: 400, body: { ok: false, error: 'path is required' } }
     let stat
     try {
@@ -336,6 +337,28 @@ function json(payload, status = 200) {
 
 function configFile() {
   return join(stateDir(), 'state.json')
+}
+
+/**
+ * 去掉路径最外层引号：Windows「复制为路径」会带双引号，输入框里也常带单/中文引号。
+ * 只剥一层，不改路径本身。
+ */
+function cleanPath(value) {
+  if (typeof value !== 'string') return ''
+  let text = value.trim()
+  const pairs = [
+    ['"', '"'],
+    ["'", "'"],
+    ['\u201c', '\u201d'],
+    ['\u2018', '\u2019'],
+  ]
+  for (const [open, close] of pairs) {
+    if (text.length > 1 && text.startsWith(open) && text.endsWith(close)) {
+      text = text.slice(1, -1).trim()
+      break
+    }
+  }
+  return text
 }
 
 function readState() {
