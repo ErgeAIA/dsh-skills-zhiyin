@@ -92,6 +92,48 @@ window.__ModuleLoader__.load({
         reasonPack: '技能包停用',
         reasonAgents: 'agents 开关关闭',
         toggleHint: '点开关立即生效',
+        exportConfig: '导出配置',
+        exportConfigHint: '导出一份可移植的 JSON 配置（技能包 / 停用项）',
+        exportConfigFailed: '导出失败：',
+        importConfig: '导入配置',
+        importConfigHint: '粘贴此前导出的 JSON 覆盖当前配置；旧配置会自动备份',
+        importConfigHint2: '粘贴此前「导出配置」得到的 JSON。导入会覆盖当前的技能包与停用项；旧配置会先自动备份到插件状态目录。',
+        importConfigPlaceholder: '{\n  "schemaVersion": 1,\n  "packs": []\n}',
+        importConfigRun: '导入',
+        importConfigOk: '导入完成',
+        importConfigBadJson: '不是合法的 JSON',
+        importConfigMissing: '个成员未安装',
+        packUnit: '个技能包',
+        observedAt: '观测于',
+        masterDisable: '全部停用',
+        masterEnable: '全部启用',
+        masterDisableHint: '一键全部停用：模型目录为空、/ 菜单也选不到',
+        masterEnableHint: '恢复各技能自己的开关状态',
+        viewCards: '卡片',
+        viewList: '列表',
+        sortBy: '排序',
+        sortName: '名称',
+        sortSource: '来源',
+        sortChars: '字符数',
+        sortEnabled: '启用状态',
+        packAllOn: '全部启用',
+        packAllOff: '全部停用',
+        packPartial: '部分启用',
+        packGhost: '未安装',
+        packMore: '更多操作',
+        packRename: '改名',
+        packCopy: '复制',
+        packDelete: '删除',
+        packEmptyHint: '还没有技能包；点右上角新建，再把技能勾进来',
+        packEmptyHint2: '还没有成员',
+        packNoMatch: '没有匹配技能包',
+        packNameRule: '1–40 个字符；仅限中文、字母、数字、空格、下划线、连字符',
+        alertBudget: '目录字符数已超出预算',
+        alertConflict: '同名技能冲突',
+        alertFrom: '个来源',
+        alertGhost: '技能包引用了未安装技能',
+        close: '关闭',
+        enabled: '已启用',
       },
       en: {
         nav: 'Zhiyin',
@@ -173,6 +215,48 @@ window.__ModuleLoader__.load({
         reasonPack: 'pack disabled',
         reasonAgents: 'agents switch off',
         toggleHint: 'Takes effect immediately',
+        exportConfig: 'Export config',
+        exportConfigHint: 'Download a portable JSON snapshot (packs / disabled items)',
+        exportConfigFailed: 'Export failed: ',
+        importConfig: 'Import config',
+        importConfigHint: 'Paste a previously exported JSON to overwrite the current config; the old one is backed up first',
+        importConfigHint2: 'Paste the JSON you exported earlier. Importing overwrites the current packs and disabled items; the old config is backed up into the plugin state directory first.',
+        importConfigPlaceholder: '{\n  "schemaVersion": 1,\n  "packs": []\n}',
+        importConfigRun: 'Import',
+        importConfigOk: 'Import done',
+        importConfigBadJson: 'Not valid JSON',
+        importConfigMissing: 'members are not installed',
+        packUnit: 'packs',
+        observedAt: 'Observed at',
+        masterDisable: 'Disable all',
+        masterEnable: 'Enable all',
+        masterDisableHint: 'Disable everything at once: empty model catalog, nothing in the / menu',
+        masterEnableHint: 'Restore each skill own switch',
+        viewCards: 'Cards',
+        viewList: 'List',
+        sortBy: 'Sort',
+        sortName: 'Name',
+        sortSource: 'Source',
+        sortChars: 'Characters',
+        sortEnabled: 'Enabled state',
+        packAllOn: 'All enabled',
+        packAllOff: 'All disabled',
+        packPartial: 'Partly enabled',
+        packGhost: 'not installed',
+        packMore: 'More actions',
+        packRename: 'Rename',
+        packCopy: 'Duplicate',
+        packDelete: 'Delete',
+        packEmptyHint: 'No packs yet; create one at the top right, then tick skills into it',
+        packEmptyHint2: 'No members yet',
+        packNoMatch: 'No matching pack',
+        packNameRule: '1-40 characters; letters, digits, spaces, underscore and hyphen only',
+        alertBudget: 'Catalog characters exceed the budget',
+        alertConflict: 'Duplicate skill names',
+        alertFrom: 'sources',
+        alertGhost: 'Pack references skills that are not installed',
+        close: 'Close',
+        enabled: 'Enabled',
       },
     }
 
@@ -235,6 +319,13 @@ window.__ModuleLoader__.load({
         fontWeight: 600,
       },
       head: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
+      headActions: {
+        marginLeft: 'auto',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+      },
       title: { fontSize: 22, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' },
       subtitle: { opacity: 0.6, fontSize: 13 },
       row: { display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginTop: 18 },
@@ -732,7 +823,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         },
         [t],
       )
-      const [state, setState] = React.useState({ loading: true, data: null, error: null })
+      const [state, setState] = React.useState({ loading: true, data: null, error: null, exportError: null })
+      // 搜索输入与实际生效的查询分开：输入停 250ms 才过滤，避免每敲一个字就重排 177 张卡。
+      const [queryInput, setQueryInput] = React.useState('')
       const [query, setQuery] = React.useState('')
       const [filter, setFilter] = React.useState('all')
       const [busy, setBusy] = React.useState(false)
@@ -749,6 +842,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [installPath, setInstallPath] = React.useState('')
       const [installName, setInstallName] = React.useState('')
       const [installTarget, setInstallTarget] = React.useState('user')
+      const [importingConfig, setImportingConfig] = React.useState(false)
+      const [importConfigText, setImportConfigText] = React.useState('')
+      const [importResult, setImportResult] = React.useState(null)
       const [draftName, setDraftName] = React.useState('')
       // 视图与排序偏好属于浏览器，存 localStorage，不写 state.json。
       const [view, setView] = React.useState(() => {
@@ -762,8 +858,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
+      // 搜索防抖：250ms 静默期后再拿输入去过滤。
+      React.useEffect(() => {
+        const timer = setTimeout(() => setQuery(queryInput), 250)
+        return () => clearTimeout(timer)
+      }, [queryInput])
+
       const load = React.useCallback(() => {
-        setState((previous) => ({ ...previous, loading: true, error: null }))
+        setState((previous) => ({ ...previous, loading: true, error: null, exportError: null }))
         fetch('/zhiyin/state', { headers: { accept: 'application/json' } })
           .then((response) => {
             if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -803,6 +905,71 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         },
         [load],
       )
+
+      // 导出配置：拉一份 JSON，直接让浏览器下载一份带时间戳的文件。
+      const exportConfig = React.useCallback(() => {
+        setBusy(true)
+        fetch('/zhiyin/export', { headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            return response.json()
+          })
+          .then((payload) => {
+            const text = JSON.stringify(payload, null, 2)
+            const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const stamp = String(payload?.exportedAt ?? '').replace(/[:.]/g, '-') || 'export'
+            const anchor = document.createElement('a')
+            anchor.href = url
+            anchor.download = `zhiyin-config-${stamp}.json`
+            document.body.appendChild(anchor)
+            anchor.click()
+            anchor.remove()
+            setTimeout(() => URL.revokeObjectURL(url), 2000)
+          })
+          .catch((error) =>
+            setState((previous) => ({
+              ...previous,
+              exportError: String(error?.message ?? error),
+            })),
+          )
+          .finally(() => setBusy(false))
+      }, [])
+
+      // 导入配置：粘贴此前导出的 JSON；后端先备份旧配置再覆盖，并回报缺失成员。
+      const importConfig = React.useCallback(() => {
+        const raw = importConfigText.trim()
+        if (!raw) return
+        let parsed = null
+        try {
+          parsed = JSON.parse(raw)
+        } catch {
+          setImportResult({ ok: false, text: say('importConfigBadJson', '不是合法的 JSON') })
+          return
+        }
+        setBusy(true)
+        fetch('/zhiyin/import', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ config: parsed }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
+            const missing = Array.isArray(result.missing) ? result.missing : []
+            setImportResult({
+              ok: true,
+              text:
+                `${say('importConfigOk', '导入完成')}：${result.packs} ${say('packUnit', '个技能包')}` +
+                (missing.length > 0
+                  ? `；${missing.length} ${say('importConfigMissing', '个成员未安装')}（${missing.slice(0, 4).join('、')}${missing.length > 4 ? ' …' : ''}）`
+                  : ''),
+            })
+            load()
+          })
+          .catch((error) => setImportResult({ ok: false, text: String(error?.message ?? error) }))
+          .finally(() => setBusy(false))
+      }, [importConfigText, load, say])
 
       React.useEffect(() => {
         load()
@@ -902,6 +1069,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       // 当前作用域内所有技能名（用于判断包成员是否为「幽灵」）
       const scopedNames = React.useMemo(() => new Set(scoped.map((skill) => skill.name)), [scoped])
 
+      // 技能包按搜索词过滤：包名或成员名命中即可。
+      const visiblePacks = React.useMemo(() => {
+        const packs = data?.packs ?? []
+        const needle = query.trim().toLowerCase()
+        if (needle === '') return packs
+        return packs.filter(
+          (pack) =>
+            String(pack?.name ?? '').toLowerCase().includes(needle) ||
+            (pack?.members ?? []).some((name) => String(name).toLowerCase().includes(needle)),
+        )
+      }, [data, query])
+
       // 技能包三态：由成员派生（全部启用 / 部分启用 / 全部停用）。
       const packStatus = (pack) => {
         const members = (pack.members ?? []).filter((name) => scopedNames.has(name))
@@ -977,18 +1156,48 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           { style: css.head },
           h('h2', { style: css.title }, say('title', '织音')),
           h('span', { style: css.subtitle }, say('subtitle', '让技能自由编组，让能力彼此协奏')),
-          data
-            ? h(
-                'span',
-                {
-                  style: { ...css.pill(data.takeover?.visible), marginLeft: 'auto' },
-                  title: data.takeover?.visible
-                    ? say('takeoverHintOn', '已为在跑的会话挂上策略 provider，开关即时生效。')
-                    : say('takeoverHintOff', '还没有在跑的会话；新会话出现后自动挂钩。'),
+          h(
+            'div',
+            { style: css.headActions },
+            h(
+              'button',
+              {
+                type: 'button',
+                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
+                disabled: busy,
+                title: say('exportConfigHint', '导出一份可移植的 JSON 配置（技能包 / 停用项）'),
+                onClick: exportConfig,
+              },
+              say('exportConfig', '导出配置'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
+                disabled: busy,
+                title: say('importConfigHint', '粘贴此前导出的 JSON 覆盖当前配置；旧配置会自动备份'),
+                onClick: () => {
+                  setImportConfigText('')
+                  setImportResult(null)
+                  setImportingConfig(true)
                 },
-                data.takeover?.visible ? say('takeoverOn', '开关已生效') : say('takeoverOff', '未接管'),
-              )
-            : null,
+              },
+              say('importConfig', '导入配置'),
+            ),
+            data
+              ? h(
+                  'span',
+                  {
+                    style: css.pill(data.takeover?.visible),
+                    title: data.takeover?.visible
+                      ? say('takeoverHintOn', '已为在跑的会话挂上策略 provider，开关即时生效。')
+                      : say('takeoverHintOff', '还没有在跑的会话；新会话出现后自动挂钩。'),
+                  },
+                  data.takeover?.visible ? say('takeoverOn', '开关已生效') : say('takeoverOff', '未接管'),
+                )
+              : null,
+          ),
         ),
 
         // 元信息条：版本 · 观测时间 ｜ 右侧主按钮（全部停用/全部启用）
@@ -1018,6 +1227,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
         state.error
           ? h('p', { style: { ...css.hint, marginTop: 12 } }, `${say('failed', '观测失败：')}${state.error}`)
+          : null,
+
+        state.exportError
+          ? h('p', { style: { ...css.hint, marginTop: 12 } }, `${say('exportConfigFailed', '导出失败：')}${state.exportError}`)
           : null,
 
         // 告警区：内容之上，点名具体对象
@@ -1128,12 +1341,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 : null,
               h('input', {
                 style: css.input,
-                value: query,
+                value: queryInput,
                 placeholder:
                   tab === 'list'
                     ? say('search', '按名称或描述搜索')
                     : say('searchPacks', '搜技能包名或成员'),
-                onChange: (event) => setQuery(event.target.value),
+                onChange: (event) => setQueryInput(event.target.value),
               }),
               tab === 'list'
                 ? h('label', { style: css.sortWrap },
@@ -1179,7 +1392,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               (data.packs ?? []).length === 0
                 ? h('div', { style: css.hint }, say('packEmptyHint', '还没有技能包；点右上角新建，再把技能勾进来'))
                 : null,
-              (data.packs ?? []).map((pack) => {
+              visiblePacks.length === 0 && (data.packs ?? []).length > 0
+                ? h('div', { style: css.hint }, say('packNoMatch', '没有匹配技能包'))
+                : null,
+              visiblePacks.map((pack) => {
                 const status = packStatus(pack)
                 const ghosts = (pack.members ?? []).filter((name) => !scopedNames.has(name))
                 const openMembers = () => {
@@ -1684,6 +1900,49 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       },
                     },
                     say('importRun', '导入'),
+                  ),
+                ),
+              ),
+            )
+          : null,
+
+        // 导入配置弹窗：粘贴此前导出的 JSON；导入前后端自动备份旧配置。
+        importingConfig
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalMd } },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('importConfig', '导入配置'))),
+                h('p', { style: css.hint }, say('importConfigHint2', '粘贴此前「导出配置」得到的 JSON。导入会覆盖当前的技能包与停用项；旧配置会先自动备份到插件状态目录。')),
+                h('textarea', {
+                  style: css.textarea,
+                  value: importConfigText,
+                  placeholder: say('importConfigPlaceholder', '{\n  "schemaVersion": 1,\n  "packs": []\n}'),
+                  onChange: (event) => setImportConfigText(event.target.value),
+                }),
+                importResult
+                  ? h(
+                      'div',
+                      { style: { ...css.alertItem, marginTop: 2, borderColor: importResult.ok ? 'rgba(74,157,106,0.4)' : 'rgba(208,100,100,0.4)', background: importResult.ok ? 'rgba(74,157,106,0.10)' : 'rgba(208,100,100,0.10)' } },
+                      h('span', { style: css.alertIcon }, importResult.ok ? '✓' : '⚠'),
+                      h('span', null, importResult.text),
+                    )
+                  : null,
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setImportingConfig(false) }, say('cancel', '取消')),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.btn,
+                      disabled: busy || importConfigText.trim() === '',
+                      onClick: importConfig,
+                    },
+                    say('importConfigRun', '导入'),
                   ),
                 ),
               ),

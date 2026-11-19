@@ -262,6 +262,92 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, name, to } }
   })
 
+  // 导出配置：只导出可移植的编排状态（包 / 停用项 / 总开关），
+  // 跟「导出配置 / 导入配置」呼应 PRD DR-10（配置丢失是唯一不可恢复事故）。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/export',
+      resource: async () => {
+        const state = readState()
+        return json({
+          schemaVersion: 1,
+          exportedAt: new Date().toISOString(),
+          pluginVersion: PLUGIN_VERSION,
+          agentsRoot: state.agentsRoot !== false,
+          allOff: state.allOff === true,
+          disabled: state.disabled ?? {},
+          packs: (state.packs ?? []).map((pack, index) => ({
+            id: pack?.id,
+            name: pack?.name,
+            enabled: pack?.enabled !== false,
+            members: Array.isArray(pack?.members) ? pack.members : [],
+            order: typeof pack?.order === 'number' ? pack.order : index,
+          })),
+          // 不导出 known：它是观测缓存（可随时由 collectState 重建），且会让文件涨到 80KB+，
+          // 既超出 PRD C-18「最小导出」边界，也会撑爆导入侧 64KB body 限制。
+          exclude: [],
+          combos: [],
+          intent: null,
+        })
+      },
+    }),
+  )
+
+  // 导入侧给更宽的 body 上限：导出已经瘦身成「最小导出」，
+  // 但用户手写的配置可能含很长的成员清单，别因为体积把格式错误报成「太大」。
+  post(ctx, '/zhiyin/import', async (body) => {
+    const payload = body && typeof body === 'object' && body.config && typeof body.config === 'object' ? body.config : body
+    const incomingPacks = Array.isArray(payload?.packs) ? payload.packs : null
+    if (incomingPacks === null && payload?.schemaVersion === undefined) {
+      return { status: 400, body: { ok: false, error: '不是有效的织音配置：缺少 packs 或 schemaVersion' } }
+    }
+    // 规范化专业技能包：给缺 id/order 的补默认值、去重成员、截断超长包名。
+    const packs = incomingPacks === null
+      ? []
+      : incomingPacks
+          .filter((pack) => pack && typeof pack === 'object')
+          .map((pack, index) => ({
+            id: typeof pack.id === 'string' && pack.id ? pack.id : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + index,
+            name: typeof pack.name === 'string' ? pack.name.trim().slice(0, PACK_NAME_MAX) : ('包 ' + (index + 1)),
+            enabled: pack.enabled !== false,
+            members: Array.isArray(pack.members)
+              ? [...new Set(pack.members.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim()))]
+              : [],
+            order: typeof pack.order === 'number' ? pack.order : index,
+          }))
+    // 导入 = 恢复配置（替换语义），先给当前 state 落一份带时间戳的备份，再覆盖可编辑字段。
+    const backup = backupState()
+    const state = readState()
+    // 只有确实带了 packs 数组才覆盖：粘贴的 JSON 缺 packs 时不清空现有技能包。
+    if (incomingPacks !== null) state.packs = packs
+    if (payload && typeof payload === 'object') {
+      if (typeof payload.agentsRoot === 'boolean') state.agentsRoot = payload.agentsRoot
+      if (typeof payload.allOff === 'boolean') state.allOff = payload.allOff
+      if (payload.disabled && typeof payload.disabled === 'object' && !Array.isArray(payload.disabled)) state.disabled = payload.disabled
+      // known 是缓存不是配置：导入时只做合并，本地观测到的元信息优先，避免被旧快照覆盖。
+      if (payload.known && typeof payload.known === 'object' && !Array.isArray(payload.known)) {
+        state.known = { ...payload.known, ...state.known }
+      }
+    }
+    saveState(state)
+    invalidateAll()
+    // 导入后实际生效的技能包（粘贴的 JSON 没带 packs 时就是原有那些）。
+    const effective = Array.isArray(state.packs) ? state.packs : []
+    // 列出包内引用、但当前作用域观测不到的技能（best-effort，失败不影响导入）。
+    let missing = []
+    try {
+      const snapshot = await collectState(ctx)
+      const names = new Set((snapshot.skills ?? []).map((skill) => skill.name))
+      const wanted = new Set(effective.flatMap((pack) => pack.members ?? []))
+      missing = [...wanted].filter((name) => !names.has(name))
+    } catch {
+      /* 缺失清单失败不影响导入 */
+    }
+    note('config-imported', { packs: effective.length, backup, missing: missing.length })
+    return { status: 200, body: { ok: true, packs: effective.length, backup, missing } }
+  }, 1048576)
+
   // 新出现的 Agent 及时挂上策略 provider（轮询足够便宜，且不依赖内部事件名）。
   const timer = setInterval(() => {
     try {
@@ -288,7 +374,7 @@ function installRoot(ctx, target) {
   return null
 }
 
-function post(ctx, path, run) {
+function post(ctx, path, run, limit = 65536) {
   try {
     ctx.effect(() =>
       ctx.webServer.register({
@@ -314,15 +400,31 @@ function post(ctx, path, run) {
           }
           let raw = ''
           try {
-            raw = await readBody(request)
-          } catch {
-            raw = ''
+            raw = await readBody(request, limit)
+          } catch (error) {
+            // 请求体超限时要说清楚是哪一类问题：以前一律吞成空体，
+            // 上层只能报「不是有效的织音配置」，把「太大」误报成「格式不对」。
+            const tooLarge = String(error?.message ?? error).includes('body too large')
+            response.writeHead(tooLarge ? 413 : 400, { 'content-type': 'application/json; charset=utf-8' })
+            response.end(
+              JSON.stringify({
+                ok: false,
+                error: tooLarge
+                  ? `请求体过大：超过 ${limit} 字节`
+                  : '读取请求体失败',
+              }),
+            )
+            return
           }
           let body = {}
-          try {
-            body = raw.length > 0 ? JSON.parse(raw) : {}
-          } catch {
-            body = {}
+          if (raw.length > 0) {
+            try {
+              body = JSON.parse(raw)
+            } catch {
+              response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' })
+              response.end(JSON.stringify({ ok: false, error: '请求体不是合法的 JSON' }))
+              return
+            }
           }
           const result = await run(body)
           response.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' })
@@ -409,6 +511,21 @@ function saveState(state) {
     renameSync(tmp, configFile())
   } catch (error) {
     note('state-save-failed', { error: String(error?.message ?? error) })
+  }
+}
+
+/** 把当前 state.json 复制一份带时间戳的备份，返回备份路径；失败返回 null。 */
+function backupState() {
+  try {
+    const file = configFile()
+    if (!existsSync(file)) return null
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const dest = join(stateDir(), 'backup-' + stamp + '.json')
+    cpSync(file, dest)
+    return dest
+  } catch (error) {
+    note('state-backup-failed', { error: String(error?.message ?? error) })
+    return null
   }
 }
 
