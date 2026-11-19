@@ -2809,7 +2809,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           backups.map((entry) =>
                             h(
                               'div',
-                              { key: entry.file, style: css.cbRow },
+                              { key: entry.file, style: { ...css.cbRow, cursor: 'default' } },
                               h(
                                 'div',
                                 { style: css.groupMain },
