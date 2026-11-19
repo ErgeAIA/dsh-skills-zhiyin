@@ -492,6 +492,125 @@ window.__ModuleLoader__.load({
       },
       itemOff: { opacity: 0.55 },
       switch: { flex: '0 0 auto', cursor: 'pointer', width: 16, height: 16, accentColor: 'currentColor' },
+
+      // 元信息条（版本 · 观测时间 ｜ 右侧主按钮）
+      metaBar: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
+        fontSize: 11.5,
+        opacity: 0.62,
+        flexWrap: 'wrap',
+      },
+      metaDot: { opacity: 0.5 },
+      primaryBtn: {
+        marginLeft: 'auto',
+        padding: '5px 14px',
+        borderRadius: 8,
+        border: '1px solid var(--zhiyin-accent, #e0743c)',
+        background: 'rgba(224,116,60,0.16)',
+        color: 'var(--zhiyin-accent, #e0743c)',
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: 'pointer',
+      },
+      // 告警区（内容之上、点名具体对象）
+      alertWrap: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 },
+      alertItem: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        padding: '8px 12px',
+        borderRadius: 10,
+        border: '1px solid rgba(224,163,62,0.35)',
+        background: 'rgba(224,163,62,0.10)',
+        fontSize: 12.5,
+        lineHeight: 1.45,
+      },
+      alertIcon: { flex: '0 0 auto', opacity: 0.8, marginTop: 1 },
+      // 工具条（卡片/列表 分段 · 搜索 · 排序）
+      toolbar: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, flexWrap: 'wrap' },
+      sortWrap: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto', fontSize: 12, opacity: 0.8 },
+      sortSelect: {
+        padding: '6px 10px',
+        borderRadius: 8,
+        border: '1px solid rgba(128,128,128,0.14)',
+        background: 'rgba(128,128,128,0.05)',
+        color: 'inherit',
+        fontSize: 12.5,
+      },
+      // 技能卡网格
+      cardGrid: {
+        marginTop: 12,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+        gap: 10,
+      },
+      skillCard: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        borderRadius: 12,
+        padding: '12px 14px',
+        background: 'rgba(128,128,128,0.045)',
+        border: '1px solid rgba(128,128,128,0.10)',
+      },
+      cardHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
+      cardName: {
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: 13,
+        fontWeight: 600,
+        flex: '0 1 auto',
+        minWidth: 0,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      },
+      cardDesc: {
+        fontSize: 12,
+        opacity: 0.6,
+        lineHeight: 1.45,
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        minHeight: 34,
+      },
+      cardFoot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' },
+      dot: (on) => ({
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        background: on ? '#4a9d6a' : 'rgba(128,128,128,0.5)',
+        flex: '0 0 auto',
+      }),
+      // 技能包行尾 … 菜单
+      menuWrap: { position: 'relative', flex: '0 0 auto' },
+      menu: {
+        position: 'absolute',
+        right: 0,
+        top: 34,
+        zIndex: 20,
+        minWidth: 132,
+        padding: 4,
+        borderRadius: 10,
+        border: '1px solid rgba(128,128,128,0.16)',
+        background: 'var(--vscode-editorWidget-background, #252526)',
+        boxShadow: '0 10px 26px rgba(0,0,0,0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+      },
+      menuItem: {
+        border: 'none',
+        background: 'transparent',
+        color: 'inherit',
+        textAlign: 'left',
+        padding: '7px 10px',
+        borderRadius: 7,
+        fontSize: 12.5,
+        cursor: 'pointer',
+      },
     }
 
     const ICONS = {
@@ -631,6 +750,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [installName, setInstallName] = React.useState('')
       const [installTarget, setInstallTarget] = React.useState('user')
       const [draftName, setDraftName] = React.useState('')
+      // 视图与排序偏好属于浏览器，存 localStorage，不写 state.json。
+      const [view, setView] = React.useState(() => {
+        try { return window.localStorage.getItem('zhiyin.view') || 'list' } catch { return 'list' }
+      })
+      const [sortField, setSortField] = React.useState(() => {
+        try { return window.localStorage.getItem('zhiyin.sort') || 'name' } catch { return 'name' }
+      })
+      const [menuOpen, setMenuOpen] = React.useState(null)   // 技能包行尾 … 菜单
+      const [renaming, setRenaming] = React.useState(null)   // 改名弹窗：{ id, name }
+      React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
+      React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
       const load = React.useCallback(() => {
         setState((previous) => ({ ...previous, loading: true, error: null }))
@@ -678,6 +808,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         load()
       }, [load])
 
+      // 点空白处收起技能包 … 菜单
+      React.useEffect(() => {
+        if (!menuOpen) return undefined
+        const close = () => setMenuOpen(null)
+        window.addEventListener('click', close)
+        return () => window.removeEventListener('click', close)
+      }, [menuOpen])
+
       const data = state.data
 
       // 「此刻 DSH 的技能世界」：总开关关掉时，~/.agents/skills 整组不属于它。
@@ -707,7 +845,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       const skills = React.useMemo(() => {
         const needle = query.trim().toLowerCase()
-        return scoped.filter((skill) => {
+        const filtered = scoped.filter((skill) => {
           if (filter === 'model' && !skill.model) return false
           if (filter === 'user' && !(skill.user && !skill.model)) return false
           if (filter === 'internal' && (skill.model || skill.user)) return false
@@ -718,7 +856,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             (skill.description ?? '').toLowerCase().includes(needle)
           )
         })
-      }, [scoped, query, filter])
+        const chars = (skill) => Math.min((skill.description ?? '').length, 500)
+        const sorted = filtered.slice().sort((a, b) => {
+          if (sortField === 'source') return String(a.source).localeCompare(String(b.source)) || a.name.localeCompare(b.name)
+          if (sortField === 'chars') return chars(b) - chars(a) || a.name.localeCompare(b.name)
+          if (sortField === 'enabled') return Number(b.enabled !== false) - Number(a.enabled !== false) || a.name.localeCompare(b.name)
+          return a.name.localeCompare(b.name)
+        })
+        return sorted
+      }, [scoped, query, filter, sortField])
 
       const pct = data ? Math.round((data.catalogChars / data.budgetChars) * 100) : 0
       const sourceLabel = (skill) => {
@@ -730,6 +876,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         if (skill.source === 'custom') return say('sourceCustom', '自定义目录')
         return skill.source
       }
+      const sourceShort = (skill) => {
+        if (skill.source === 'bundled') return say('sourceBundled', '内置')
+        if (skill.source === 'custom') return say('sourceCustom', '自定义')
+        if (skill.source === 'user-dsh') return '.dsh'
+        if (skill.source === 'user-agents') return '.agents'
+        return String(skill.source)
+      }
       const reasonLabel = (reason) => {
         if (reason === 'manual') return say('reasonManual', '手动停用')
         if (reason === 'pack') return say('reasonPack', '技能包停用')
@@ -737,6 +890,84 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         if (reason === 'all-off') return say('reasonAllOff', '全部停用')
         return ''
       }
+
+      const formatTime = (iso) => {
+        if (!iso) return ''
+        const d = new Date(iso)
+        if (Number.isNaN(d.getTime())) return ''
+        const pad = (n) => String(n).padStart(2, '0')
+        return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+      }
+
+      // 当前作用域内所有技能名（用于判断包成员是否为「幽灵」）
+      const scopedNames = React.useMemo(() => new Set(scoped.map((skill) => skill.name)), [scoped])
+
+      // 技能包三态：由成员派生（全部启用 / 部分启用 / 全部停用）。
+      const packStatus = (pack) => {
+        const members = (pack.members ?? []).filter((name) => scopedNames.has(name))
+        if (members.length === 0) return { kind: 'empty', on: 0, total: 0 }
+        let on = 0
+        for (const name of members) {
+          const skill = scoped.find((entry) => entry.name === name)
+          if (skill && skill.enabled !== false) on += 1
+        }
+        if (on === members.length) return { kind: 'all', on, total: members.length }
+        if (on === 0) return { kind: 'none', on, total: members.length }
+        return { kind: 'partial', on, total: members.length }
+      }
+      const packStatusLabel = (status) => {
+        if (status.kind === 'all') return say('packAllOn', '全部启用')
+        if (status.kind === 'none') return say('packAllOff', '全部停用')
+        if (status.kind === 'partial') return say('packPartial', '部分启用')
+        return say('packEmpty', '空包')
+      }
+      const packStatusStyle = (status) => ({
+        ...css.badge(true),
+        background:
+          status.kind === 'all'
+            ? 'rgba(74,157,106,0.20)'
+            : status.kind === 'none'
+              ? 'rgba(128,128,128,0.16)'
+              : 'rgba(224,163,62,0.22)',
+        opacity: status.kind === 'empty' ? 0.5 : 0.95,
+      })
+
+      // 复制技能包：名字加「副本」，按 1–40 字符与重名规则生成。
+      const copyPack = (pack) => {
+        const taken = new Set((data?.packs ?? []).map((entry) => entry.name))
+        let candidate = pack.name.slice(0, 40 - 3) + ' 副本'
+        let n = 2
+        while (taken.has(candidate) || candidate.length > 40) {
+          const tail = ` 副本${n}`
+          candidate = pack.name.slice(0, 40 - tail.length) + tail
+          n += 1
+        }
+        write('/zhiyin/pack', { action: 'create', name: candidate }).then((result) => {
+          if (result?.ok && result.id) {
+            write('/zhiyin/pack', { action: 'members', id: result.id, members: pack.members ?? [] })
+          }
+        })
+      }
+
+      // 告警：目录超预算 / 同名冲突 / 包内引用了未安装技能
+      const alerts = React.useMemo(() => {
+        const out = []
+        if (data && data.catalogChars > data.budgetChars) {
+          out.push({ key: 'budget', text: `${say('alertBudget', '目录字符数已超出预算')} ${data.catalogChars} / ${data.budgetChars}` })
+        }
+        if (data && Array.isArray(data.conflicts)) {
+          for (const conflict of data.conflicts) {
+            out.push({ key: 'conflict:' + conflict.name, text: `${say('alertConflict', '同名技能冲突')}：${conflict.name}（${conflict.count} ${say('alertFrom', '个来源')}）` })
+          }
+        }
+        for (const pack of data?.packs ?? []) {
+          const ghosts = (pack.members ?? []).filter((name) => !scopedNames.has(name))
+          if (ghosts.length > 0) {
+            out.push({ key: 'ghost:' + pack.id, text: `${say('alertGhost', '技能包引用了未安装技能')} · ${pack.name}：${ghosts.slice(0, 4).join('、')}${ghosts.length > 4 ? ' …' : ''}` })
+          }
+        }
+        return out
+      }, [data, scopedNames, say])
 
       return h(
         'div',
@@ -760,8 +991,49 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             : null,
         ),
 
+        // 元信息条：版本 · 观测时间 ｜ 右侧主按钮（全部停用/全部启用）
+        data
+          ? h(
+              'div',
+              { style: css.metaBar },
+              h('span', null, `@local/dsh-zhiyin-proto v${data.version ?? '0.0.0'}`),
+              h('span', { style: css.metaDot }, '·'),
+              h('span', null, `${say('observedAt', '观测于')} ${formatTime(data.at)}`),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  style: busy ? { ...css.primaryBtn, opacity: 0.5, cursor: 'default' } : css.primaryBtn,
+                  disabled: busy,
+                  title:
+                    data.allOff === true
+                      ? say('masterEnableHint', '恢复各技能自己的开关状态')
+                      : say('masterDisableHint', '一键全部停用：模型目录为空、/ 菜单也选不到'),
+                  onClick: () => write('/zhiyin/settings', { allOff: data.allOff !== true }),
+                },
+                data.allOff === true ? say('masterEnable', '全部启用') : say('masterDisable', '全部停用'),
+              ),
+            )
+          : null,
+
         state.error
           ? h('p', { style: { ...css.hint, marginTop: 12 } }, `${say('failed', '观测失败：')}${state.error}`)
+          : null,
+
+        // 告警区：内容之上，点名具体对象
+        alerts.length > 0
+          ? h(
+              'div',
+              { style: css.alertWrap },
+              alerts.map((alert) =>
+                h(
+                  'div',
+                  { key: alert.key, style: css.alertItem },
+                  h('span', { style: css.alertIcon }, '⚠'),
+                  h('span', null, alert.text),
+                ),
+              ),
+            )
           : null,
 
         data
@@ -794,22 +1066,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               ),
               h(
                 'div',
-                { style: css.groupRow },
-                h(
-                  'div',
-                  { style: css.groupMain },
-                  h('div', { style: css.groupTitle }, say('skillsMaster', '启用技能')),
-                  h('div', { style: css.groupDesc }, say('skillsMasterHint', '关掉 = 一键全部停用：模型目录为空、/ 菜单也选不到；重新打开会恢复各技能自己的开关状态')),
-                ),
-                h(Toggle, {
-                  checked: data.allOff !== true,
-                  disabled: busy,
-                  title: say('skillsMaster', '启用技能'),
-                  onChange: () => write('/zhiyin/settings', { allOff: data.allOff !== true }),
-                }),
-              ),
-              h(
-                'div',
                 { style: css.groupRowLast },
                 h(
                   'div',
@@ -829,6 +1085,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
+        // 标签页（技能 / 技能包）+ 右侧视图切换与刷新
         data
           ? h(
               'div',
@@ -836,9 +1093,33 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: css.seg },
-                h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, say('tabList', '技能列表')),
-                h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, say('tabPacks', '技能包')),
+                h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, `${say('tabList', '技能')} ${counts.total}`),
+                h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, `${say('tabPacks', '技能包')} ${(data.packs ?? []).length}`),
               ),
+              tab === 'list'
+                ? h(
+                    'div',
+                    { style: { ...css.seg, marginLeft: 'auto' } },
+                    h('button', { type: 'button', style: view === 'cards' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('cards') }, say('viewCards', '卡片')),
+                    h('button', { type: 'button', style: view === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('list') }, say('viewList', '列表')),
+                  )
+                : null,
+              h('button', {
+                type: 'button',
+                style: { ...css.iconBtn, marginLeft: tab === 'list' ? 0 : 'auto' },
+                title: say('refresh', '重新观测'),
+                'aria-label': say('refresh', '重新观测'),
+                onClick: load,
+                disabled: state.loading,
+              }, state.loading ? say('loading', '观测中') : h(Icon, { name: 'refresh', size: 14 })),
+            )
+          : null,
+
+        // 工具条：分组动作 · 搜索（占满）· 排序 / 安装
+        data
+          ? h(
+              'div',
+              { style: css.toolbar },
               tab === 'packs'
                 ? h('span', { style: { display: 'inline-flex', gap: 6 } },
                     h('button', { type: 'button', style: css.iconBtn, title: say('packNew', '新建技能包'), 'aria-label': say('packNew', '新建技能包'), onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 })),
@@ -854,6 +1135,21 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     : say('searchPacks', '搜技能包名或成员'),
                 onChange: (event) => setQuery(event.target.value),
               }),
+              tab === 'list'
+                ? h('label', { style: css.sortWrap },
+                    say('sortBy', '排序'),
+                    h('select', {
+                      style: css.sortSelect,
+                      value: sortField,
+                      onChange: (event) => setSortField(event.target.value),
+                    },
+                      h('option', { value: 'name' }, say('sortName', '名称')),
+                      h('option', { value: 'source' }, say('sortSource', '来源')),
+                      h('option', { value: 'chars' }, say('sortChars', '字符数')),
+                      h('option', { value: 'enabled' }, say('sortEnabled', '启用状态')),
+                    ),
+                  )
+                : null,
               tab === 'list'
                 ? h(
                     'button',
@@ -873,11 +1169,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h(Icon, { name: 'install', size: 14 }),
                   )
                 : null,
-              h(
-                'button',
-                { type: 'button', style: css.iconBtn, title: say('refresh', '重新观测'), 'aria-label': say('refresh', '重新观测'), onClick: load, disabled: state.loading },
-                state.loading ? say('loading', '观测中') : h(Icon, { name: 'refresh', size: 14 }),
-              ),
             )
           : null,
 
@@ -888,8 +1179,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               (data.packs ?? []).length === 0
                 ? h('div', { style: css.hint }, say('packEmptyHint', '还没有技能包；点右上角新建，再把技能勾进来'))
                 : null,
-              (data.packs ?? []).map((pack) =>
-                h(
+              (data.packs ?? []).map((pack) => {
+                const status = packStatus(pack)
+                const ghosts = (pack.members ?? []).filter((name) => !scopedNames.has(name))
+                const openMembers = () => {
+                  setDraftMembers(pack.members ?? [])
+                  setMemberQuery('')
+                  setEditing(pack.id)
+                }
+                return h(
                   'div',
                   { key: pack.id, style: css.item },
                   h(
@@ -900,16 +1198,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       { style: css.itemHead },
                       h('span', { style: css.name }, pack.name),
                       h('span', { style: css.badge(true) }, `${pack.members?.length ?? 0} 个技能`),
-                      h('span', { style: { ...css.hint, marginLeft: 'auto' } }, pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中')),
+                      h('span', { style: { ...packStatusStyle(status), marginLeft: 'auto' } }, packStatusLabel(status)),
                     ),
                     pack.members?.length
                       ? h(
                           'div',
                           { style: css.desc },
                           pack.members.slice(0, 6).join(' · ') +
-                            (pack.members.length > 6 ? ` … +${pack.members.length - 6}` : ''),
+                            (pack.members.length > 6 ? ` … +${pack.members.length - 6}` : '') +
+                            (ghosts.length ? `  ·  ${say('packGhost', '未安装')} ${ghosts.length}` : ''),
                         )
-                      : h('div', { style: css.desc }, say('packEmpty', '还没有成员')),
+                      : h('div', { style: css.desc }, say('packEmptyHint2', '还没有成员')),
                   ),
                   h(
                     'button',
@@ -919,29 +1218,43 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       title: say('packMembers', '管理成员'),
                       'aria-label': say('packMembers', '管理成员'),
                       disabled: busy,
-                      onClick: () => {
-                        setDraftMembers(pack.members ?? [])
-                        setMemberQuery('')
-                        setEditing(pack.id)
-                      },
+                      onClick: openMembers,
                     },
                     h(Icon, { name: 'users', size: 14 }),
                   ),
                   h(
-                    'button',
-                    {
-                      type: 'button',
-                      style: css.iconBtn,
-                      title: say('packDelete', '删除技能包'),
-                      'aria-label': say('packDelete', '删除技能包'),
-                      disabled: busy,
-                      onClick: () => {
-                        if (window.confirm(say('packDeleteAsk', '删除技能包？包内技能不会被卸载。') + ' ' + pack.name)) {
-                          write('/zhiyin/pack', { action: 'delete', id: pack.id })
-                        }
+                    'div',
+                    { style: css.menuWrap },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: { ...css.iconBtn, fontWeight: 700, lineHeight: 1 },
+                        title: say('packMore', '更多操作'),
+                        'aria-label': say('packMore', '更多操作'),
+                        disabled: busy,
+                        onClick: (event) => {
+                          event.stopPropagation()
+                          setMenuOpen(menuOpen === pack.id ? null : pack.id)
+                        },
                       },
-                    },
-                    h(Icon, { name: 'trash', size: 13 }),
+                      '…',
+                    ),
+                    menuOpen === pack.id
+                      ? h(
+                          'div',
+                          { style: css.menu, onClick: (event) => event.stopPropagation() },
+                          h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); setRenaming({ id: pack.id, name: pack.name }) } }, say('packRename', '改名')),
+                          h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); copyPack(pack) } }, say('packCopy', '复制')),
+                          h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); openMembers() } }, say('packMembers', '管理成员')),
+                          h('button', { type: 'button', style: { ...css.menuItem, color: '#d06464' }, onClick: () => {
+                            setMenuOpen(null)
+                            if (window.confirm(say('packDeleteAsk', '删除技能包？包内技能不会被卸载。') + ' ' + pack.name)) {
+                              write('/zhiyin/pack', { action: 'delete', id: pack.id })
+                            }
+                          } }, say('packDelete', '删除')),
+                        )
+                      : null,
                   ),
                   h(Toggle, {
                     checked: pack.enabled !== false,
@@ -949,12 +1262,74 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     title: pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中'),
                     onChange: () => write('/zhiyin/pack', { action: 'toggle', id: pack.id, enabled: pack.enabled === false }),
                   }),
-                ),
-              ),
+                )
+              }),
             )
           : null,
 
-        data && tab === 'list'
+        // 卡片视图
+        data && tab === 'list' && view === 'cards'
+          ? h(
+              'div',
+              { style: css.cardGrid },
+              skills.length === 0
+                ? h('div', { style: css.hint }, say('empty', '没有匹配的技能'))
+                : skills.map((skill) => {
+                    const on = skill.enabled !== false
+                    return h(
+                      'div',
+                      {
+                        key: skill.name,
+                        style: on ? css.skillCard : { ...css.skillCard, ...css.itemOff },
+                        title: skill.linkTarget ?? skill.logicalPath ?? skill.path ?? undefined,
+                      },
+                      h(
+                        'div',
+                        { style: css.cardHead },
+                        h('span', { style: css.cardName }, skill.name),
+                        h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, sourceShort(skill)),
+                        h('span', { style: { ...css.hint, flex: '0 0 auto' } }, String(Math.min((skill.description ?? '').length, 500))),
+                      ),
+                      h('div', { style: css.cardDesc }, skill.description ?? ''),
+                      h(
+                        'div',
+                        { style: css.cardFoot },
+                        h('span', { style: css.dot(on) }),
+                        h('span', { style: { fontSize: 11.5, opacity: 0.6 } },
+                          on ? say('enabled', '已启用') : (reasonLabel(skill.hiddenReason) || say('disabledBadge', '已停用'))),
+                        skill.source === 'user-dsh' || skill.source === 'user-agents'
+                          ? h('button', {
+                              type: 'button',
+                              title: say('uninstallHint', '移入归档目录，可恢复'),
+                              'aria-label': say('uninstall', '卸载'),
+                              style: { ...css.iconBtn, marginLeft: 'auto' },
+                              disabled: busy,
+                              onClick: () => {
+                                if (window.confirm(say('uninstallAsk', '卸载并把技能移入归档目录？') + ' ' + skill.name)) {
+                                  write('/zhiyin/uninstall', { name: skill.name })
+                                }
+                              },
+                            }, h(Icon, { name: 'archive', size: 14 }))
+                          : null,
+                        h(Toggle, {
+                          checked: on,
+                          disabled: busy,
+                          title: skill.hiddenReason ? reasonLabel(skill.hiddenReason) : say('toggleHint', '点开关立即生效'),
+                          onChange: () => write('/zhiyin/skill', {
+                            name: skill.name,
+                            enabled: !on,
+                            description: skill.description,
+                            source: skill.source,
+                          }),
+                        }),
+                      ),
+                    )
+                  }),
+            )
+          : null,
+
+        // 列表视图
+        data && tab === 'list' && view === 'list'
           ? h(
               'div',
               { style: css.list },
@@ -1129,6 +1504,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packNew', '新建技能包'))),
                 h('input', {
                   style: css.field,
+                  maxLength: 40,
                   value: draftName,
                   placeholder: say('packNamePlaceholder', '技能包名称'),
                   onChange: (event) => setDraftName(event.target.value),
@@ -1146,6 +1522,44 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       onClick: () => {
                         write('/zhiyin/pack', { action: 'create', name: draftName.trim() })
                         setCreating(false)
+                      },
+                    },
+                    say('save', '保存'),
+                  ),
+                ),
+              ),
+            )
+          : null,
+
+        renaming
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalSm } },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packRename', '改名'))),
+                h('input', {
+                  style: css.field,
+                  maxLength: 40,
+                  value: renaming.name,
+                  placeholder: say('packNamePlaceholder', '技能包名称'),
+                  onChange: (event) => setRenaming({ ...renaming, name: event.target.value }),
+                }),
+                h('p', { style: css.hint }, say('packNameRule', '1–40 个字符；仅限中文、字母、数字、空格、下划线、连字符')),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setRenaming(null) }, say('cancel', '取消')),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: css.btn,
+                      disabled: busy || renaming.name.trim().length < 1 || renaming.name.trim().length > 40,
+                      onClick: () => {
+                        write('/zhiyin/pack', { action: 'rename', id: renaming.id, name: renaming.name.trim() })
+                        setRenaming(null)
                       },
                     },
                     say('save', '保存'),

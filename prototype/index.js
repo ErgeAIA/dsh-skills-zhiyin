@@ -24,6 +24,13 @@ export const inject = ['webServer', 'skills', 'agents', 'workingDirectory']
 const BUDGET_CHARS = 8000
 const DESCRIPTION_MAX_LENGTH = 500
 const PROVIDER_NAME = 'zhiyin'
+const PLUGIN_VERSION = (() => {
+  try {
+    return JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+})()
 
 const EMPTY_STATE = {
   v: 1,
@@ -32,6 +39,19 @@ const EMPTY_STATE = {
   disabled: {},
   packs: [],
   known: {},
+}
+
+/** 技能包名规则：1–40 字符，允许中日韩、空格、下划线、连字符；重名拒绝。 */
+const PACK_NAME_MAX = 40
+function packNameValid(name) {
+  if (typeof name !== 'string') return false
+  const trimmed = name.trim()
+  if (trimmed.length < 1 || trimmed.length > PACK_NAME_MAX) return false
+  return !/[^\p{L}\p{N} _-]/u.test(trimmed)
+}
+function packNameTaken(packs, name, exceptId) {
+  const needle = name.trim()
+  return packs.some((pack) => pack.id !== exceptId && (pack.name ?? '').trim() === needle)
 }
 
 let cache = null
@@ -129,6 +149,8 @@ export function apply(ctx) {
     if (action === 'create') {
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
       if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+      if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '技能包名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
+      if (packNameTaken(packs, name)) return { status: 400, body: { ok: false, error: '已有同名技能包' } }
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
       packs.push({ id: newId, name, enabled: true, members: [], order: packs.length })
       saveState(state)
@@ -142,6 +164,8 @@ export function apply(ctx) {
     if (action === 'rename') {
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
       if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+      if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '技能包名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
+      if (packNameTaken(packs, name, pack.id)) return { status: 400, body: { ok: false, error: '已有同名技能包' } }
       pack.name = name
     } else if (action === 'toggle') {
       pack.enabled = body?.enabled === true
@@ -156,7 +180,11 @@ export function apply(ctx) {
     } else if (action === 'members') {
       const members = Array.isArray(body?.members) ? body.members : null
       if (!members) return { status: 400, body: { ok: false, error: 'members must be an array' } }
-      pack.members = members.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim())
+      const seen = new Set()
+      pack.members = members
+        .filter((name) => typeof name === 'string' && name.trim())
+        .map((name) => name.trim())
+        .filter((name) => (seen.has(name) ? false : (seen.add(name), true)))
     } else if (action === 'reorder') {
       const ids = Array.isArray(body?.ids) ? body.ids : []
       for (let i = 0; i < ids.length; i += 1) {
@@ -761,9 +789,14 @@ async function collectState(ctx) {
   let scopes = 0
   const failures = []
   const known = {}
+  // 同名冲突：同一技能名在不同来源/路径出现多次，提示用户可能互相遮蔽。
+  const nameOrigins = new Map()
 
   const noteSkill = (skill) => {
     if (!byName.has(skill.name)) byName.set(skill.name, skill)
+    const originKey = String(skill.source) + '|' + String(skill.path ?? skill.logicalPath ?? '')
+    if (!nameOrigins.has(skill.name)) nameOrigins.set(skill.name, new Set())
+    nameOrigins.get(skill.name).add(originKey)
     if (!known[skill.name]) {
       known[skill.name] = {
         description: skill.description,
@@ -840,14 +873,22 @@ async function collectState(ctx) {
       .reduce((total, skill) => total + Math.min(skill.description.length, DESCRIPTION_MAX_LENGTH), 0) +
     200
 
+  // 同名冲突清单（>1 个不同来源/路径）。
+  const conflicts = []
+  for (const [name, origins] of nameOrigins) {
+    if (origins.size > 1) conflicts.push({ name, count: origins.size })
+  }
+
   const current = readState()
   return {
     at: new Date().toISOString(),
+    version: PLUGIN_VERSION,
     complete,
     scopes,
     scopedScopes,
     scopeDebug,
     failures,
+    conflicts,
     budgetChars: BUDGET_CHARS,
     descriptionMaxLength: DESCRIPTION_MAX_LENGTH,
     catalogChars,
