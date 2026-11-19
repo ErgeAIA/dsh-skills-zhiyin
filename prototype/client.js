@@ -84,6 +84,7 @@ window.__ModuleLoader__.load({
         next: '技能包与组合在下一版接入；这一版先让你看清现状。',
         agentsRoot: '加载 ~/.agents/skills',
         agentsRootHint: '关掉后 DSH 只看 ~/.dsh/skills 与项目技能',
+        agentsRootHintShort: '开启后读取 ~/.agents/skills 与 ~/.dsh/skills 的合集；关闭后只读 ~/.dsh/skills 与项目技能',
         disabledBadge: '已停用',
         enabledBadge: '启用中',
         toggleFailed: '开关失败：',
@@ -164,6 +165,7 @@ window.__ModuleLoader__.load({
         next: 'Packs and scores land next; this version shows the current state.',
         agentsRoot: 'Load ~/.agents/skills',
         agentsRootHint: 'Off: DSH only reads ~/.dsh/skills and project skills',
+        agentsRootHintShort: 'On: reads ~/.agents/skills and ~/.dsh/skills together; off: only ~/.dsh/skills and project skills',
         disabledBadge: 'disabled',
         enabledBadge: 'enabled',
         toggleFailed: 'Toggle failed: ',
@@ -175,7 +177,7 @@ window.__ModuleLoader__.load({
     }
 
     const css = {
-      page: { padding: '4px 0 48px', color: 'inherit' },
+      page: { maxWidth: 780, padding: '2px 0 48px', color: 'inherit' },
       overlay: {
         position: 'fixed',
         inset: 0,
@@ -211,24 +213,31 @@ window.__ModuleLoader__.load({
       modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
       seg: {
         display: 'inline-flex',
-        borderRadius: 8,
-        background: 'rgba(128,128,128,0.12)',
+        borderRadius: 10,
+        border: '1px solid rgba(128,128,128,0.14)',
+        background: 'rgba(128,128,128,0.04)',
         overflow: 'hidden',
+        flex: '0 0 auto',
       },
       segBtn: {
         border: 'none',
         background: 'transparent',
         color: 'inherit',
-        fontSize: 12,
-        padding: '3px 10px',
+        fontSize: 12.5,
+        padding: '6px 14px',
         cursor: 'pointer',
-        opacity: 0.7,
+        opacity: 0.62,
       },
-      segBtnOn: { background: 'rgba(128,128,128,0.26)', opacity: 1, fontWeight: 600 },
+      segBtnOn: {
+        background: 'rgba(224,116,60,0.16)',
+        color: 'var(--zhiyin-accent, #e0743c)',
+        opacity: 1,
+        fontWeight: 600,
+      },
       head: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
-      title: { fontSize: 20, fontWeight: 600, margin: 0 },
+      title: { fontSize: 22, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' },
       subtitle: { opacity: 0.6, fontSize: 13 },
-      row: { display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginTop: 14 },
+      row: { display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginTop: 18 },
       switchRow: {
         display: 'flex',
         alignItems: 'center',
@@ -274,27 +283,59 @@ window.__ModuleLoader__.load({
         userSelect: 'none',
       },
       pill: (on) => ({
-        fontSize: 12,
+        fontSize: 11.5,
         padding: '2px 10px',
         borderRadius: 999,
-        background: 'rgba(128,128,128,0.18)',
-        opacity: on ? 1 : 0.55,
+        border: 'none',
+        background: on ? 'rgba(224,116,60,0.16)' : 'rgba(128,128,128,0.14)',
+        color: on ? 'var(--zhiyin-accent, #e0743c)' : 'inherit',
+        opacity: on ? 1 : 0.6,
+        flex: '0 0 auto',
       }),
       hint: { fontSize: 12, opacity: 0.6 },
       grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(118px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
         gap: 8,
-        marginTop: 16,
+        marginTop: 18,
       },
       card: {
-        borderRadius: 10,
-        padding: '8px 10px',
-        background: 'rgba(128,128,128,0.07)',
+        borderRadius: 12,
+        padding: '10px 12px',
+        background: 'rgba(128,128,128,0.05)',
+        border: '1px solid rgba(128,128,128,0.12)',
+        transition: 'background 120ms, border-color 120ms',
       },
-      cardActive: { background: 'rgba(128,128,128,0.2)' },
-      statLabel: { fontSize: 12, opacity: 0.6 },
-      statValue: { fontSize: 20, fontWeight: 600, marginTop: 2 },
+      cardActive: {
+        background: 'rgba(128,128,128,0.16)',
+        borderColor: 'var(--zhiyin-accent, #e0743c)',
+      },
+      statLabel: { fontSize: 11.5, opacity: 0.62 },
+      statValue: { fontSize: 19, fontWeight: 600, marginTop: 3, lineHeight: 1.2 },
+
+      group: {
+        marginTop: 18,
+        borderRadius: 12,
+        border: '1px solid rgba(128,128,128,0.12)',
+        background: 'rgba(128,128,128,0.035)',
+        overflow: 'hidden',
+      },
+      groupRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '12px 14px',
+        borderBottom: '1px solid rgba(128,128,128,0.10)',
+      },
+      groupRowLast: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '12px 14px',
+      },
+      groupMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
+      groupTitle: { fontSize: 13, fontWeight: 500 },
+      groupDesc: { fontSize: 12, opacity: 0.58, lineHeight: 1.45 },
       bar: {
         height: 6,
         borderRadius: 999,
@@ -332,13 +373,14 @@ window.__ModuleLoader__.load({
         background: pct > 100 ? '#d9534f' : pct > 80 ? '#e0a33e' : 'rgba(128,128,128,0.55)',
       }),
       input: {
-        flex: '1 1 200px',
+        flex: '1 1 220px',
         minWidth: 160,
-        padding: '6px 10px',
-        borderRadius: 8,
-        border: 'none',
-        background: 'rgba(128,128,128,0.12)',
+        padding: '7px 12px',
+        borderRadius: 10,
+        border: '1px solid rgba(128,128,128,0.14)',
+        background: 'rgba(128,128,128,0.05)',
         color: 'inherit',
+        fontSize: 13,
       },
       textarea: {
         flex: '1 1 auto',
@@ -353,27 +395,29 @@ window.__ModuleLoader__.load({
         resize: 'vertical',
       },
       btn: {
-        padding: '6px 12px',
-        borderRadius: 8,
-        border: 'none',
-        background: 'rgba(128,128,128,0.14)',
+        padding: '6px 14px',
+        borderRadius: 10,
+        border: '1px solid rgba(128,128,128,0.16)',
+        background: 'transparent',
         color: 'inherit',
+        fontSize: 12.5,
         cursor: 'pointer',
       },
       list: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 },
       item: {
-        borderRadius: 10,
-        padding: '10px 12px',
+        borderRadius: 12,
+        padding: '12px 14px',
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        minHeight: 56,
-        background: 'rgba(128,128,128,0.035)',
+        minHeight: 62,
+        background: 'rgba(128,128,128,0.045)',
+        border: '1px solid rgba(128,128,128,0.10)',
       },
       iconBtn: {
         flex: '0 0 auto',
-        width: 28,
-        height: 28,
+        width: 30,
+        height: 30,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -388,8 +432,9 @@ window.__ModuleLoader__.load({
       itemMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
       itemHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
       name: {
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 13,
+        fontFamily: 'inherit',
+        fontSize: 13.5,
+        fontWeight: 600,
         flex: '0 1 auto',
         minWidth: 0,
         whiteSpace: 'nowrap',
@@ -417,8 +462,8 @@ window.__ModuleLoader__.load({
       },
       metaText: { fontSize: 10.5, opacity: 0.5, flex: '0 0 auto', letterSpacing: '0.02em' },
       desc: {
-        fontSize: 12,
-        opacity: 0.6,
+        fontSize: 12.5,
+        opacity: 0.62,
         lineHeight: 1.45,
         display: '-webkit-box',
         WebkitLineClamp: 2,
@@ -688,26 +733,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           { style: css.head },
           h('h2', { style: css.title }, say('title', '织音')),
           h('span', { style: css.subtitle }, say('subtitle', '让技能自由编组，让能力彼此协奏')),
+          data
+            ? h(
+                'span',
+                {
+                  style: { ...css.pill(data.takeover?.visible), marginLeft: 'auto' },
+                  title: data.takeover?.visible
+                    ? say('takeoverHintOn', '已为在跑的会话挂上策略 provider，开关即时生效。')
+                    : say('takeoverHintOff', '还没有在跑的会话；新会话出现后自动挂钩。'),
+                },
+                data.takeover?.visible ? say('takeoverOn', '开关已生效') : say('takeoverOff', '未接管'),
+              )
+            : null,
         ),
-
-        data
-          ? h(
-              'div',
-              { style: css.row },
-              h(
-                'span',
-                { style: css.pill(data.takeover?.visible) },
-                data.takeover?.visible ? say('takeoverOn', '已接管') : say('takeoverOff', '未接管'),
-              ),
-              h(
-                'span',
-                { style: css.hint },
-                data.takeover?.visible
-                  ? say('takeoverHintOn', '当前会话的技能目录由织音发布。')
-                  : say('takeoverHintOff', '当前会话仍由 DSH 默认消费者发布目录；设置页只做观测。'),
-              ),
-            )
-          : null,
 
         state.error
           ? h('p', { style: { ...css.hint, marginTop: 12 } }, `${say('failed', '观测失败：')}${state.error}`)
@@ -724,13 +762,56 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         data
           ? h(
               'div',
-              { style: css.budgetRow },
-              h('span', { style: css.budgetLabel }, say('budget', '目录字符数')),
-              h('span', { style: css.budgetNum }, String(data.catalogChars),
-                h('span', { style: css.budgetCap }, ` / ${data.budgetChars}`)),
-              h('span', { style: css.budgetTrack }, h('span', { style: css.budgetFill(pct) })),
-              h('span', { style: { ...css.metaText, marginLeft: 8 } },
-                data.complete ? say('complete', '观测完整') : say('incomplete', '观测不完整'),
+              { style: css.group },
+              h(
+                'div',
+                { style: css.groupRow },
+                h(
+                  'div',
+                  { style: css.groupMain },
+                  h('div', { style: css.groupTitle }, say('agentsRoot', '加载 ~/.agents/skills')),
+                  h('div', { style: css.groupDesc }, say('agentsRootHintShort', '开启后读取 ~/.agents/skills 与 ~/.dsh/skills 的合集；关闭后只读 ~/.dsh/skills 与项目技能')),
+                ),
+                h(Toggle, {
+                  checked: data.agentsRoot !== false,
+                  disabled: busy,
+                  title: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
+                  onChange: () => write('/zhiyin/settings', { agentsRoot: data.agentsRoot === false }),
+                }),
+              ),
+              h(
+                'div',
+                { style: css.groupRow },
+                h(
+                  'div',
+                  { style: css.groupMain },
+                  h('div', { style: css.groupTitle }, say('skillsMaster', '启用技能')),
+                  h('div', { style: css.groupDesc }, say('skillsMasterHint', '关掉 = 一键全部停用：模型目录为空、/ 菜单也选不到；重新打开会恢复各技能自己的开关状态')),
+                ),
+                h(Toggle, {
+                  checked: data.allOff !== true,
+                  disabled: busy,
+                  title: say('skillsMaster', '启用技能'),
+                  onChange: () => write('/zhiyin/settings', { allOff: data.allOff !== true }),
+                }),
+              ),
+              h(
+                'div',
+                { style: css.groupRowLast },
+                h(
+                  'div',
+                  { style: css.groupMain },
+                  h(
+                    'div',
+                    { style: css.groupTitle },
+                    say('budget', '目录字符数'),
+                    h('span', { style: { ...css.budgetNum, marginLeft: 8 } }, String(data.catalogChars),
+                      h('span', { style: css.budgetCap }, ` / ${data.budgetChars}`)),
+                  ),
+                  h('div', { style: css.groupDesc },
+                    data.complete ? say('complete', '观测完整') : say('incomplete', '观测不完整')),
+                  h('span', { style: { ...css.budgetTrack, marginTop: 6 } }, h('span', { style: css.budgetFill(pct) })),
+                ),
               ),
             )
           : null,
@@ -738,7 +819,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         data
           ? h(
               'div',
-              { style: { ...css.row, justifyContent: 'space-between' } },
+              { style: { ...css.row, marginTop: 22 } },
               h(
                 'div',
                 { style: css.seg },
@@ -759,20 +840,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     ? say('search', '按名称或描述搜索')
                     : say('searchPacks', '搜技能包名或成员'),
                 onChange: (event) => setQuery(event.target.value),
-              }),
-              h(Switch, {
-                label: say('agentsRoot', '启用 .agents 技能目录'),
-                hint: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
-                checked: data.agentsRoot !== false,
-                disabled: busy,
-                onChange: () => write('/zhiyin/settings', { agentsRoot: data.agentsRoot === false }),
-              }),
-              h(Switch, {
-                label: say('skillsMaster', '启用技能'),
-                hint: say('skillsMasterHint', '关掉 = 一键全部停用：模型目录为空、/ 菜单也选不到；重新打开会恢复各技能自己的开关状态'),
-                checked: data.allOff !== true,
-                disabled: busy,
-                onChange: () => write('/zhiyin/settings', { allOff: data.allOff !== true }),
               }),
               tab === 'list'
                 ? h(
@@ -812,12 +879,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { key: pack.id, style: css.item },
-                  h(Toggle, {
-                    checked: pack.enabled !== false,
-                    disabled: busy,
-                    title: pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中'),
-                    onChange: () => write('/zhiyin/pack', { action: 'toggle', id: pack.id, enabled: pack.enabled === false }),
-                  }),
                   h(
                     'div',
                     { style: css.itemMain },
@@ -829,7 +890,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       h('span', { style: { ...css.hint, marginLeft: 'auto' } }, pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中')),
                     ),
                     pack.members?.length
-                      ? h('div', { style: css.desc }, pack.members.join(' · '))
+                      ? h(
+                          'div',
+                          { style: css.desc },
+                          pack.members.slice(0, 6).join(' · ') +
+                            (pack.members.length > 6 ? ` … +${pack.members.length - 6}` : ''),
+                        )
                       : h('div', { style: css.desc }, say('packEmpty', '还没有成员')),
                   ),
                   h(
@@ -864,6 +930,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     },
                     h(Icon, { name: 'trash', size: 13 }),
                   ),
+                  h(Toggle, {
+                    checked: pack.enabled !== false,
+                    disabled: busy,
+                    title: pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中'),
+                    onChange: () => write('/zhiyin/pack', { action: 'toggle', id: pack.id, enabled: pack.enabled === false }),
+                  }),
                 ),
               ),
             )
@@ -883,20 +955,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         style: skill.enabled === false ? { ...css.item, ...css.itemOff } : css.item,
                         title: skill.linkTarget ?? skill.logicalPath ?? skill.path ?? undefined,
                       },
-                      h(Toggle, {
-                        checked: skill.enabled !== false,
-                        disabled: busy,
-                        title: skill.hiddenReason
-                          ? reasonLabel(skill.hiddenReason)
-                          : say('toggleHint', '点开关立即生效'),
-                        onChange: () =>
-                          write('/zhiyin/skill', {
-                            name: skill.name,
-                            enabled: skill.enabled === false,
-                            description: skill.description,
-                            source: skill.source,
-                          }),
-                      }),
                       skill.source === 'user-dsh' || skill.source === 'user-agents'
                         ? h(
                             'button',
@@ -956,6 +1014,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           ? h('div', { style: css.desc }, skill.description)
                           : null,
                       ),
+                      h(Toggle, {
+                        checked: skill.enabled !== false,
+                        disabled: busy,
+                        title: skill.hiddenReason
+                          ? reasonLabel(skill.hiddenReason)
+                          : say('toggleHint', '点开关立即生效'),
+                        onChange: () =>
+                          write('/zhiyin/skill', {
+                            name: skill.name,
+                            enabled: skill.enabled === false,
+                            description: skill.description,
+                            source: skill.source,
+                          }),
+                      }),
                     ),
                   ),
             )
