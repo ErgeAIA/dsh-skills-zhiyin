@@ -63,6 +63,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | provider.list 有硬约束 | 只读内存快照，禁止在 list 内调用 ctx.skills.list/snapshot（会自锁） |
 | 第三方插件无 Typert Remote | 宿主与页面通信用同源 HTTP 路由 `ctx.webServer.register`，前端 fetch |
 | Git 分支纪律 | 一个任务一个分支，合并后收口并删除子分支；删分支前先核实合并状态并告知结论 |
+| 每次交付须附下一步计划 | 回复任务完成情况时，须同时给出下一步计划：接下来做什么、为何、怎么验收；不只报结果，也不先说结论再补计划 |
 
 ## References
 

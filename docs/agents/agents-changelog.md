@@ -2,7 +2,7 @@
 title: AGENTS.md Changelog
 type: agents-changelog
 project: dsh-skills-zhiyin
-updated: 2026-11-17
+updated: 2026-11-19
 description: >
   AGENTS.md 的变更记录，AGENTS.md 每改动一次就追加一行，不随日常开发更新。
   只追加，不删除或改写历史。AI 在本文件新增或修改任何条目后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -37,3 +37,4 @@ description: >
 - <Conventions「仓库目录布局固定：根目录只留 AGENTS.md、README.md、CHANGELOG.md、.gitignore 与 docs/、prototype/」> → update → 允许根目录放 PRODUCT.md、DESIGN.md 与 .impeccable/（impeccable 要求产物落在项目根，且 contract 文件必须能被工具按固定路径读到）
 - <References 无产品真相指针> → update → 新增「设计前先读产品真相 → 见 PRODUCT.md」
 - <Permissions「每次只推进一个阶段，完成即停，等用户验证」> → update → 「按任务需要连续推进多个阶段，每完成一个功能自行 review（语法、假 ctx 冒烟、真机数据），不需要 UI 验收时不要停下来等；最后整体交付验收」；原因：用户 2026-11-18 指出一步一停进度太慢
+- <Conventions 无「交付须附下一步计划」> → update → 新增「每次交付须附下一步计划」行；原因：用户 2026-11-19 要求每次交付除报告完成外还要给出下一步计划
