@@ -23,7 +23,16 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-19 18:5x 导出/导入配置落地（commit 500f04d）：导出瘦身、导入备份、错误分流
+- **最后更新**：2026-11-19 22:5x 组合/合奏意图/批量/回滚落地（commit de23008，merge ca27269）：功能面补齐 PRD FR-010~014、FR-023、FR-025
+  - 宿主新增 POST /zhiyin/combo：create / rename / setPacks / delete / preview / apply / stack / exit；组合只存包 ID（PRD §7.3），预览用「最终生效集合」而不是增量，叠加先出叠加预览再执行
+  - 宿主新增 POST /zhiyin/intent：单技能排除与常驻互斥切换（FR-011/FR-010），只改意图、不动包；hiddenReason 优先级落为 allOff > agentsRoot > 排除 > 常驻 > 合奏模式 > 包停用 > 手动停用
+  - /zhiyin/skill 支持 names[] 批量提交：一次写盘、一次 invalidate，目录只翻一遍（FR-023）
+  - 新增 GET /zhiyin/backups 与 POST /zhiyin/rollback：导入前必有备份，回滚前再备份当前态；备份只留最近 20 份（FR-025）
+  - collectState 输出补 packs[].active / packs[].cost（每包目录成本，FR-021）、combos、intent；导出/导入的 combos/intent 从占位变成真实字段，导入时清洗幽灵包 ID
+  - 设置页新增「组合」标签页：合奏模式条、组合卡（应用/叠加/预览/改名/删除/选择包）、未编配与组合未纳入标记；技能行与卡片加排除·常驻按钮；列表视图加复选框与批量条；页头加「撤销上次」
+  - 冒烟：组合名 1–40 与重名拒绝、setPacks 去重清幽灵、preview on/off/enable/hide/unassigned、apply/stack 落意图、排除与常驻互斥、导出 11 键无 known、导入 round-trip 保 combos+intent、批量 applied=2、回滚恢复 mode/combos/alwaysOn、坏文件名 404；渲染桩跑通三标签页与全部交互（POST 载荷逐条核对）；node --check 双半边 exit 0
+  - 待验收：宿主改动需完整重启 DSH 后由用户验证组合页、排除/常驻、批量条与撤销上次
+  - 上一轮：导出/导入配置落地（commit 500f04d）：导出瘦身、导入备份、错误分流
   - 宿主新增 GET /zhiyin/export：只导出最小集（schemaVersion/exportedAt/pluginVersion/agentsRoot/allOff/disabled/packs/exclude/combos/intent），对齐 PRD C-18
   - 导出不再带 known：它是观测缓存、可由 collectState 重建；带上会让文件涨到 84KB 并撑爆导入侧 64KB body 限制（现导出 360 字节）
   - 宿主新增 POST /zhiyin/import：替换语义——先落一份带时间戳备份再覆盖 packs/agentsRoot/allOff/disabled；缺 packs 不清空现有包；回报未安装成员清单
