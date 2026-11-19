@@ -2,7 +2,7 @@
 title: Project Progress
 type: project-progress
 project: dsh-skills-zhiyin
-updated: 2026-11-17
+updated: 2026-11-19
 description: >
   项目开发进度实时记录：阶段、分支、代码状态、最近进展。每次会话更新。
   AI 在本文件新增进展或修改当前状态后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -107,6 +107,8 @@ description: >
   - 根目录只留 AGENTS.md / README.md / CHANGELOG.md / .gitignore 与 docs/、prototype/：PRD 进 docs/prd/，ADR 进 docs/adr/，UI 决议进 docs/design/，HANDOVER.md 改名进 docs/handoff/handoff-2026-11-17-m0-skills-provider.md
   - AGENTS.md 首行定位改为「技能管理插件，管安装、卸载、启停与技能包编组」，写盘边界（安装新建目录 / 卸载移入归档）写进 Permissions 与 Conventions
   - prototype/package.json version → 0.1.0
+  - 市场风格设置页骨架（commit a700806）：页头下加元信息条（版本 · 观测时间 ｜ 右侧「全部停用/全部启用」主按钮）；告警区上移至内容之上（目录超预算 / 同名冲突 / 包内引用未安装技能）；标签页（技能 / 技能包）独立成行并带计数；工具条新增「卡片/列表」视图切换（localStorage 持久化）与排序（名称/来源/字符数/启用状态）；技能卡：等宽名 + 来源徽标 + 字符数 + 两行描述 + ●启用状态 + 开关；技能包卡：三态徽标（全部/部分/全部停用，由成员派生）+ 成员预览前 6 + 行尾 … 菜单（改名/复制/管理成员/删除）
+  - 后端（同 commit）：包名 create/rename 校验 1–40 字符与重名；members 保存去重；collectState 增加 version 字段与 conflicts 同名冲突清单（按 来源|路径 去重）
   - git init（main）+ 首次提交 `1e3b33d` 并 push 到 origin（私有仓库）；credentials 走 gh CLI
   - 上一轮：初始化项目协作档案；git init（main）；.gitignore / CHANGELOG.md / README.md 三件委托交付并验收；codegraph 1.6.2 已建索引（5 文件 / 71 节点 / 195 边）
 - **下一步**：重启 DSH 后验证启停是否真机生效（看 zhiyin-proto/events.ndjson 的 provider-registered），再做技能包（packs 状态已在 hiddenReason 里支撑）
