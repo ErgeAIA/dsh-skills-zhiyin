@@ -11,7 +11,7 @@
  * 为什么不走 Remote：Typert 的客户端装配是构建期固定清单、生成器不随
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 
@@ -32,12 +32,25 @@ const PLUGIN_VERSION = (() => {
   }
 })()
 
+/** 合奏意图的默认值（PRD §7.4）：compat = 不接管，orchestrated = 由织音投影。 */
+const EMPTY_INTENT = {
+  schemaVersion: 1,
+  mode: 'compat',
+  activePackIds: [],
+  alwaysOnSkillNames: [],
+  excludedSkillNames: [],
+  revision: 0,
+  updatedAt: null,
+}
+
 const EMPTY_STATE = {
   v: 1,
   agentsRoot: true,
   allOff: false,
   disabled: {},
   packs: [],
+  combos: [],
+  intent: { ...EMPTY_INTENT },
   known: {},
 }
 
@@ -52,6 +65,102 @@ function packNameValid(name) {
 function packNameTaken(packs, name, exceptId) {
   const needle = name.trim()
   return packs.some((pack) => pack.id !== exceptId && (pack.name ?? '').trim() === needle)
+}
+
+/** 组合名规则与技能包一致：1–40 字符；重名拒绝。 */
+function comboNameTaken(combos, name, exceptId) {
+  const needle = name.trim()
+  return combos.some((combo) => combo.id !== exceptId && (combo.name ?? '').trim() === needle)
+}
+
+function newId(prefix) {
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+}
+
+/** 把磁盘上的 intent 补成完整形状；每次返回新对象，避免改到 EMPTY_INTENT。 */
+function normalizeIntent(state) {
+  const raw = state?.intent && typeof state.intent === 'object' ? state.intent : {}
+  const list = (value) =>
+    Array.isArray(value)
+      ? value.filter((entry) => typeof entry === 'string' && entry.trim()).map((entry) => entry.trim())
+      : []
+  return {
+    schemaVersion: 1,
+    mode: raw.mode === 'orchestrated' ? 'orchestrated' : 'compat',
+    activePackIds: list(raw.activePackIds),
+    alwaysOnSkillNames: list(raw.alwaysOnSkillNames),
+    excludedSkillNames: list(raw.excludedSkillNames),
+    revision: Number.isInteger(raw.revision) ? raw.revision : 0,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
+  }
+}
+
+/** 只保留真实存在的包 ID 并去重；组合里被删掉的包会静默退出。 */
+function normalizePackIds(state, input) {
+  const available = new Set((state.packs ?? []).map((pack) => pack.id))
+  const seen = new Set()
+  const out = []
+  for (const entry of Array.isArray(input) ? input : []) {
+    if (typeof entry !== 'string') continue
+    const id = entry.trim()
+    if (!id || seen.has(id) || !available.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+/** 某个包此刻是否生效：自己的开关 + 合奏模式下的组合约束。 */
+function packActive(state, pack, intent) {
+  if (!pack || pack.enabled === false) return false
+  const plan = intent ?? normalizeIntent(state)
+  if (plan.mode === 'orchestrated') return plan.activePackIds.includes(pack.id)
+  return true
+}
+
+/** 含这个技能的包（含被停用的包，用于区分「包停用」与「未编配」）。 */
+function memberPacks(state, skillName) {
+  return (state.packs ?? []).filter(
+    (pack) => Array.isArray(pack?.members) && pack.members.includes(skillName),
+  )
+}
+
+/** 应用前预览：只算差异，不写 state，也不改任何技能包。 */
+async function previewIntent(ctx, state, packIds, stack) {
+  const base = normalizeIntent(state)
+  const next = {
+    ...base,
+    mode: 'orchestrated',
+    activePackIds: normalizePackIds(state, stack ? [...base.activePackIds, ...packIds] : packIds),
+  }
+  const draft = { ...state, intent: next }
+  const observed = await collectState(ctx)
+  const skills = Array.isArray(observed?.skills) ? observed.skills : []
+  const visible = (plan) =>
+    new Set(skills.filter((skill) => hiddenReason(plan, skill.name, skill.source) === null).map((skill) => skill.name))
+  const before = visible(state)
+  const after = visible(draft)
+  const packsBefore = (state.packs ?? []).filter((pack) => packActive(state, pack, base)).map((pack) => pack.id)
+  const packsAfter = (state.packs ?? []).filter((pack) => packActive(draft, pack, next)).map((pack) => pack.id)
+  const catalogChars =
+    skills
+      .filter((skill) => after.has(skill.name))
+      .reduce((total, skill) => total + Math.min((skill.description ?? '').length, DESCRIPTION_MAX_LENGTH), 0) + 200
+  const allPackIds = (state.packs ?? []).map((pack) => pack.id)
+  return {
+    mode: 'orchestrated',
+    activePackIds: next.activePackIds,
+    // 生效面用「最终集合」而不是增量：用户看的是应用后哪些包在场上。
+    packsOn: packsAfter,
+    packsOff: allPackIds.filter((id) => !packsAfter.includes(id)),
+    packsEnter: packsAfter.filter((id) => !packsBefore.includes(id)),
+    packsLeave: packsBefore.filter((id) => !packsAfter.includes(id)),
+    enable: [...after].filter((name) => !before.has(name)).sort(),
+    hide: [...before].filter((name) => !after.has(name)).sort(),
+    unassigned: skills.filter((skill) => hiddenReason(draft, skill.name, skill.source) === 'unassigned').length,
+    catalogChars,
+    budgetChars: BUDGET_CHARS,
+  }
 }
 
 let cache = null
@@ -80,21 +189,27 @@ export function apply(ctx) {
     }),
   )
 
+  // 单个技能的开关；传 names 时合并成一次提交（FR-023 批量提交：  
+  // 一次写盘 / 一次 invalidate，目录只翻一遍）。
   post(ctx, '/zhiyin/skill', async (body) => {
     const state = readState()
-    const skillName = typeof body?.name === 'string' ? body.name.trim() : ''
-    if (!skillName) return { status: 400, body: { ok: false, error: 'name is required' } }
-    if (body.description && !state.known[skillName]) {
-      state.known[skillName] = {
-        description: String(body.description).slice(0, 400),
-        source: typeof body.source === 'string' ? body.source : 'custom',
+    const incoming = Array.isArray(body?.names) ? body.names : [body?.name]
+    const names = [...new Set(incoming.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim()))]
+    if (names.length === 0) return { status: 400, body: { ok: false, error: 'name is required' } }
+    const at = new Date().toISOString()
+    for (const skillName of names) {
+      if (names.length === 1 && body.description && !state.known[skillName]) {
+        state.known[skillName] = {
+          description: String(body.description).slice(0, 400),
+          source: typeof body.source === 'string' ? body.source : 'custom',
+        }
       }
+      if (body.enabled === true) delete state.disabled[skillName]
+      else state.disabled[skillName] = { at }
     }
-    if (body.enabled === true) delete state.disabled[skillName]
-    else state.disabled[skillName] = { at: new Date().toISOString() }
     saveState(state)
     invalidateAll()
-    return { status: 200, body: { ok: true, disabled: Object.keys(state.disabled).length } }
+    return { status: 200, body: { ok: true, applied: names.length, disabled: Object.keys(state.disabled).length } }
   })
 
   post(ctx, '/zhiyin/settings', async (body) => {
@@ -201,6 +316,104 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, packs: packs.length } }
   })
 
+  // 组合（PRD §7.3）：只保存包 ID 列表；应用/叠加写进 intent，改生效面而不是包本身。
+  post(ctx, '/zhiyin/combo', async (body) => {
+    const state = readState()
+    const combos = Array.isArray(state.combos) ? state.combos : (state.combos = [])
+    const action = typeof body?.action === 'string' ? body.action : ''
+    const id = typeof body?.id === 'string' ? body.id : ''
+    const index = combos.findIndex((combo) => combo.id === id)
+    const now = new Date().toISOString()
+
+    if (action === 'create') {
+      const name = typeof body?.name === 'string' ? body.name.trim() : ''
+      if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+      if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '组合名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
+      if (comboNameTaken(combos, name)) return { status: 400, body: { ok: false, error: '已有同名组合' } }
+      const newComboId = newId('c')
+      combos.push({ id: newComboId, name, description: '', packIds: [], order: combos.length, createdAt: now, updatedAt: now })
+      saveState(state)
+      invalidateAll()
+      return { status: 200, body: { ok: true, id: newComboId } }
+    }
+
+    // 退出合奏：回到兼容模式，包自己的开关原样保留。
+    if (action === 'exit') {
+      const current = normalizeIntent(state)
+      state.intent = { ...current, mode: 'compat', activePackIds: [], revision: current.revision + 1, updatedAt: now }
+      saveState(state)
+      invalidateAll()
+      note('intent-exit', { revision: state.intent.revision })
+      return { status: 200, body: { ok: true, intent: normalizeIntent(state) } }
+    }
+
+    // 差异预览：不写 state；应用前必须让用户看到「会加入谁、会退出谁」。
+    if (action === 'preview') {
+      const combo = index >= 0 ? combos[index] : null
+      const packIds = Array.isArray(body?.packIds) ? body.packIds : (combo?.packIds ?? [])
+      const preview = await previewIntent(ctx, state, packIds, body?.stack === true)
+      return { status: 200, body: { ok: true, preview } }
+    }
+
+    if (index < 0) return { status: 404, body: { ok: false, error: 'combo not found' } }
+    const combo = combos[index]
+
+    if (action === 'rename') {
+      const name = typeof body?.name === 'string' ? body.name.trim() : ''
+      if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+      if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '组合名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
+      if (comboNameTaken(combos, name, combo.id)) return { status: 400, body: { ok: false, error: '已有同名组合' } }
+      combo.name = name
+    } else if (action === 'setPacks') {
+      combo.packIds = normalizePackIds(state, body?.packIds)
+    } else if (action === 'delete') {
+      combos.splice(index, 1)
+    } else if (action === 'apply' || action === 'stack') {
+      const current = normalizeIntent(state)
+      const active = action === 'stack' ? [...current.activePackIds, ...combo.packIds] : combo.packIds
+      state.intent = {
+        ...current,
+        mode: 'orchestrated',
+        activePackIds: normalizePackIds(state, active),
+        revision: current.revision + 1,
+        updatedAt: now,
+      }
+      note('intent-applied', { combo: combo.id, action, packs: state.intent.activePackIds.length })
+    } else {
+      return { status: 400, body: { ok: false, error: 'unknown action: ' + action } }
+    }
+
+    combo.updatedAt = now
+    saveState(state)
+    invalidateAll()
+    return { status: 200, body: { ok: true, combos: combos.length, intent: normalizeIntent(state) } }
+  })
+
+  // 合奏层开关：单技能排除（FR-011）与常驻技能（FR-010）。只改 intent，不动任何包。
+  post(ctx, '/zhiyin/intent', async (body) => {
+    const state = readState()
+    const name = typeof body?.name === 'string' ? body.name.trim() : ''
+    if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+    const field = body?.field === 'alwaysOn' ? 'alwaysOnSkillNames' : 'excludedSkillNames'
+    const on = body?.value === true
+    const current = normalizeIntent(state)
+    const next = { ...current }
+    const names = new Set(current[field])
+    if (on) names.add(name)
+    else names.delete(name)
+    next[field] = [...names]
+    // 常驻与排除互斥：设一个就清掉另一个，免得同一技能既常驻又被排除。
+    if (on && field === 'excludedSkillNames') next.alwaysOnSkillNames = current.alwaysOnSkillNames.filter((entry) => entry !== name)
+    if (on && field === 'alwaysOnSkillNames') next.excludedSkillNames = current.excludedSkillNames.filter((entry) => entry !== name)
+    next.revision = current.revision + 1
+    next.updatedAt = new Date().toISOString()
+    state.intent = next
+    saveState(state)
+    invalidateAll()
+    note('intent-updated', { field, name, on })
+    return { status: 200, body: { ok: true, intent: next } }
+  })
+
   post(ctx, '/zhiyin/install', async (body) => {
     const source = cleanPath(body?.path)
     if (!source) return { status: 400, body: { ok: false, error: 'path is required' } }
@@ -286,9 +499,15 @@ export function apply(ctx) {
           })),
           // 不导出 known：它是观测缓存（可随时由 collectState 重建），且会让文件涨到 80KB+，
           // 既超出 PRD C-18「最小导出」边界，也会撑爆导入侧 64KB body 限制。
-          exclude: [],
-          combos: [],
-          intent: null,
+          combos: (state.combos ?? []).map((combo, index) => ({
+            id: combo?.id,
+            name: combo?.name,
+            description: combo?.description ?? '',
+            packIds: Array.isArray(combo?.packIds) ? combo.packIds : [],
+            order: typeof combo?.order === 'number' ? combo.order : index,
+          })),
+          // 意图（PRD §7.4）：模式 / 生效包 / 常驻 / 排除，一并导出，导入方能原样恢复生效面。
+          intent: normalizeIntent(state),
         })
       },
     }),
@@ -316,6 +535,22 @@ export function apply(ctx) {
               : [],
             order: typeof pack.order === 'number' ? pack.order : index,
           }))
+    // 组合同样规范化：缺 id/order 补默认值，成员只留字符串。
+    const incomingCombos = Array.isArray(payload?.combos) ? payload.combos : null
+    const combos = incomingCombos === null
+      ? []
+      : incomingCombos
+          .filter((combo) => combo && typeof combo === 'object')
+          .map((combo, index) => ({
+            id: typeof combo.id === 'string' && combo.id ? combo.id : 'c' + Date.now().toString(36) + index,
+            name: typeof combo.name === 'string' ? combo.name.trim().slice(0, PACK_NAME_MAX) : ('组合 ' + (index + 1)),
+            description: typeof combo.description === 'string' ? combo.description.slice(0, 200) : '',
+            packIds: Array.isArray(combo.packIds) ? combo.packIds.filter((packId) => typeof packId === 'string') : [],
+            order: typeof combo.order === 'number' ? combo.order : index,
+            createdAt: typeof combo.createdAt === 'string' ? combo.createdAt : new Date().toISOString(),
+            updatedAt: typeof combo.updatedAt === 'string' ? combo.updatedAt : new Date().toISOString(),
+          }))
+
     // 导入 = 恢复配置（替换语义），先给当前 state 落一份带时间戳的备份，再覆盖可编辑字段。
     const backup = backupState()
     const state = readState()
@@ -325,6 +560,15 @@ export function apply(ctx) {
       if (typeof payload.agentsRoot === 'boolean') state.agentsRoot = payload.agentsRoot
       if (typeof payload.allOff === 'boolean') state.allOff = payload.allOff
       if (payload.disabled && typeof payload.disabled === 'object' && !Array.isArray(payload.disabled)) state.disabled = payload.disabled
+      // 组合引用的包可能在本机不存在：先落地，再把幽灵 ID 洗干净。
+      if (incomingCombos !== null) {
+        state.combos = combos.map((combo) => ({ ...combo, packIds: normalizePackIds(state, combo.packIds) }))
+      }
+      if (payload.intent && typeof payload.intent === 'object') {
+        const intent = normalizeIntent({ intent: payload.intent })
+        intent.activePackIds = normalizePackIds(state, intent.activePackIds)
+        state.intent = intent
+      }
       // known 是缓存不是配置：导入时只做合并，本地观测到的元信息优先，避免被旧快照覆盖。
       if (payload.known && typeof payload.known === 'object' && !Array.isArray(payload.known)) {
         state.known = { ...payload.known, ...state.known }
@@ -344,9 +588,39 @@ export function apply(ctx) {
     } catch {
       /* 缺失清单失败不影响导入 */
     }
-    note('config-imported', { packs: effective.length, backup, missing: missing.length })
-    return { status: 200, body: { ok: true, packs: effective.length, backup, missing } }
+    const effectiveCombos = Array.isArray(state.combos) ? state.combos.length : 0
+    note('config-imported', { packs: effective.length, combos: effectiveCombos, backup, missing: missing.length })
+    return { status: 200, body: { ok: true, packs: effective.length, combos: effectiveCombos, backup, missing } }
   }, 1048576)
+
+  // 投影日志与回滚（FR-025）：列出导入前留下的快照，并允许退回任意一份。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/backups',
+      resource: async () => json({ backups: listBackups() }),
+    }),
+  )
+  post(ctx, '/zhiyin/rollback', async (body) => {
+    const wanted = typeof body?.file === 'string' ? body.file.trim() : ''
+    const backups = listBackups()
+    const target = wanted || backups[0]?.file || ''
+    if (!target || !backups.some((entry) => entry.file === target)) {
+      return { status: 404, body: { ok: false, error: '没有可回滚的备份' } }
+    }
+    // 回滚本身也可能手滑：先把当前状态再备份一份，任何一步都可退。
+    const safety = backupState()
+    try {
+      cpSync(join(stateDir(), target), configFile())
+    } catch (error) {
+      note('state-rollback-failed', { file: target, error: String(error?.message ?? error) })
+      return { status: 500, body: { ok: false, error: '回滚失败：' + String(error?.message ?? error) } }
+    }
+    cache = null // 下一位读者必须重新读盘，而不是继续用内存里的旧状态。
+    invalidateAll()
+    note('state-rolled-back', { file: target, safety })
+    return { status: 200, body: { ok: true, file: target, safety } }
+  })
 
   // 新出现的 Agent 及时挂上策略 provider（轮询足够便宜，且不依赖内部事件名）。
   const timer = setInterval(() => {
@@ -522,10 +796,31 @@ function backupState() {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const dest = join(stateDir(), 'backup-' + stamp + '.json')
     cpSync(file, dest)
+    // 只留最近 20 份：回滚容量够用，状态目录不会无限膨胀。
+    for (const stale of listBackups().slice(20)) {
+      try {
+        unlinkSync(join(stateDir(), stale.file))
+      } catch {
+        /* 删不掉就留着，不影响回滚 */
+      }
+    }
     return dest
   } catch (error) {
     note('state-backup-failed', { error: String(error?.message ?? error) })
     return null
+  }
+}
+
+/** 可用备份（新的在前）：只认 stateDir 下的 backup-*.json。 */
+function listBackups() {
+  try {
+    return readdirSync(stateDir())
+      .filter((name) => /^backup-.*\.json$/.test(name))
+      .sort()
+      .reverse()
+      .map((file) => ({ file, at: statSync(join(stateDir(), file)).mtime.toISOString() }))
+  } catch {
+    return []
   }
 }
 
@@ -541,14 +836,32 @@ function note(event, detail) {
   }
 }
 
-/** 这个技能此刻是否应当被隐藏，以及原因。 */
+/**
+ * 这个技能此刻是否应当被隐藏，以及原因。
+ *
+ * 优先级：全部停用 > agents 目录开关 > 合奏层排除 > 常驻技能 > 合奏模式（未编配 / 组合未纳入）> 包停用 > 手动停用。
+ * 合奏层只决定「生效面」，从不修改技能包自己的开关，所以退出合奏能原样恢复。
+ */
 function hiddenReason(state, skillName, source) {
-  // 一键全部关掉：优先级最高，压过技能包与单个开关。
+  // 一键全部关掉：优先级最高，压过技能包、组合与单个开关。
   if (state.allOff === true) return 'all-off'
   if (state.agentsRoot === false && source === 'user-agents') return 'agents-root'
-  const packs = (state.packs ?? []).filter(
-    (pack) => Array.isArray(pack?.members) && pack.members.includes(skillName),
-  )
+  const intent = normalizeIntent(state)
+  const alwaysOn = intent.alwaysOnSkillNames.includes(skillName)
+  // 单技能排除（FR-011）：只影响生效面，不改任何包。
+  if (intent.excludedSkillNames.includes(skillName)) {
+    if (alwaysOn) note('intent-conflict', { skillName, detail: '同时被设为常驻，按排除处理' })
+    return 'excluded'
+  }
+  // 常驻技能（FR-010）：不受包启停与组合约束。
+  if (alwaysOn) return null
+  const packs = memberPacks(state, skillName)
+  if (intent.mode === 'orchestrated') {
+    // 接管后：未编配的技能不自动生效；编配了但组合没纳入的包也不生效。
+    if (packs.length === 0) return 'unassigned'
+    if (!packs.some((pack) => packActive(state, pack, intent))) return 'combo'
+    return null
+  }
   if (packs.length > 0) {
     if (!packs.some((pack) => pack.enabled !== false)) return 'pack'
   } else if (state.disabled?.[skillName]) {
@@ -997,6 +1310,17 @@ async function collectState(ctx) {
   }
 
   const current = readState()
+  const intent = normalizeIntent(current)
+  // 每个包的目录成本（FR-021）：按已知描述截断到 500 字符累加，用来判断这个包值不值。
+  const packsOut = (current.packs ?? []).map((pack) => {
+    const members = Array.isArray(pack.members) ? pack.members : []
+    const cost = members.reduce((total, name) => {
+      const description = current.known?.[name]?.description
+      return total + Math.min(typeof description === 'string' ? description.length : 0, DESCRIPTION_MAX_LENGTH)
+    }, 0)
+    return { ...pack, members, active: packActive(current, pack, intent), cost }
+  })
+  const combosOut = (current.combos ?? []).map((combo, index) => ({ ...combo, order: combo.order ?? index }))
   return {
     at: new Date().toISOString(),
     version: PLUGIN_VERSION,
@@ -1022,6 +1346,8 @@ async function collectState(ctx) {
       neither: skills.filter((skill) => !skill.model && !skill.user).length,
       disabled: skills.filter((skill) => !skill.enabled).length,
     },
-    packs: current.packs ?? [],
+    packs: packsOut,
+    combos: combosOut,
+    intent,
   }
 }
