@@ -1274,12 +1274,15 @@ async function collectState(ctx) {
   const skills = [...byName.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((skill) => {
-      const meta = readState().known?.[skill.name]
+      const current = readState()
+      const meta = current.known?.[skill.name]
       // 停用中的技能，列表里看到的是我们自己的影子候选 —— 展示信息回填原始元数据，
       // 免得设置页把来源写成 zhiyin、描述写成占位串。
       const shadowed = skill.provider === PROVIDER_NAME
       const source = shadowed ? (meta?.source ?? skill.source) : skill.source
-      const reason = hiddenReason(readState(), skill.name, source)
+      const reason = hiddenReason(current, skill.name, source)
+      // 引用计数（FR-008）：含这个技能的技能包，用于「停用不误关共享」。
+      const refs = memberPacks(current, skill.name).map((pack) => pack.name)
       return {
         name: skill.name,
         description: shadowed && meta?.description ? meta.description : skill.description,
@@ -1294,6 +1297,8 @@ async function collectState(ctx) {
         resourceKind: skill.resourceBase?.kind ?? null,
         enabled: reason === null,
         hiddenReason: reason,
+        refCount: refs.length,
+        refs,
       }
     })
 

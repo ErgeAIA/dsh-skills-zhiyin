@@ -189,6 +189,33 @@ window.__ModuleLoader__.load({
         batchDisable: '批量停用',
         batchClear: '清除选择',
         alertUnassigned: '合奏模式下有未编配技能不生效',
+        matrixTitle: '生效面矩阵',
+        matrixSub: '四个生效面各自由谁控制，别只盯着「已启用」',
+        matrixCatalog: '模型目录',
+        matrixTool: 'skill 工具',
+        matrixSlash: '/name 菜单',
+        matrixGet: '可信 get()',
+        matrixBy: '由谁控制',
+        matrixCatalogBy: '合奏成员 × 源允许模型',
+        matrixToolBy: '合奏成员 × 源允许模型',
+        matrixSlashBy: '合奏成员 × 源允许用户',
+        matrixGetBy: '合奏成员（源策略不限制）',
+        matrixMemberBy: '合奏成员：全部停用 / agents 开关 / 合奏 / 技能包 / 手动停用',
+        matrixTaken: '技能包启用不会放宽源策略，最终取交集',
+        matrixUncontrolled: 'GUI 斜杠菜单由宿主另一个服务读取，织音默认不接管',
+        matrixNow: '当前',
+        refCountTitle: '引用它的技能包',
+        refCountNone: '没有被任何技能包引用',
+        refCountShort: '引用',
+        refCountHint: '停用其中一个包，只要另一个还在启用，技能依然有效',
+        backupsTitle: '配置备份',
+        backupsHint: '导入配置或回滚时自动留下；最多保留 20 份，新的在前',
+        backupsEmpty: '还没有备份',
+        backupsTime: '时间',
+        backupsFile: '文件',
+        backupsRollback: '回滚到这份',
+        backupsAsk: '回滚到这份备份？当前配置会先另存一份备份。',
+        backupsOpen: '备份列表',
       },
       en: {
         nav: 'Zhiyin',
@@ -367,6 +394,33 @@ window.__ModuleLoader__.load({
         batchDisable: 'Disable all',
         batchClear: 'Clear',
         alertUnassigned: 'Some unassigned skills do not play in orchestrated mode',
+        matrixTitle: 'Effective-surface matrix',
+        matrixSub: 'What controls each of the four surfaces — do not read "enabled" alone',
+        matrixCatalog: 'Model catalog',
+        matrixTool: 'skill tool',
+        matrixSlash: '/name menu',
+        matrixGet: 'Trusted get()',
+        matrixBy: 'Controlled by',
+        matrixCatalogBy: 'Ensemble member × model-invocable by source',
+        matrixToolBy: 'Ensemble member × model-invocable by source',
+        matrixSlashBy: 'Ensemble member × user-invocable by source',
+        matrixGetBy: 'Ensemble member (source policy does not restrict)',
+        matrixMemberBy: 'Membership: all-off / agents switch / orchestration / pack / manual disable',
+        matrixTaken: 'Enabling a pack never relaxes the source policy; the result is the intersection',
+        matrixUncontrolled: 'The GUI slash menu is read by another host service; Zhiyin does not take it over by default',
+        matrixNow: 'Now',
+        refCountTitle: 'Packs referencing it',
+        refCountNone: 'Referenced by no pack',
+        refCountShort: 'Refs',
+        refCountHint: 'Turn one pack off and the skill still plays as long as another pack is on',
+        backupsTitle: 'Config backups',
+        backupsHint: 'Written automatically on config import and rollback; at most 20 kept, newest first',
+        backupsEmpty: 'No backups yet',
+        backupsTime: 'Time',
+        backupsFile: 'File',
+        backupsRollback: 'Roll back to this',
+        backupsAsk: 'Roll back to this backup? The current config is backed up first.',
+        backupsOpen: 'Backups',
       },
     }
 
@@ -537,6 +591,26 @@ window.__ModuleLoader__.load({
       groupMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
       groupTitle: { fontSize: 13, fontWeight: 500 },
       groupDesc: { fontSize: 12, opacity: 0.58, lineHeight: 1.45 },
+      // 生效面矩阵（FR-020）：四行，每行一个生效面 + 谁控制它 + 当前数量。
+      matrixRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        minWidth: 0,
+        padding: '9px 14px',
+        borderBottom: '1px solid rgba(128,128,128,0.10)',
+      },
+      matrixRowLast: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        minWidth: 0,
+        padding: '9px 14px',
+      },
+      matrixName: { fontSize: 12.5, fontWeight: 600, flex: '0 0 auto', minWidth: 88 },
+      matrixBy: { fontSize: 12, opacity: 0.62, flex: '1 1 auto', minWidth: 0 },
+      matrixNum: { fontSize: 12.5, opacity: 0.8, flex: '0 0 auto' },
+      refBadge: { fontSize: 11, opacity: 0.72, flex: '0 0 auto' },
       bar: {
         height: 6,
         borderRadius: 999,
@@ -1024,6 +1098,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [comboMenu, setComboMenu] = React.useState(null)            // 组合行尾 … 菜单
       const [selectedNames, setSelectedNames] = React.useState([])      // 批量提交选中的技能名
       const [comboRenaming, setComboRenaming] = React.useState(null)    // 组合改名：{ id, name }
+      const [backups, setBackups] = React.useState(null)               // 配置备份列表
+      const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1381,6 +1457,37 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .finally(() => setBusy(false))
       }
 
+      // 备份列表（FR-025）：把导入/回滚留下的快照列出来，可任选一份退回。
+      const loadBackups = React.useCallback(() => {
+        fetch('/zhiyin/backups', { headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            return response.json()
+          })
+          .then((payload) => setBackups(Array.isArray(payload?.backups) ? payload.backups : []))
+          .catch((error) => setBackups({ error: String(error?.message ?? error) }))
+      }, [])
+      React.useEffect(() => {
+        if (backupsOpen) loadBackups()
+      }, [backupsOpen, loadBackups])
+      const rollbackTo = (file) => {
+        if (!window.confirm(say('backupsAsk', '回滚到这份备份？当前配置会先另存一份备份。'))) return
+        setBusy(true)
+        fetch('/zhiyin/rollback', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ file }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
+            setBackupsOpen(false)
+            load()
+          })
+          .catch(fail)
+          .finally(() => setBusy(false))
+      }
+
       // 告警：目录超预算 / 同名冲突 / 包内引用了未安装技能
       const alerts = React.useMemo(() => {
         const out = []
@@ -1406,6 +1513,34 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         }
         return out
       }, [data, scopedNames, say, intent, scoped])
+
+      // 生效面矩阵（FR-020）：模型目录 / skill 工具 / /name 菜单 / 可信 get() 各自谁控制。
+      // 数量按「当前作用域里真正生效的技能」取，与隐藏原因保持一致。
+      const matrix = React.useMemo(() => {
+        const playing = scoped.filter((skill) => skill.enabled !== false)
+        return {
+          catalog: {
+            name: say('matrixCatalog', '模型目录'),
+            by: say('matrixCatalogBy', '合奏成员 × 源允许模型'),
+            n: playing.filter((skill) => skill.model).length,
+          },
+          tool: {
+            name: say('matrixTool', 'skill 工具'),
+            by: say('matrixToolBy', '合奏成员 × 源允许模型'),
+            n: playing.filter((skill) => skill.model).length,
+          },
+          slash: {
+            name: say('matrixSlash', '/name 菜单'),
+            by: say('matrixSlashBy', '合奏成员 × 源允许用户'),
+            n: playing.filter((skill) => skill.user).length,
+          },
+          get: {
+            name: say('matrixGet', '可信 get()'),
+            by: say('matrixGetBy', '合奏成员（源策略不限制）'),
+            n: playing.length,
+          },
+        }
+      }, [scoped, say])
 
       return h(
         'div',
@@ -1470,6 +1605,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               },
               say('rollback', '撤销上次'),
             ),
+            h(
+              'button',
+              {
+                type: 'button',
+                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
+                disabled: busy,
+                title: say('backupsHint', '导入配置或回滚时自动留下；最多保留 20 份，新的在前'),
+                onClick: () => setBackupsOpen(true),
+              },
+              say('backupsOpen', '备份列表'),
+            ),
             data
               ? h(
                   'span',
@@ -1531,6 +1677,39 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h('span', null, alert.text),
                 ),
               ),
+            )
+          : null,
+
+        // 生效面矩阵（FR-020）：四个生效面各自由谁控制，只列当前真正生效的技能数。
+        data
+          ? h(
+              'div',
+              { style: css.group },
+              h(
+                'div',
+                { style: css.groupRow },
+                h(
+                  'div',
+                  { style: css.groupMain },
+                  h('div', { style: css.groupTitle }, say('matrixTitle', '生效面矩阵')),
+                  h('div', { style: css.groupDesc }, say('matrixSub', '四个生效面各自由谁控制，别只盯着「已启用」')),
+                ),
+              ),
+              [matrix.catalog, matrix.tool, matrix.slash, matrix.get].map((row, index) =>
+                h(
+                  'div',
+                  { key: row.name, style: index === 3 ? css.matrixRowLast : css.matrixRow },
+                  h('span', { style: css.matrixName }, row.name),
+                  h(
+                    'span',
+                    { style: css.matrixBy, title: say('matrixMemberBy', '合奏成员：全部停用 / agents 开关 / 合奏 / 技能包 / 手动停用') },
+                    row.by,
+                  ),
+                  h('span', { style: css.matrixNum }, String(row.n)),
+                ),
+              ),
+              h('div', { style: { ...css.groupDesc, padding: '0 14px 10px' } }, say('matrixTaken', '技能包启用不会放宽源策略，最终取交集')),
+              h('div', { style: { ...css.groupDesc, padding: '0 14px 12px' } }, say('matrixUncontrolled', 'GUI 斜杠菜单由宿主另一个服务读取，织音默认不接管')),
             )
           : null,
 
@@ -1921,6 +2100,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           disabled: busy,
                           onClick: () => setIntentFlag(skill.name, 'excluded', !excludedNames.has(skill.name)),
                         }, h(Icon, { name: excludedNames.has(skill.name) ? 'check' : 'ban', size: 14 })),
+                        skill.refCount > 1
+                          ? h(
+                              'span',
+                              {
+                                style: css.refBadge,
+                                title: `${say('refCountTitle', '引用它的技能包')}：${(skill.refs ?? []).join('、')}${skill.refCount > (skill.refs ?? []).length ? ' …' : ''}`,
+                              },
+                              say('refCountShort', '引用') + ' ' + skill.refCount,
+                            )
+                          : null,
                         skill.source === 'user-dsh' || skill.source === 'user-agents'
                           ? h('button', {
                               type: 'button',
@@ -2034,6 +2223,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                                 title: `${say('linkBadgeTitle', '符号链接，实体在')}${skill.linkTarget}`,
                               },
                               '⛓',
+                            )
+                          : null,
+                        skill.refCount > 1
+                          ? h(
+                              'span',
+                              {
+                                style: css.refBadge,
+                                title: `${say('refCountTitle', '引用它的技能包')}：${(skill.refs ?? []).join('、')}${skill.refCount > (skill.refs ?? []).length ? ' …' : ''}`,
+                              },
+                              say('refCountShort', '引用') + ' ' + skill.refCount,
                             )
                           : null,
                         h(
@@ -2590,7 +2789,54 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
-        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '组合在下一版；技能包整组开关即可切换场景。')),
+        // 备份列表弹窗（FR-025）：列出导入/回滚留下的快照，可任选一份退回。
+        backupsOpen
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalMd } },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('backupsTitle', '配置备份'))),
+                h('p', { style: css.hint }, say('backupsHint', '导入配置或回滚时自动留下；最多保留 20 份，新的在前')),
+                backups
+                  ? Array.isArray(backups)
+                    ? backups.length === 0
+                      ? h('p', { style: css.hint }, say('backupsEmpty', '还没有备份'))
+                      : h(
+                          'div',
+                          { style: css.previewList },
+                          backups.map((entry) =>
+                            h(
+                              'div',
+                              { key: entry.file, style: css.cbRow },
+                              h(
+                                'div',
+                                { style: css.groupMain },
+                                h('div', { style: { ...css.matrixName, minWidth: 0 } }, String(entry.at ?? '')),
+                                h('div', { style: { ...css.matrixBy, marginTop: 2 } }, String(entry.file ?? '')),
+                              ),
+                              h('button', {
+                                type: 'button',
+                                style: css.btn,
+                                disabled: busy,
+                                onClick: () => rollbackTo(entry.file),
+                              }, say('backupsRollback', '回滚到这份')),
+                            ),
+                          )
+                        )
+                    : h('p', { style: css.hint }, String(backups.error ?? ''))
+                  : null,
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setBackupsOpen(false) }, say('close', '关闭')),
+                ),
+              ),
+            )
+          : null,
+
+        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '组合可先预览后应用；导入配置与回滚都会留下备份。')),
       )
     }
 
