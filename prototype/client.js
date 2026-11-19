@@ -1696,16 +1696,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
     function statCards(data, counts, say, filter, setFilter) {
       const items = [
-        { key: 'statTotal', label: '技能总数', value: counts.total, filter: 'all' },
-        { key: 'statModel', label: '模型可用', value: counts.model, filter: 'model' },
+        { key: 'statTotal', label: '技能总数', value: counts.total, filter: 'all', hint: '当前作用域下观测到的全部技能（按名称去重）' },
+        { key: 'statModel', label: '模型可用', value: counts.model, filter: 'model', hint: '可被模型侧调用的技能（modelInvocable）；对话时模型能自己选中它们' },
         {
           key: 'statUser',
           label: '仅用户可用',
           value: Math.max(0, counts.user - counts.both),
           filter: 'user',
+          hint: '只出现在 / 菜单、模型不可直接调用的技能',
         },
-        { key: 'statNeither', label: '仅内部可用', value: counts.neither, filter: 'internal' },
-        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled' },
+        { key: 'statNeither', label: '仅内部可用', value: counts.neither, filter: 'internal', hint: '既不在模型侧也不在 / 菜单、只作为内部能力的技能' },
+        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随插件内置（bundled 来源）的技能' },
       ]
       return items.map((item) => {
         const active = filter === item.filter
@@ -1714,7 +1715,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           {
             key: item.key,
             type: 'button',
-            title: say('filterHint', '点一下只列这一类，再点一下回到全部'),
+            title: item.hint + '｜' + say('filterHint', '点一下只看这类，再点回到全部'),
             onClick: () => setFilter(active ? 'all' : item.filter),
             style: {
               ...css.card,
