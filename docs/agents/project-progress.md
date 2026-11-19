@@ -23,7 +23,17 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-19 12:5x 市场页参考落盘（dsh-market 分析 + 技能包语义确认），准备按新骨架改设置页
+- **最后更新**：2026-11-19 18:5x 导出/导入配置落地（commit 500f04d）：导出瘦身、导入备份、错误分流
+  - 宿主新增 GET /zhiyin/export：只导出最小集（schemaVersion/exportedAt/pluginVersion/agentsRoot/allOff/disabled/packs/exclude/combos/intent），对齐 PRD C-18
+  - 导出不再带 known：它是观测缓存、可由 collectState 重建；带上会让文件涨到 84KB 并撑爆导入侧 64KB body 限制（现导出 360 字节）
+  - 宿主新增 POST /zhiyin/import：替换语义——先落一份带时间戳备份再覆盖 packs/agentsRoot/allOff/disabled；缺 packs 不清空现有包；回报未安装成员清单
+  - 导入对 known 只合并不覆盖：本地观测元信息优先，旧快照不污染现状
+  - post() 增加 body 上限参数：默认 64KB，导入放宽到 1MB；超限返 413、坏 JSON 返 400，不再把「太大」误报成「不是有效的织音配置」
+  - 页面头部加「导出配置 / 导入配置」；导出失败独立文案「导出失败：」，不再混进「观测失败：」
+  - 搜索加 250ms 防抖：输入值与生效查询分离，技能包页也按包名/成员过滤
+  - 冒烟：导出 200/360 字节且无 known；round-trip 保住 packs 2 个、disabled、known 177 项本地优先、备份 1 份；坏 JSON 400、缺 packs 400、超限 413；node --check 双半边 exit 0
+  - 待验收：宿主改动需完整重启 DSH 后由用户验证导出下载、导入恢复与错误提示
+  - 上一轮：市场页参考落盘（dsh-market 分析 + 技能包语义确认），准备按新骨架改设置页
   - 两个开关从工具条挪进「设置组」卡片：加载 ~/.agents/skills（含合集/仅 ~/.dsh 说明）、启用技能、目录字符数与进度条；工具条只留 分段控件 + 搜索 + 动作图标
   - 接管状态从单独一行降级为标题右侧状态胶囊（悬停出说明），减少一行噪声
   - 字号建立层级：标题 22 / 组标题 13 / 名称 13.5·600 / 描述 12.5·0.62；名称去掉等宽字体
