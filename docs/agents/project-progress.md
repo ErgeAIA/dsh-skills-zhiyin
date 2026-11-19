@@ -2,7 +2,7 @@
 title: Project Progress
 type: project-progress
 project: dsh-skills-zhiyin
-updated: 2026-11-19
+updated: 2026-11-20
 description: >
   项目开发进度实时记录：阶段、分支、代码状态、最近进展。每次会话更新。
   AI 在本文件新增进展或修改当前状态后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -18,12 +18,19 @@ description: >
 ## 当前状态
 
 - **当前分支**：main（技能停用修复走 fix/skill-disable-ui → 提交 b555e53 → 合并 e85668f → 已推送 origin，分支已删）
-- **阶段**：原型期 P1——启停（模型面 + / 菜单面）、技能包、导入 txt、安装/卸载已实现并脚本冒烟通过；进入 UI 精修
+- **阶段**：原型期 P1 功能面基本补齐——启停（模型面 + / 菜单面）、技能包、导入 txt、安装/卸载、组合与合奏意图、导出/导入、批量提交、备份回滚；按用户指令功能做完后统一精修 UI
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能列表、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-19 22:5x 组合/合奏意图/批量/回滚落地（commit de23008，merge ca27269）：功能面补齐 PRD FR-010~014、FR-023、FR-025
+- **最后更新**：2026-11-20 00:1x 技能包引用计数 + 生效面矩阵 + 备份列表（commit e403b3e，merge e1bc4b8）：补齐 FR-008、FR-020，并给 FR-025 一个可点开的界面
+  - collectState 给每个技能补 refCount / refs：列出含它的技能包名（FR-008），用于「停用不误关共享」——被多包引用的技能停用前能先看清
+  - 技能卡与列表行：refCount > 1 时显示「引用 N」小徽标，悬浮列出具体包名
+  - 设置页新增「生效面矩阵」区块（FR-020）：模型目录 / skill 工具 / /name 菜单 / 可信 get() 四行，各标注由谁控制与当前生效数量；注明技能包启用不放宽源策略、GUI 斜杠菜单默认不接管
+  - 前端新增「备份列表」弹窗：列出 stateDir 下 backup-*.json（时间 + 文件名，新的在前），可任选一份回滚，回滚前再备份当前态；页头加入口
+  - 冒烟：refCount/refs 正确（skill-1 被 A、B 两包引用 → refCount=2；只被停用包引用 → hiddenReason=pack）；/zhiyin/backups 返回 200；导入后备份文件 +1；node --check 双半边 exit 0
+  - 待验收：宿主改动需完整重启 DSH 后验证矩阵区块、引用徽标与备份弹窗
+  - 上一轮：组合/合奏意图/批量/回滚落地（commit de23008，merge ca27269）：功能面补齐 PRD FR-010~014、FR-023、FR-025
   - 宿主新增 POST /zhiyin/combo：create / rename / setPacks / delete / preview / apply / stack / exit；组合只存包 ID（PRD §7.3），预览用「最终生效集合」而不是增量，叠加先出叠加预览再执行
   - 宿主新增 POST /zhiyin/intent：单技能排除与常驻互斥切换（FR-011/FR-010），只改意图、不动包；hiddenReason 优先级落为 allOff > agentsRoot > 排除 > 常驻 > 合奏模式 > 包停用 > 手动停用
   - /zhiyin/skill 支持 names[] 批量提交：一次写盘、一次 invalidate，目录只翻一遍（FR-023）
