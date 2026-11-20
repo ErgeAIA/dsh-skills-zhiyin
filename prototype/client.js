@@ -924,6 +924,11 @@ window.__ModuleLoader__.load({
         color: 'inherit',
         fontSize: 12.5,
       },
+      // 原生 <option> 弹层不继承 select 样式，深色主题会白底浅字看不见——显式给深底浅字。
+      optionStyle: {
+        background: 'var(--vscode-editorWidget-background, #252526)',
+        color: 'var(--vscode-foreground, #e6e6e6)',
+      },
       // 技能卡网格
       // 瀑布流：按列宽自动分栏，卡片高度随内容变化，不再被同一行拉齐。
       cardGrid: {
@@ -1113,6 +1118,31 @@ window.__ModuleLoader__.load({
   edit: [
     ['path', 'M12 20h9'],
     ['path', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z'],
+  ],
+  download: [
+    ['path', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'],
+    ['path', 'm7 10 5 5 5-5'],
+    ['path', 'M12 15V3'],
+  ],
+  upload: [
+    ['path', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'],
+    ['path', 'm17 8-5-5-5 5'],
+    ['path', 'M12 3v12'],
+  ],
+  undo: [
+    ['path', 'M9 14 4 9l5-5'],
+    ['path', 'M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
+  ],
+  history: [
+    ['path', 'M3 12a9 9 0 1 0 3-6.7L3 8'],
+    ['path', 'M3 3v5h5'],
+    ['path', 'M12 7v5l4 2'],
+  ],
+  sort: [
+    ['path', 'M8 4v16'],
+    ['path', 'm5 7 3-3 3 3'],
+    ['path', 'M16 20V4'],
+    ['path', 'm13 17 3 3 3-3'],
   ],
 }
 
@@ -1897,69 +1927,57 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           h(
             'div',
             { style: css.headActions },
-            h(
-              'button',
-              {
-                type: 'button',
-                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
-                disabled: busy,
-                title: say('exportConfigHint', '导出一份可移植的 JSON 配置（技能包 / 停用项）'),
-                onClick: exportConfig,
+            h('button', {
+              type: 'button',
+              style: css.iconBtn,
+              disabled: busy,
+              title: say('exportConfigHint', '导出一份可移植的 JSON 配置（技能包 / 停用项）'),
+              'aria-label': say('exportConfig', '导出配置'),
+              onClick: exportConfig,
+            }, h(Icon, { name: 'download', size: 15 })),
+            h('button', {
+              type: 'button',
+              style: css.iconBtn,
+              disabled: busy,
+              title: say('importConfigHint', '粘贴此前导出的 JSON 覆盖当前配置；旧配置会自动备份'),
+              'aria-label': say('importConfig', '导入配置'),
+              onClick: () => {
+                setImportConfigText('')
+                setImportResult(null)
+                setImportingConfig(true)
               },
-              say('exportConfig', '导出配置'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
-                disabled: busy,
-                title: say('importConfigHint', '粘贴此前导出的 JSON 覆盖当前配置；旧配置会自动备份'),
-                onClick: () => {
-                  setImportConfigText('')
-                  setImportResult(null)
-                  setImportingConfig(true)
-                },
-              },
-              say('importConfig', '导入配置'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
-                disabled: busy,
-                title: say('rollbackHint', '退回最近一次导入前的状态（每次导入都会留一份备份）'),
-                onClick: () => {
-                  if (!window.confirm(say('rollbackAsk', '回滚到最近一次导入前的状态？当前配置会先另存一份备份。'))) return
-                  setBusy(true)
-                  fetch('/zhiyin/rollback', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: '{}',
+            }, h(Icon, { name: 'upload', size: 15 })),
+            h('button', {
+              type: 'button',
+              style: css.iconBtn,
+              disabled: busy,
+              title: say('rollbackHint', '退回最近一次导入前的状态（每次导入都会留一份备份）'),
+              'aria-label': say('rollback', '撤销上次'),
+              onClick: () => {
+                if (!window.confirm(say('rollbackAsk', '回滚到最近一次导入前的状态？当前配置会先另存一份备份。'))) return
+                setBusy(true)
+                fetch('/zhiyin/rollback', {
+                  method: 'POST',
+                  headers: { 'content-type': 'application/json' },
+                  body: '{}',
+                })
+                  .then((response) => response.json())
+                  .then((result) => {
+                    if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
+                    load()
                   })
-                    .then((response) => response.json())
-                    .then((result) => {
-                      if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
-                      load()
-                    })
-                    .catch((error) => setState((prev) => ({ ...prev, error: String(error?.message ?? error) })))
-                    .finally(() => setBusy(false))
-                },
+                  .catch((error) => setState((prev) => ({ ...prev, error: String(error?.message ?? error) })))
+                  .finally(() => setBusy(false))
               },
-              say('rollback', '撤销上次'),
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                style: { ...css.btn, padding: '4px 11px', fontSize: 12, opacity: 0.8 },
-                disabled: busy,
-                title: say('backupsHint', '导入配置或回滚时自动留下；最多保留 20 份，新的在前'),
-                onClick: () => setBackupsOpen(true),
-              },
-              say('backupsOpen', '备份列表'),
-            ),
+            }, h(Icon, { name: 'undo', size: 15 })),
+            h('button', {
+              type: 'button',
+              style: css.iconBtn,
+              disabled: busy,
+              title: say('backupsHint', '导入配置或回滚时自动留下；最多保留 20 份，新的在前'),
+              'aria-label': say('backupsOpen', '备份列表'),
+              onClick: () => setBackupsOpen(true),
+            }, h(Icon, { name: 'history', size: 15 })),
             data
               ? h(
                   'span',
@@ -2163,16 +2181,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               }),
               tab === 'list'
                 ? h('label', { style: css.sortWrap },
+                    h(Icon, { name: 'sort', size: 13 }),
                     say('sortBy', '排序'),
                     h('select', {
                       style: css.sortSelect,
                       value: sortField,
                       onChange: (event) => setSortField(event.target.value),
                     },
-                      h('option', { value: 'name' }, say('sortName', '名称')),
-                      h('option', { value: 'source' }, say('sortSource', '来源')),
-                      h('option', { value: 'chars' }, say('sortChars', '字符数')),
-                      h('option', { value: 'enabled' }, say('sortEnabled', '启用状态')),
+                      h('option', { value: 'name', style: css.optionStyle }, say('sortName', '名称')),
+                      h('option', { value: 'source', style: css.optionStyle }, say('sortSource', '来源')),
+                      h('option', { value: 'chars', style: css.optionStyle }, say('sortChars', '字符数')),
+                      h('option', { value: 'enabled', style: css.optionStyle }, say('sortEnabled', '启用状态')),
                     ),
                   )
                 : null,
@@ -2815,7 +2834,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: { ...css.modal, ...css.modalMd } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('install', '安装技能'))),
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('install', '安装技能')),
+                  h('button', {
+                    type: 'button',
+                    style: css.iconBtn,
+                    disabled: busy,
+                    title: say('close', '关闭'),
+                    'aria-label': say('close', '关闭'),
+                    onClick: () => setInstalling(false),
+                  }, h(Icon, { name: 'close', size: 13 })),
+                ),
                 h('p', { style: css.hint }, say('installHint', '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能')),
                 h('input', {
                   style: css.field,
@@ -2890,33 +2921,34 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setInstalling(false) }, say('cancel', '取消')),
                   installCandidates.length > 0
                     ? h(
                         'div',
                         { style: { display: 'flex', gap: 8, marginLeft: 'auto' } },
-                        h('button', { type: 'button', style: css.btn, onClick: () => setInstallSelected(installCandidates.map((candidate) => candidate.subpath)) }, say('installAll', '全选')),
-                        h('button', { type: 'button', style: css.btn, onClick: () => setInstallSelected([]) }, say('installNone', '全不选')),
+                        h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => setInstallSelected(installCandidates.map((candidate) => candidate.subpath)) }, say('installAll', '全选')),
+                        h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => setInstallSelected([]) }, say('installNone', '全不选')),
                         h(
                           'button',
                           {
                             type: 'button',
-                            style: css.primaryBtn,
+                            style: { ...css.primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 6 },
                             disabled: busy || installSelected.length === 0,
                             onClick: runInstallSelected,
                           },
-                          `${say('installSelected', '安装选中')} (${installSelected.length})`,
+                          busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'install', size: 14 }),
+                          ` ${busy ? say('installing', '安装中…') : `${say('installSelected', '安装选中')} (${installSelected.length})`}`,
                         ),
                       )
                     : h(
                         'button',
                         {
                           type: 'button',
-                          style: css.primaryBtn,
+                          style: { ...css.primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 6 },
                           disabled: busy || installPath.trim() === '',
                           onClick: () => runInstall(),
                         },
-                        say('install', '安装技能'),
+                        busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'install', size: 14 }),
+                        ` ${busy ? say('installing', '安装中…') : say('install', '安装技能')}`,
                       ),
                 ),
               ),
