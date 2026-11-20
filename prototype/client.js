@@ -201,7 +201,16 @@ window.__ModuleLoader__.load({
         consistencyDrifted: '有漂移',
         consistencyHintSynced: '观测与投影一致',
         consistencyHintDegraded: '上次观测不完整，保留上次成功投影',
-        consistencyHintDrifted: '有技能被外部改动或来源切换，与投影不一致',
+        consistencyHintDrifted: '技能包 / 组合引用了观测不到的技能，与投影不一致',
+        readOnlyBadge: '只读',
+        readOnlyHintBundled: '内置技能：织音只改可见性，不改动它的文件',
+        readOnlyHintExternal: '外部来源：不在织音管理的目录里，只能启停',
+        readOnlyHintRoot: '不在织音管理的安装目录里，只能启停',
+        repair: '修复',
+        repairAsk: '把观测不到的引用从技能包 / 组合 / 意图里剪掉？当前配置会先备份。',
+        repairOk: '已剪掉失效引用：',
+        repairNone: '没有需要修复的引用',
+        repairHint: '清理指向已消失技能的引用，让观测与投影重新一致',
         matrixTitle: '生效面矩阵',
         matrixSub: '四个生效面各自由谁控制，别只盯着「已启用」',
         matrixCatalog: '模型目录',
@@ -216,6 +225,7 @@ window.__ModuleLoader__.load({
         matrixMemberBy: '合奏成员：全部停用 / agents 开关 / 合奏 / 技能包 / 手动停用',
         matrixTaken: '技能包启用不会放宽源策略，最终取交集',
         matrixUncontrolled: 'GUI 斜杠菜单由宿主另一个服务读取，织音默认不接管',
+        matrixReadOnly: '个技能属只读来源：只能启停，不改文件、不卸载',
         matrixNow: '当前',
         refCountTitle: '引用它的技能包',
         refCountNone: '没有被任何技能包引用',
@@ -419,7 +429,16 @@ window.__ModuleLoader__.load({
         consistencyDrifted: 'Drifted',
         consistencyHintSynced: 'Observation matches projection',
         consistencyHintDegraded: 'Last observation was incomplete; last good projection kept',
-        consistencyHintDrifted: 'Some skills changed externally or moved source; out of sync with projection',
+        consistencyHintDrifted: 'Packs or combos reference skills that were not observed; out of sync with projection',
+        readOnlyBadge: 'Read-only',
+        readOnlyHintBundled: 'Bundled skill: Zhiyin only changes visibility, never its files',
+        readOnlyHintExternal: 'External source: not in a Zhiyin-managed directory; toggle only',
+        readOnlyHintRoot: 'Not in a Zhiyin-managed install root; toggle only',
+        repair: 'Repair',
+        repairAsk: 'Remove references to skills that were not observed from packs, combos and intent? The current config is backed up first.',
+        repairOk: 'Removed stale references: ',
+        repairNone: 'Nothing to repair',
+        repairHint: 'Drop references to vanished skills so observation and projection agree again',
         matrixTitle: 'Effective-surface matrix',
         matrixSub: 'What controls each of the four surfaces — do not read "enabled" alone',
         matrixCatalog: 'Model catalog',
@@ -434,6 +453,7 @@ window.__ModuleLoader__.load({
         matrixMemberBy: 'Membership: all-off / agents switch / orchestration / pack / manual disable',
         matrixTaken: 'Enabling a pack never relaxes the source policy; the result is the intersection',
         matrixUncontrolled: 'The GUI slash menu is read by another host service; Zhiyin does not take it over by default',
+        matrixReadOnly: 'skills are read-only sources: toggle only, no file edits or uninstall',
         matrixNow: 'Now',
         refCountTitle: 'Packs referencing it',
         refCountNone: 'Referenced by no pack',
@@ -1258,6 +1278,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       const data = state.data
 
+      // 一致性修复：只剪掉指向已消失技能的引用，不猜技能去哪了；后端先备份。
+      const repairDrift = React.useCallback(() => {
+        const drift = data?.consistency?.drift ?? []
+        const ask = say('repairAsk', '把观测不到的引用从技能包 / 组合 / 意图里剪掉？当前配置会先备份。')
+        if (!window.confirm(drift.length > 0 ? ask + '\n\n' + drift.join('、') : ask)) return
+        write('/zhiyin/repair', {}).then((result) => {
+          if (!result || result.ok !== true) return
+          const removed = result.missing ?? []
+          window.alert(result.changed === true
+            ? say('repairOk', '已剪掉失效引用：') + (removed.length > 0 ? removed.join('、') : '—')
+            : say('repairNone', '没有需要修复的引用'))
+        })
+      }, [data, write, say])
+
       // 「此刻 DSH 的技能世界」：总开关关掉时，~/.agents/skills 整组不属于它。
       const scoped = React.useMemo(() => {
         const all = data?.skills ?? []
@@ -1332,6 +1366,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         if (reason === 'unassigned') return say('reasonUnassigned', '未编配')
         if (reason === 'combo') return say('reasonCombo', '组合未纳入')
         return ''
+      }
+      const readOnlyHint = (skill) => {
+        if (skill.readOnlyReason === 'bundled') return say('readOnlyHintBundled', '内置技能：织音只改可见性，不改动它的文件')
+        if (skill.readOnlyReason === 'external') return say('readOnlyHintExternal', '外部来源：不在织音管理的目录里，只能启停')
+        return say('readOnlyHintRoot', '不在织音管理的安装目录里，只能启停')
       }
 
       const formatTime = (iso) => {
@@ -1713,6 +1752,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     ? say('consistencyDrifted', '有漂移')
                     : say('consistencySynced', '一致'),
               ),
+              data.consistency?.status === 'drifted' && data.complete !== false
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: { ...css.btn, padding: '2px 9px', fontSize: 11.5 },
+                      disabled: busy,
+                      title: say('repairHint', '清理指向已消失技能的引用，让观测与投影重新一致'),
+                      onClick: repairDrift,
+                    },
+                    say('repair', '修复'),
+                  )
+                : null,
               h(
                 'button',
                 {
@@ -1784,6 +1836,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               ),
               h('div', { style: { ...css.groupDesc, padding: '0 14px 10px' } }, say('matrixTaken', '技能包启用不会放宽源策略，最终取交集')),
               h('div', { style: { ...css.groupDesc, padding: '0 14px 12px' } }, say('matrixUncontrolled', 'GUI 斜杠菜单由宿主另一个服务读取，织音默认不接管')),
+              data.counts?.readOnly > 0
+                ? h(
+                    'div',
+                    { style: { ...css.groupDesc, padding: '0 14px 12px' } },
+                    `${data.counts.readOnly} ${say('matrixReadOnly', '个技能属只读来源：只能启停，不改文件、不卸载')}`,
+                  )
+                : null,
             )
           : null,
 
@@ -2161,6 +2220,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         { style: css.cardHead },
                         h('span', { style: css.cardName }, skill.name),
                         h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, sourceShort(skill)),
+                        skill.readOnly
+                          ? h('span', { style: { ...css.metaText, flex: '0 0 auto' }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
+                          : null,
                         h('span', { style: { ...css.hint, flex: '0 0 auto' } }, String(Math.min((skill.description ?? '').length, 500))),
                       ),
                       h('div', { style: css.cardDesc }, skill.description ?? ''),
@@ -2174,7 +2236,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           type: 'button',
                           title: say('excludeHint', '从生效面排除这个技能；不改动任何技能包'),
                           'aria-label': excludedNames.has(skill.name) ? say('includeBack', '恢复') : say('exclude', '排除'),
-                          style: { ...css.iconBtn, marginLeft: skill.source === 'user-dsh' || skill.source === 'user-agents' ? 0 : 'auto' },
+                          style: { ...css.iconBtn, marginLeft: skill.uninstallable === true ? 0 : 'auto' },
                           disabled: busy,
                           onClick: () => setIntentFlag(skill.name, 'excluded', !excludedNames.has(skill.name)),
                         }, h(Icon, { name: excludedNames.has(skill.name) ? 'check' : 'ban', size: 14 })),
@@ -2188,7 +2250,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               say('refCountShort', '引用') + ' ' + skill.refCount,
                             )
                           : null,
-                        skill.source === 'user-dsh' || skill.source === 'user-agents'
+                        skill.uninstallable === true
                           ? h('button', {
                               type: 'button',
                               title: say('uninstallHint', '移入归档目录，可恢复'),
@@ -2254,7 +2316,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         style: css.pick,
                         onChange: () => toggleSelected(skill.name),
                       }),
-                      skill.source === 'user-dsh' || skill.source === 'user-agents'
+                      skill.uninstallable === true
                         ? h(
                             'button',
                             {
@@ -2279,6 +2341,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           'div',
                           { style: css.itemHead },
                           h('span', { style: css.name }, skill.name),
+                        skill.readOnly
+                          ? h('span', { style: { ...css.metaText, opacity: 0.5 }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
+                          : null,
                         skill.enabled === false
                           ? h('span', { style: css.badgeWarn }, say('disabledBadge', '已停用'))
                           : null,
