@@ -63,9 +63,9 @@ window.__ModuleLoader__.load({
         save: '保存',
         cancel: '取消',
         install: '安装技能',
-        installHint: '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能',
+        installHint: '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；技能名以 SKILL.md 的 name 为准，目录名同名',
         installPath: 'owner/repo、https://github.com/owner/repo 或 D:\skills\my-skill',
-        installName: '技能名（留空则用 SKILL.md 里的 name）',
+        installAgents: 'SSOT 技能源 ~/.agents/skills（技能包从这里取）',
         installMultiple: '这个仓库里有多个技能，勾选后一起安装：',
         installSelected: '安装选中',
         installSelectedCount: '已选 {n} / {m}',
@@ -75,8 +75,11 @@ window.__ModuleLoader__.load({
         installDone: '已安装 {n} 个技能',
         installPartial: '部分安装失败：',
         installFailed: '安装失败：',
-        installUser: '用户目录 ~/.dsh/skills',
+        installUser: '用户目录 ~/.dsh/skills（直接可见，绕过技能包）',
         installProject: '项目 .dsh/skills',
+        linkStatus: '已链接 {n} · 包期望 {d} · 待补 {a} · 待清 {r}',
+        linkMissing: '{n} 个包成员不在 ~/.agents/skills，链接不了',
+        linkSync: '同步链接',
         uninstall: '卸载',
         uninstallAsk: '卸载并把技能移入归档目录？',
         uninstallHint: '移入归档目录，可恢复',
@@ -311,9 +314,9 @@ window.__ModuleLoader__.load({
         save: 'Save',
         cancel: 'Cancel',
         install: 'Install',
-        installHint: 'Paste a GitHub repo, skill folder, npx skills add command, raw SKILL.md link, or a local folder path; install only creates a new directory',
+        installHint: 'Paste a GitHub repo, skill folder, npx skills add command, raw SKILL.md link, or a local folder path; the skill name and its directory both follow the SKILL.md name',
         installPath: 'owner/repo, https://github.com/owner/repo, or D:\skills\my-skill',
-        installName: 'Skill name (blank = name from SKILL.md)',
+        installAgents: 'SSOT source ~/.agents/skills (packs pick from here)',
         installMultiple: 'This repo has several skills; tick the ones to install:',
         installSelected: 'Install selected',
         installSelectedCount: '{n} of {m} selected',
@@ -322,8 +325,12 @@ window.__ModuleLoader__.load({
         installProgress: 'Installing {i}/{n}…',
         installDone: 'Installed {n} skills',
         installPartial: 'Some installs failed: ',
-        installUser: 'User ~/.dsh/skills',
+        installFailed: 'Install failed: ',
+        installUser: 'User ~/.dsh/skills (visible directly, bypasses packs)',
         installProject: 'Project .dsh/skills',
+        linkStatus: 'Linked {n} · wanted {d} · to add {a} · to remove {r}',
+        linkMissing: '{n} pack members are not in ~/.agents/skills and cannot be linked',
+        linkSync: 'Sync links',
         uninstall: 'Uninstall',
         uninstallAsk: 'Move this skill into the archive directory?',
         uninstallHint: 'Moves into the archive directory; recoverable',
@@ -1195,8 +1202,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
   const [importName, setImportName] = React.useState('')
       const [installing, setInstalling] = React.useState(false)
       const [installPath, setInstallPath] = React.useState('')
-      const [installName, setInstallName] = React.useState('')
-      const [installTarget, setInstallTarget] = React.useState('user')
+      const [installTarget, setInstallTarget] = React.useState('agents')
       const [installError, setInstallError] = React.useState('')
       const [installCandidates, setInstallCandidates] = React.useState([])
       const [installSelected, setInstallSelected] = React.useState([])
@@ -1288,7 +1294,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setInstallError('')
         setInstalling(false)
         setInstallPath('')
-        setInstallName('')
       }
 
       const runInstall = (subpath) => {
@@ -1301,7 +1306,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             text,
-            name: installName.trim(),
             target: installTarget,
             ...(subpath === undefined ? {} : { subpath }),
           }),
@@ -1723,6 +1727,23 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         })
       }
 
+      // 链接同步：包开关后端会自动落链接，这里给一个手动兜底（例如手工删过目录）。
+      const syncLinks = () => {
+        setBusy(true)
+        fetch('/zhiyin/links', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ apply: true }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
+            load()
+          })
+          .catch(fail)
+          .finally(() => setBusy(false))
+      }
+
       // 备份列表（FR-025）：把导入/回滚留下的快照列出来，可任选一份退回。
       const loadBackups = React.useCallback(() => {
         fetch('/zhiyin/backups', { headers: { accept: 'application/json' } })
@@ -2111,8 +2132,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       disabled: busy,
                       onClick: () => {
                         setInstallPath('')
-                        setInstallName('')
-                        setInstallTarget('user')
+                        setInstallTarget('agents')
                         setInstallError('')
                         setInstallCandidates([])
                         setInstallSelected([])
@@ -2135,6 +2155,21 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 : null,
               visiblePacks.length === 0 && (data.packs ?? []).length > 0
                 ? h('div', { style: css.hint }, say('packNoMatch', '没有匹配技能包'))
+                : null,
+              data.links
+                ? h(
+                    'div',
+                    { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 } },
+                    h('span', {}, say('linkStatus', '已链接 {n} · 包期望 {d} · 待补 {a} · 待清 {r}')
+                      .replace('{n}', String((data.links.current ?? []).length))
+                      .replace('{d}', String((data.links.desired ?? []).length))
+                      .replace('{a}', String((data.links.add ?? []).length))
+                      .replace('{r}', String((data.links.remove ?? []).length))),
+                    (data.links.missing ?? []).length
+                      ? h('span', { style: { color: '#d0a040' } }, say('linkMissing', '{n} 个包成员不在 ~/.agents/skills，链接不了').replace('{n}', String(data.links.missing.length)))
+                      : null,
+                    h('button', { type: 'button', style: { ...css.btn, padding: '2px 9px', fontSize: 12 }, disabled: busy, onClick: syncLinks }, say('linkSync', '同步链接')),
+                  )
                 : null,
               visiblePacks.map((pack) => {
                 const status = packStatus(pack)
@@ -2743,15 +2778,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   placeholder: say('installPath', 'owner/repo、https://github.com/owner/repo 或 D:\\skills\\my-skill'),
                   onChange: (event) => setInstallPath(event.target.value),
                 }),
-                h('input', {
-                  style: css.field,
-                  value: installName,
-                  placeholder: say('installName', '技能名（留空则用 SKILL.md 里的 name）'),
-                  onChange: (event) => setInstallName(event.target.value),
-                }),
                 h(
                   'div',
-                  { style: { display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' } },
+                  { style: { display: 'flex', gap: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' } },
+                  h('label', { style: { display: 'flex', gap: 5, alignItems: 'center' } },
+                    h('input', {
+                      type: 'radio',
+                      checked: installTarget === 'agents',
+                      onChange: () => setInstallTarget('agents'),
+                    }),
+                    say('installAgents', 'SSOT 技能源 ~/.agents/skills（技能包从这里取）'),
+                  ),
                   h('label', { style: { display: 'flex', gap: 5, alignItems: 'center' } },
                     h('input', {
                       type: 'radio',
