@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 12:3x 包冲突声明与三态一致性 + 不完整观测保护（commit 6cdcb09，merge 5417d0c）：补齐 FR-005、FR-022，收紧 FR-010 与 FR-019
+- **最后更新**：2026-11-20 13:1x 一致性修复入口 + 只读来源标注（commit b5df5e2，merge f0fe5b8）：给 FR-022 补上修复动作，补齐 FR-026
+  - 宿主新增 POST /zhiyin/repair：只剪掉观测不到的引用——技能包里不存在的成员、组合里不存在的包、意图里不存在的技能；修复前先备份（复用 backupState），修复后再观测即为 synced。观测不完整（lastComplete=false 或本次快照 complete=false）时返回 409，不猜哪些引用失效
+  - collectState 每个技能新增 uninstallable / readOnly / readOnlyReason：判据是该技能名是否真实存在于安装根（~/.dsh/skills 或 <项目>/.dsh/skills），与 /zhiyin/uninstall 的查找逻辑同源；counts 新增 readOnly
+  - /zhiyin/uninstall 找不到时给出「不在织音管理的技能目录里（只读来源），无法卸载」，不再只报 skill not found
+  - 设置页：一致性胶囊为「有漂移」时旁边出现「修复」按钮（确认后列出要剪掉的技能名，执行完提示结果）；技能卡与列表行显示「只读」小字并悬浮说明原因；只读技能不再显示卸载按钮（此前对没有安装目录的 66 个 .agents 技能也显示，点了必然 404）；生效面矩阵脚注补「N 个技能属只读来源：只能启停，不改文件、不卸载」
+  - 冒烟：管理根内技能 uninstallable=true / 目录外 readOnly=true / counts.readOnly=3；无漂移时 repair 返回 changed=false；造幽灵成员与幽灵意图后 drifted → repair 200 且 missing=['ghost-skill']、写出备份、之后 synced、包成员与意图均已清理；观测不完整时 repair 409；渲染桩确认「修复」按钮、矩阵脚注与列表「只读」都在；node --check 双半边 exit 0
+  - 待验收：宿主改动需完整重启 DSH 后验证「修复」按钮与只读标注
+  - 上一轮：2026-11-20 12:3x 包冲突声明与三态一致性 + 不完整观测保护（commit 6cdcb09，merge 5417d0c）：补齐 FR-005、FR-022，收紧 FR-010 与 FR-019
   - 技能包新增 conflictsWith：pack create/import/copy 默认空数组；新增 pack action=conflicts 设置互斥包（只留存在的包、去自身、去重）；collectState 每个包输出规范化 conflictsWith
   - 冲突双向预检（FR-005）：新增 conflictPairsFor / activePackIds；启用包、应用/叠加组合前先算生效集合里的冲突对，命中默认 409 阻断，body.ack=true 才放行并 note('conflict-ack') 留痕（不落永久忽略）；preview 结果带回 conflicts
   - 三态一致性（FR-022）：collectState 输出 consistency —— complete=false → degraded；包引用观测不到的技能 → drifted（带 drift 清单）；否则 synced；同时持久化 lastComplete / lastGoodAt。pending / failed 在同步投影模型下暂无对应态
