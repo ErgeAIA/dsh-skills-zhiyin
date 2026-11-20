@@ -561,7 +561,7 @@ export function apply(ctx) {
         break
       }
     }
-    if (!from) return { status: 404, body: { ok: false, error: 'skill not found in managed roots' } }
+    if (!from) return { status: 404, body: { ok: false, error: '该技能不在织音管理的技能目录里（只读来源），无法卸载' } }
     const archiveRoot = join(stateDir(), 'archive')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const to = join(archiveRoot, stamp + '-' + name)
@@ -726,6 +726,73 @@ export function apply(ctx) {
     invalidateAll()
     note('state-rolled-back', { file: target, safety })
     return { status: 200, body: { ok: true, file: target, safety } }
+  })
+  // 一致性修复（FR-022）：把观测不到的引用从包 / 组合 / 意图里剪掉。
+  // 不猜技能去哪了，只清理指向不存在对象的引用；修复前照样留一份备份。
+  post(ctx, '/zhiyin/repair', async () => {
+    const state = readState()
+    const guard = incompleteGuard(state)
+    if (guard) return guard
+    const observed = await collectState(ctx)
+    if (observed?.complete === false) {
+      return { status: 409, body: { ok: false, error: '观测不完整，无法判断哪些引用已失效；请先重新观测后再试', incomplete: true } }
+    }
+    const names = new Set((observed?.skills ?? []).map((skill) => skill.name))
+    const prunedPacks = []
+    const packs = (state.packs ?? []).map((pack) => {
+      const members = Array.isArray(pack.members) ? pack.members : []
+      const kept = members.filter((name) => names.has(name))
+      if (kept.length !== members.length) {
+        prunedPacks.push({ id: pack.id, name: pack.name, names: members.filter((name) => !names.has(name)) })
+      }
+      return { ...pack, members: kept }
+    })
+    const packIds = new Set(packs.map((pack) => pack.id))
+    const combos = (state.combos ?? []).map((combo) => {
+      const ids = Array.isArray(combo.packIds) ? combo.packIds : []
+      const kept = ids.filter((id) => packIds.has(id))
+      return { ...combo, packIds: kept }
+    })
+    const combosPruned = combos.reduce((total, combo, index) => {
+      const before = (state.combos?.[index]?.packIds ?? []).length
+      return total + (before - combo.packIds.length)
+    }, 0)
+    const intent = normalizeIntent(state)
+    const alwaysOn = intent.alwaysOnSkillNames.filter((name) => names.has(name))
+    const excluded = intent.excludedSkillNames.filter((name) => names.has(name))
+    const next = {
+      ...state,
+      packs,
+      combos,
+      intent: {
+        ...intent,
+        activePackIds: intent.activePackIds.filter((id) => packIds.has(id)),
+        alwaysOnSkillNames: alwaysOn,
+        excludedSkillNames: excluded,
+        revision: intent.revision + 1,
+        updatedAt: new Date().toISOString(),
+      },
+    }
+    const missing = [
+      ...new Set([
+        ...prunedPacks.flatMap((pack) => pack.names),
+        ...intent.alwaysOnSkillNames.filter((name) => !names.has(name)),
+        ...intent.excludedSkillNames.filter((name) => !names.has(name)),
+      ]),
+    ]
+    const changed = prunedPacks.length > 0 || combosPruned > 0 || missing.length > 0
+      || intent.activePackIds.length !== next.intent.activePackIds.length
+    if (!changed) {
+      return { status: 200, body: { ok: true, changed: false, missing: [], packs: [], combos: 0 } }
+    }
+    const backup = backupState()
+    saveState(next)
+    invalidateAll()
+    note('consistency-repaired', { packs: prunedPacks.length, combos: combosPruned, missing: missing.length, backup })
+    return {
+      status: 200,
+      body: { ok: true, changed: true, missing, packs: prunedPacks, combos: combosPruned, backup },
+    }
   })
 
   // 新出现的 Agent 及时挂上策略 provider（轮询足够便宜，且不依赖内部事件名）。
@@ -1377,6 +1444,8 @@ async function collectState(ctx) {
     saveState({ ...state, known: nextKnown })
   }
 
+  // 只读来源（FR-026）：不在织音管理的安装根里的技能，只能启停、不能卸载。
+  const uninstallRoots = [installRoot(ctx, 'user'), installRoot(ctx, 'project')].filter(Boolean)
   const skills = [...byName.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((skill) => {
@@ -1405,6 +1474,10 @@ async function collectState(ctx) {
         hiddenReason: reason,
         refCount: refs.length,
         refs,
+        uninstallable: uninstallRoots.some((root) => existsSync(join(root, skill.name))),
+        readOnly: !uninstallRoots.some((root) => existsSync(join(root, skill.name))),
+        readOnlyReason:
+          source === 'bundled' ? 'bundled' : source === 'custom' ? 'external' : 'root',
       }
     })
 
@@ -1476,6 +1549,7 @@ async function collectState(ctx) {
       both: skills.filter((skill) => skill.model && skill.user).length,
       neither: skills.filter((skill) => !skill.model && !skill.user).length,
       disabled: skills.filter((skill) => !skill.enabled).length,
+      readOnly: skills.filter((skill) => skill.readOnly).length,
     },
     packs: packsOut,
     combos: combosOut,
