@@ -1846,12 +1846,16 @@ async function collectState(ctx) {
       ? { status: 'drifted', drift: ghostMembers, lastGoodAt }
       : { status: 'synced', lastGoodAt }
   // 每个包的目录成本（FR-021）：按已知描述截断到 500 字符累加，用来判断这个包值不值。
+  const descByName = new Map(skills.map((skill) => [skill.name, skill.description]))
+  // 「全部技能」= 此刻织音能看见的全部技能：.agents 开关关掉时，user-agents 整组不在世界里。
+  const allPackSkills = current.agentsRoot === false ? skills.filter((skill) => skill.source !== 'user-agents') : skills
+  const allPackNames = allPackSkills.map((skill) => skill.name)
   const packsOut = (current.packs ?? []).map((pack) => {
     const members = Array.isArray(pack.members) ? pack.members : []
     const isAll = pack.id === ALL_PACK_ID
-    const counted = isAll ? skills.map((skill) => skill.name) : members
+    const counted = isAll ? allPackNames : members
     const cost = counted.reduce((total, name) => {
-      const description = current.known?.[name]?.description
+      const description = descByName.get(name) ?? current.known?.[name]?.description
       return total + Math.min(typeof description === 'string' ? description.length : 0, DESCRIPTION_MAX_LENGTH)
     }, 0)
     return {
@@ -1859,7 +1863,7 @@ async function collectState(ctx) {
       members,
       all: isAll,
       locked: isAll,
-      memberCount: isAll ? skills.length : members.length,
+      memberCount: isAll ? allPackNames.length : members.length,
       conflictsWith: normalizeConflicts(current, pack.id, pack.conflictsWith),
       active: packActive(current, pack, intent),
       cost,
