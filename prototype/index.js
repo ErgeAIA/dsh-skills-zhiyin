@@ -63,6 +63,9 @@ const EMPTY_STATE = {
 
 /** 技能包名规则：1–40 字符，允许中日韩、空格、下划线、连字符；重名拒绝。 */
 const PACK_NAME_MAX = 40
+// AI Vault 式「全部技能」默认包：随观测动态包含所有技能，与具体技能包互斥，可关不可删。
+const ALL_PACK_ID = '__all__'
+const ALL_PACK_NAME = '全部技能'
 function packNameValid(name) {
   if (typeof name !== 'string') return false
   const trimmed = name.trim()
@@ -339,6 +342,9 @@ export function apply(ctx) {
       if (packNameTaken(packs, name)) return { status: 400, body: { ok: false, error: '已有同名技能包' } }
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
       packs.push({ id: newId, name, enabled: true, members: [], conflictsWith: [], order: packs.length })
+      // 新建包默认启用：按互斥规则关掉「全部技能」。
+      const allPack = packs.find((candidate) => candidate.id === ALL_PACK_ID)
+      if (allPack) allPack.enabled = false
       saveState(state)
       invalidateAll()
       return { status: 200, body: { ok: true, id: newId } }
@@ -346,6 +352,10 @@ export function apply(ctx) {
 
     if (index < 0) return { status: 404, body: { ok: false, error: 'pack not found' } }
     const pack = packs[index]
+    // 默认包只能启停：改名 / 删除 / 编成员 / 声明冲突都不允许。
+    if (pack.id === ALL_PACK_ID && action !== 'toggle') {
+      return { status: 400, body: { ok: false, error: '「全部技能」是默认技能包，只能启停，不能改名、删除或编辑成员' } }
+    }
 
     if (action === 'rename') {
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
@@ -360,6 +370,11 @@ export function apply(ctx) {
         if (guard) return guard
       }
       if (turningOn) {
+        // 「全部技能」与具体技能包互斥：开一边，另一边自动关。
+        for (const candidate of packs) {
+          if (candidate.id === pack.id) continue
+          if (pack.id === ALL_PACK_ID || candidate.id === ALL_PACK_ID) candidate.enabled = false
+        }
         const plan = normalizeIntent(state)
         const activeAfter = (state.packs ?? [])
           .filter((candidate) => packActive(state, candidate.id === pack.id ? { ...candidate, enabled: true } : candidate, plan))
@@ -676,7 +691,19 @@ export function apply(ctx) {
     const state = readState()
     // 只有确实带了 packs 数组才覆盖：粘贴的 JSON 缺 packs 时不清空现有技能包。
     if (incomingPacks !== null) {
-      state.packs = packs
+      const wanted = packs.filter((pack) => pack.id !== ALL_PACK_ID)
+      const incomingAll = packs.find((pack) => pack.id === ALL_PACK_ID)
+      const allPack = {
+        id: ALL_PACK_ID,
+        name: ALL_PACK_NAME,
+        enabled: incomingAll ? incomingAll.enabled !== false : true,
+        members: [],
+        conflictsWith: [],
+        order: -1,
+      }
+      state.packs = [allPack, ...wanted]
+      // 互斥：默认包开着时，具体包一律关掉。
+      if (allPack.enabled !== false) for (const pack of wanted) pack.enabled = false
       for (const pack of state.packs) pack.conflictsWith = normalizeConflicts(state, pack.id, pack.conflictsWith)
     }
     if (payload && typeof payload === 'object') {
@@ -1223,9 +1250,26 @@ function readState() {
       next.combos = []
       next.packs = (next.packs ?? []).map((pack) => ({ ...pack, conflictsWith: [] }))
     }
+    // v3：补上「全部技能」默认包并默认开启，保证升级后不会出现“什么都不可用”。
+    // 它与具体技能包互斥：全部开着时，具体包一律关掉。
+    if (!Array.isArray(next.packs)) next.packs = []
+    if (!next.packs.some((pack) => pack?.id === ALL_PACK_ID)) {
+      next.packs.unshift({ id: ALL_PACK_ID, name: ALL_PACK_NAME, enabled: true, members: [], conflictsWith: [], order: -1 })
+    }
+    if (next.v !== 3) {
+      next.v = 3
+      const allPack = next.packs.find((pack) => pack.id === ALL_PACK_ID)
+      allPack.enabled = true
+      for (const pack of next.packs) if (pack.id !== ALL_PACK_ID) pack.enabled = false
+    }
     cache = next
   } catch {
-    cache = { ...EMPTY_STATE }
+    // 首次运行还没有 state.json：直接给一份带「全部技能」的初始状态，避免装完什么都不可用。
+    cache = {
+      ...EMPTY_STATE,
+      v: 3,
+      packs: [{ id: ALL_PACK_ID, name: ALL_PACK_NAME, enabled: true, members: [], conflictsWith: [], order: -1 }],
+    }
   }
   return cache
 }
@@ -1312,6 +1356,9 @@ function hiddenReason(state, skillName, source) {
   const packs = memberPacks(state, skillName)
   // 单技能开关是底线：包只决定「这一组能不能上场」，不会替成员强行打开。
   if (state.disabled?.[skillName]) return 'manual'
+  // 「全部技能」开着时，托管来源也全部生效；它本身就是“所有技能”这个包。
+  const allPack = (state.packs ?? []).find((pack) => pack?.id === ALL_PACK_ID)
+  if (allPack && allPack.enabled !== false) return null
   if (intent.mode === 'orchestrated') {
     // 接管后：未编配的技能不自动生效；编配了但组合没纳入的包也不生效。
     if (packs.length === 0) return 'unassigned'
@@ -1801,11 +1848,22 @@ async function collectState(ctx) {
   // 每个包的目录成本（FR-021）：按已知描述截断到 500 字符累加，用来判断这个包值不值。
   const packsOut = (current.packs ?? []).map((pack) => {
     const members = Array.isArray(pack.members) ? pack.members : []
-    const cost = members.reduce((total, name) => {
+    const isAll = pack.id === ALL_PACK_ID
+    const counted = isAll ? skills.map((skill) => skill.name) : members
+    const cost = counted.reduce((total, name) => {
       const description = current.known?.[name]?.description
       return total + Math.min(typeof description === 'string' ? description.length : 0, DESCRIPTION_MAX_LENGTH)
     }, 0)
-    return { ...pack, members, conflictsWith: normalizeConflicts(current, pack.id, pack.conflictsWith), active: packActive(current, pack, intent), cost }
+    return {
+      ...pack,
+      members,
+      all: isAll,
+      locked: isAll,
+      memberCount: isAll ? skills.length : members.length,
+      conflictsWith: normalizeConflicts(current, pack.id, pack.conflictsWith),
+      active: packActive(current, pack, intent),
+      cost,
+    }
   })
   const combosOut = (current.combos ?? []).map((combo, index) => ({ ...combo, order: combo.order ?? index }))
   return {
@@ -1832,6 +1890,7 @@ async function collectState(ctx) {
       both: skills.filter((skill) => skill.model && skill.user).length,
       neither: skills.filter((skill) => !skill.model && !skill.user).length,
       disabled: skills.filter((skill) => !skill.enabled).length,
+      internal: skills.filter((skill) => skill.enabled && !skill.model && !skill.user).length,
       readOnly: skills.filter((skill) => skill.readOnly).length,
     },
     packs: packsOut,

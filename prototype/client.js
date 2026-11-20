@@ -145,6 +145,8 @@ window.__ModuleLoader__.load({
         packEmptyHint2: '还没有成员',
         packNoMatch: '没有匹配技能包',
         packNameRule: '1–40 个字符；仅限中文、字母、数字、空格、下划线、连字符',
+        packDefault: '默认',
+        packAllHint: '包含当前能看到的全部技能，新技能自动加入；开它，具体技能包自动关闭',
         packCostUnit: '字符',
         packNotInCombo: '本组合未纳入',
         packHiddenAgents: '被 .agents 开关挡住',
@@ -397,6 +399,8 @@ window.__ModuleLoader__.load({
         packEmptyHint2: 'No members yet',
         packNoMatch: 'No matching pack',
         packNameRule: '1-40 characters; letters, digits, spaces, underscore and hyphen only',
+        packDefault: 'default',
+        packAllHint: 'Every visible skill; new skills join automatically. Turning it on turns the other packs off.',
         packCostUnit: 'chars',
         packNotInCombo: 'Not in active combo',
         packHiddenAgents: 'hidden by .agents switch',
@@ -1487,7 +1491,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         const filtered = scoped.filter((skill) => {
           if (filter === 'model' && !skill.model) return false
           if (filter === 'user' && !(skill.user && !skill.model)) return false
-          if (filter === 'internal' && (skill.model || skill.user)) return false
+          if (filter === 'disabled' && skill.enabled !== false) return false
+      if (filter === 'internal' && (skill.enabled === false || skill.model || skill.user)) return false
           if (filter === 'bundled' && skill.source !== 'bundled') return false
           if (needle === '') return true
           return (
@@ -1566,6 +1571,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       // 技能包三态：由成员派生（全部启用 / 部分启用 / 全部停用）。
       const packStatus = (pack) => {
+        // 默认包没有静态成员：状态只看它自己的开关，成员数按观测到的技能算。
+        if (pack.all) {
+          const total = pack.memberCount ?? 0
+          return { kind: pack.enabled !== false ? 'all' : 'none', on: total, total }
+        }
         const members = (pack.members ?? []).filter((name) => scopedNames.has(name))
         if (members.length === 0) return { kind: 'empty', on: 0, total: 0 }
         let on = 0
@@ -2165,7 +2175,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       'div',
                       { style: css.itemHead },
                       h('span', { style: css.name }, pack.name),
-                      h('span', { style: css.badge(true) }, `${pack.members?.length ?? 0} 个技能`),
+                      h('span', { style: css.badge(true) }, `${pack.memberCount ?? pack.members?.length ?? 0} 个技能`),
+                      pack.all ? h('span', { style: { ...css.badge(true), opacity: 0.7 } }, say('packDefault', '默认')) : null,
                       pack.cost > 0 ? h('span', { style: css.metaText }, `${pack.cost} ${say('packCostUnit', '字符')}`) : null,
                       intent.mode === 'orchestrated' && pack.enabled !== false && pack.active === false
                         ? h('span', { style: { ...css.badge(true), background: 'rgba(128,128,128,0.16)', opacity: 0.72 } }, say('packNotInCombo', '本组合未纳入'))
@@ -2173,7 +2184,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
                       h('span', { style: { ...packStatusStyle(status), marginLeft: 'auto' } }, packStatusLabel(status)),
                     ),
-                    pack.members?.length
+                    pack.all
+                      ? h('div', { style: css.desc }, say('packAllHint', '包含当前能看到的全部技能，新技能自动加入；开它，具体技能包自动关闭'))
+                      : pack.members?.length
                       ? h(
                           'div',
                           { style: css.desc },
@@ -2184,7 +2197,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         )
                       : h('div', { style: css.desc }, say('packEmptyHint2', '还没有成员')),
                   ),
-                  h(
+                  pack.all ? null : h(
                     'button',
                     {
                       type: 'button',
@@ -2196,7 +2209,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     },
                     h(Icon, { name: 'users', size: 14 }),
                   ),
-                  h(
+                  pack.all ? null : h(
                     'div',
                     { style: css.menuWrap },
                     h(
@@ -3306,17 +3319,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
     function statCards(data, counts, say, filter, setFilter) {
       const items = [
         { key: 'statTotal', label: '技能总数', value: counts.total, filter: 'all', hint: '当前作用域下观测到的全部技能（按名称去重）' },
-        { key: 'statModel', label: '模型可用', value: counts.model, filter: 'model', hint: '可被模型侧调用的技能（modelInvocable）；对话时模型能自己选中它们' },
+        { key: 'statModel', label: '可自动调用', value: counts.model, filter: 'model', hint: 'Agent 会在对话里自己选用的技能（modelInvocable）；手动调用的也在其中' },
         {
           key: 'statUser',
-          label: '仅用户可用',
+          label: '仅手动调用',
           value: Math.max(0, counts.user - counts.both),
           filter: 'user',
-          hint: '只出现在 / 菜单、模型不可直接调用的技能',
+          hint: '只能用 /名字 手动唤起，模型不会自己选（disable-model-invocation: true）',
         },
-        { key: 'statNeither', label: '仅内部可用', value: counts.neither, filter: 'internal', hint: '既不在模型侧也不在 / 菜单、只作为内部能力的技能' },
-        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随插件内置（bundled 来源）的技能' },
+        { key: 'statDisabled', label: '已停用', value: counts.disabled, filter: 'disabled', hint: '被总开关、.agents 开关、技能包或单技能开关挡住的技能；文件仍在盘上，随时能打开' },
+        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随 DSH 插件内置（bundled 来源）的技能' },
       ]
+      if ((counts.internal ?? 0) > 0) {
+        items.push({ key: 'statInternal', label: '不可直接调用', value: counts.internal, filter: 'internal', hint: '模型与 / 菜单两个入口都关了（disable-model-invocation: true 且 user-invocable: false），只能被别的技能引用' })
+      }
       return items.map((item) => {
         const active = filter === item.filter
         return h(
