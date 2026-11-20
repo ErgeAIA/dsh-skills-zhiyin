@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（技能停用修复走 fix/skill-disable-ui → 提交 b555e53 → 合并 e85668f → 已推送 origin，分支已删）
-- **阶段**：原型期 P1 功能面基本补齐——启停（模型面 + / 菜单面）、技能包、导入 txt、安装/卸载、组合与合奏意图、导出/导入、批量提交、备份回滚；按用户指令功能做完后统一精修 UI
-- **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能列表、技能包、成员管理、导入/安装弹窗）
+- **当前分支**：main（简化界面 + 安装入口走 feat/simplify-install-ux → 提交 bcbd302 → 合并 2a38d8c → 已推送 origin，分支已删）
+- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——2026-11-20 起界面只留「技能 / 技能包」两页，语义是「包开关 = 成员对 agent 可见」；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留，v2 迁移把旧状态归零）；UI 还待整体精修
+- **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 13:1x 一致性修复入口 + 只读来源标注（commit b5df5e2，merge f0fe5b8）：给 FR-022 补上修复动作，补齐 FR-026
+- **最后更新**：2026-11-20 14:3x 简化界面 + 重做安装入口（commit bcbd302，merge 2a38d8c）
+  - 用户反馈「一件简单的事做得看不懂」：界面收敛为「技能 / 技能包」两页；移除组合/合奏页签、包冲突徽标与声明入口、排除/常驻按钮、生效面矩阵；底部提示改为「技能包开关决定包内技能是否对 agent 可见」
+  - v2 状态迁移：readState 检测 v!=2 时把 intent 归零为兼容模式、清空 combos 与包的 conflictsWith（路由保留，只为兼容旧导出）
+  - 安装弹窗改成一个输入框：支持 owner/repo、GitHub 链接（含 /tree /blob）、npx skills add、gh repo clone、SKILL.md 直链、本地文件夹；后端 git clone --depth 1 到临时目录找 SKILL.md，多技能列出候选，名字优先 frontmatter name
+  - 技能卡保持瀑布流（columnWidth 320）；备注、刷新/加载文案、幽灵告警只针对启用包等上一轮修正一并保留
+  - 冒烟：v2 迁移 intent=compat / combos=0 / conflicts=0；本地文件夹经文本框安装成功且取名 frontmatter；重复 409；坏来源 400；渲染桩通过；node --check 双半边 exit 0
+  - 待验收：完整重启 DSH 后看两页签、安装弹窗粘贴 GitHub 地址、包开关与全部停用；远程安装依赖本机 git 与网络
+  - 上一轮：2026-11-20 13:1x 一致性修复入口 + 只读来源标注（commit b5df5e2，merge f0fe5b8）：给 FR-022 补上修复动作，补齐 FR-026
   - 宿主新增 POST /zhiyin/repair：只剪掉观测不到的引用——技能包里不存在的成员、组合里不存在的包、意图里不存在的技能；修复前先备份（复用 backupState），修复后再观测即为 synced。观测不完整（lastComplete=false 或本次快照 complete=false）时返回 409，不猜哪些引用失效
   - collectState 每个技能新增 uninstallable / readOnly / readOnlyReason：判据是该技能名是否真实存在于安装根（~/.dsh/skills 或 <项目>/.dsh/skills），与 /zhiyin/uninstall 的查找逻辑同源；counts 新增 readOnly
   - /zhiyin/uninstall 找不到时给出「不在织音管理的技能目录里（只读来源），无法卸载」，不再只报 skill not found
