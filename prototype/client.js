@@ -16,9 +16,9 @@ window.__ModuleLoader__.load({
         nav: '织音',
         title: '织音',
         subtitle: '让技能自由编组，让能力彼此协奏',
-        refresh: '重新观测',
-        loading: '正在观测…',
-        failed: '观测失败：',
+        refresh: '刷新',
+        loading: '正在读取技能列表…',
+        failed: '读取失败：',
         takeoverOn: '开关已生效',
         takeoverOff: '未接管',
         takeoverHintOn: '已为在跑的会话挂上策略 provider，开关即时生效。',
@@ -62,9 +62,11 @@ window.__ModuleLoader__.load({
         save: '保存',
         cancel: '取消',
         install: '安装技能',
-        installHint: '填一个含 SKILL.md 的文件夹绝对路径；安装只新建目录，不会改写已有技能',
-        installPath: '文件夹路径，如 D:\skills\my-skill',
-        installName: '技能名（留空则用文件夹名）',
+        installHint: '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能',
+        installPath: 'owner/repo、https://github.com/owner/repo 或 D:\skills\my-skill',
+        installName: '技能名（留空则用 SKILL.md 里的 name）',
+        installMultiple: '这个仓库里有多个技能，选一个安装：',
+        installFailed: '安装失败：',
         installUser: '用户目录 ~/.dsh/skills',
         installProject: '项目 .dsh/skills',
         uninstall: '卸载',
@@ -81,7 +83,7 @@ window.__ModuleLoader__.load({
         modelBadge: '模型',
         userBadge: '用户',
         internalBadge: '内部',
-        next: '组合决定此刻生效面：应用前先预览差异，随时可退出合奏。',
+        next: '技能包开关决定包内技能是否对 agent 可见；单个技能也可以随时停用。',
         agentsRoot: '加载 ~/.agents/skills',
         agentsRootHint: '关掉后 DSH 只看 ~/.dsh/skills 与项目技能',
         agentsRootHintShort: '开启后读取 ~/.agents/skills 与 ~/.dsh/skills 的合集；关闭后只读 ~/.dsh/skills 与项目技能',
@@ -107,7 +109,7 @@ window.__ModuleLoader__.load({
         importConfigBadJson: '不是合法的 JSON',
         importConfigMissing: '个成员未安装',
         packUnit: '个技能包',
-        observedAt: '观测于',
+        observedAt: '更新于',
         masterDisable: '全部停用',
         masterEnable: '全部启用',
         masterDisableHint: '一键全部停用：模型目录为空、/ 菜单也选不到',
@@ -133,6 +135,7 @@ window.__ModuleLoader__.load({
         packNameRule: '1–40 个字符；仅限中文、字母、数字、空格、下划线、连字符',
         packCostUnit: '字符',
         packNotInCombo: '本组合未纳入',
+        packHiddenAgents: '被 .agents 开关挡住',
         alertBudget: '目录字符数已超出预算',
         alertConflict: '同名技能冲突',
         alertFrom: '个来源',
@@ -190,6 +193,12 @@ window.__ModuleLoader__.load({
         batchClear: '清除选择',
         alertUnassigned: '合奏模式下有未编配技能不生效',
         alertPackConflict: '技能包冲突',
+        note: '备注',
+        noteEdit: '编辑备注',
+        noteAdd: '加备注',
+        noteHint: '备注只存在本地配置里，不会写进技能文件；导出配置时会一起带走。',
+        notePlaceholder: '例如：做前端评审时先留着；下个项目再用',
+        noteEmpty: '还没有备注',
         comboConflictAsk: '这些技能包互相冲突',
         comboConflictStill: '仍然应用并留痕？',
         packConflicts: '声明冲突包',
@@ -245,8 +254,8 @@ window.__ModuleLoader__.load({
         title: 'Zhiyin',
         subtitle: 'Group skills freely; let capabilities play together',
         refresh: 'Refresh',
-        loading: 'Observing…',
-        failed: 'Observation failed: ',
+        loading: 'Loading skill list…',
+        failed: 'Load failed: ',
         takeoverOn: 'Switches live',
         takeoverOff: 'Not taken over',
         takeoverHintOn: 'Policy providers are mounted on running sessions; switches apply immediately.',
@@ -290,9 +299,11 @@ window.__ModuleLoader__.load({
         save: 'Save',
         cancel: 'Cancel',
         install: 'Install',
-        installHint: 'Absolute path to a folder containing SKILL.md; install only creates a new directory',
-        installPath: 'Folder path, e.g. D:\skills\my-skill',
-        installName: 'Skill name (blank = folder name)',
+        installHint: 'Paste a GitHub repo, skill folder, npx skills add command, raw SKILL.md link, or a local folder path; install only creates a new directory',
+        installPath: 'owner/repo, https://github.com/owner/repo, or D:\skills\my-skill',
+        installName: 'Skill name (blank = name from SKILL.md)',
+        installMultiple: 'This repo has several skills; pick one:',
+        installFailed: 'Install failed: ',
         installUser: 'User ~/.dsh/skills',
         installProject: 'Project .dsh/skills',
         uninstall: 'Uninstall',
@@ -309,7 +320,7 @@ window.__ModuleLoader__.load({
         modelBadge: 'model',
         userBadge: 'user',
         internalBadge: 'internal',
-        next: 'A combo decides what plays now: preview the diff first, leave orchestration anytime.',
+        next: 'A pack switch decides whether its skills are visible to the agent; individual skills can be toggled anytime.',
         agentsRoot: 'Load ~/.agents/skills',
         agentsRootHint: 'Off: DSH only reads ~/.dsh/skills and project skills',
         agentsRootHintShort: 'On: reads ~/.agents/skills and ~/.dsh/skills together; off: only ~/.dsh/skills and project skills',
@@ -335,7 +346,7 @@ window.__ModuleLoader__.load({
         importConfigBadJson: 'Not valid JSON',
         importConfigMissing: 'members are not installed',
         packUnit: 'packs',
-        observedAt: 'Observed at',
+        observedAt: 'Updated',
         masterDisable: 'Disable all',
         masterEnable: 'Enable all',
         masterDisableHint: 'Disable everything at once: empty model catalog, nothing in the / menu',
@@ -361,6 +372,7 @@ window.__ModuleLoader__.load({
         packNameRule: '1-40 characters; letters, digits, spaces, underscore and hyphen only',
         packCostUnit: 'chars',
         packNotInCombo: 'Not in active combo',
+        packHiddenAgents: 'hidden by .agents switch',
         alertBudget: 'Catalog characters exceed the budget',
         alertConflict: 'Duplicate skill names',
         alertFrom: 'sources',
@@ -418,6 +430,12 @@ window.__ModuleLoader__.load({
         batchClear: 'Clear',
         alertUnassigned: 'Some unassigned skills do not play in orchestrated mode',
         alertPackConflict: 'Pack conflict',
+        note: 'Note',
+        noteEdit: 'Edit note',
+        noteAdd: 'Add note',
+        noteHint: 'Notes live in the local config only, never in skill files, and travel with config export.',
+        notePlaceholder: 'e.g. keep for frontend reviews; revisit next project',
+        noteEmpty: 'No note yet',
         comboConflictAsk: 'These packs conflict',
         comboConflictStill: 'Apply anyway and log it?',
         packConflicts: 'Declare conflicts',
@@ -873,25 +891,30 @@ window.__ModuleLoader__.load({
         fontSize: 12.5,
       },
       // 技能卡网格
+      // 瀑布流：按列宽自动分栏，卡片高度随内容变化，不再被同一行拉齐。
       cardGrid: {
-        marginTop: 12,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-        gap: 10,
+        marginTop: 14,
+        columnWidth: 320,
+        columnGap: 12,
       },
       skillCard: {
-        display: 'flex',
+        display: 'inline-block',
+        width: '100%',
+        boxSizing: 'border-box',
+        breakInside: 'avoid',
+        marginBottom: 12,
+        verticalAlign: 'top',
         flexDirection: 'column',
-        gap: 8,
-        borderRadius: 12,
-        padding: '12px 14px',
+        gap: 10,
+        borderRadius: 14,
+        padding: '14px 16px',
         background: 'rgba(128,128,128,0.045)',
         border: '1px solid rgba(128,128,128,0.10)',
       },
       cardHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
       cardName: {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 600,
         flex: '0 1 auto',
         minWidth: 0,
@@ -900,14 +923,40 @@ window.__ModuleLoader__.load({
         textOverflow: 'ellipsis',
       },
       cardDesc: {
+        fontSize: 12.5,
+        opacity: 0.64,
+        lineHeight: 1.5,
+        display: '-webkit-box',
+        WebkitLineClamp: 4,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        minHeight: 20,
+      },
+      cardNote: {
         fontSize: 12,
-        opacity: 0.6,
+        lineHeight: 1.5,
+        padding: '6px 9px',
+        borderRadius: 8,
+        background: 'rgba(224,116,60,0.10)',
+        borderLeft: '2px solid var(--zhiyin-accent, #e0743c)',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        maxHeight: 84,
+        overflow: 'hidden',
+      },
+      noteLine: {
+        fontSize: 11.8,
         lineHeight: 1.45,
+        marginTop: 4,
+        paddingLeft: 8,
+        borderLeft: '2px solid var(--zhiyin-accent, #e0743c)',
+        opacity: 0.78,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
         display: '-webkit-box',
         WebkitLineClamp: 2,
         WebkitBoxOrient: 'vertical',
         overflow: 'hidden',
-        minHeight: 34,
       },
       cardFoot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' },
       dot: (on) => ({
@@ -1027,6 +1076,10 @@ window.__ModuleLoader__.load({
   check: [
     ['path', 'm20 6-11 11-5-5'],
   ],
+  edit: [
+    ['path', 'M12 20h9'],
+    ['path', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z'],
+  ],
 }
 
 function Icon({ name, size = 15 }) {
@@ -1123,6 +1176,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [installPath, setInstallPath] = React.useState('')
       const [installName, setInstallName] = React.useState('')
       const [installTarget, setInstallTarget] = React.useState('user')
+      const [installError, setInstallError] = React.useState('')
+      const [installCandidates, setInstallCandidates] = React.useState([])
       const [importingConfig, setImportingConfig] = React.useState(false)
       const [importConfigText, setImportConfigText] = React.useState('')
       const [importResult, setImportResult] = React.useState(null)
@@ -1144,6 +1199,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [comboMenu, setComboMenu] = React.useState(null)            // 组合行尾 … 菜单
       const [selectedNames, setSelectedNames] = React.useState([])      // 批量提交选中的技能名
       const [comboRenaming, setComboRenaming] = React.useState(null)    // 组合改名：{ id, name }
+      const [noteEditing, setNoteEditing] = React.useState(null)       // 正在编辑备注的技能名；null 表示关闭
+      const [noteDraft, setNoteDraft] = React.useState('')
       const [backups, setBackups] = React.useState(null)               // 配置备份列表
       const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
       const [conflictPicking, setConflictPicking] = React.useState(null)      // 声明冲突包弹窗：包 id
@@ -1198,6 +1255,42 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         },
         [load],
       )
+
+      // 安装：一个输入框收链接或本地路径；返回多个技能时列出来让用户选。
+      const runInstall = (subpath) => {
+        const text = installPath.trim()
+        if (!text) return
+        setBusy(true)
+        setInstallError('')
+        fetch('/zhiyin/install', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            name: installName.trim(),
+            target: installTarget,
+            ...(subpath === undefined ? {} : { subpath }),
+          }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result?.ok === true) {
+              setInstallCandidates([])
+              setInstalling(false)
+              setInstallPath('')
+              setInstallName('')
+              load()
+              return
+            }
+            if (result?.error === 'multiple') {
+              setInstallCandidates(result.candidates ?? [])
+              return
+            }
+            setInstallError(result?.error ?? '安装失败')
+          })
+          .catch((error) => setInstallError(String(error?.message ?? error)))
+          .finally(() => setBusy(false))
+      }
 
       // 导出配置：拉一份 JSON，直接让浏览器下载一份带时间戳的文件。
       const exportConfig = React.useCallback(() => {
@@ -1383,6 +1476,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       // 当前作用域内所有技能名（用于判断包成员是否为「幽灵」）
       const scopedNames = React.useMemo(() => new Set(scoped.map((skill) => skill.name)), [scoped])
+      // 全部观测到的技能名（不受 .agents 开关影响）：判断「未安装」只能用它。
+      const observedNames = React.useMemo(() => new Set((data?.skills ?? []).map((skill) => skill.name)), [data])
 
       // 技能包按搜索词过滤：包名或成员名命中即可。
       const visiblePacks = React.useMemo(() => {
@@ -1550,6 +1645,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .then((result) => { if (result) setConflictPicking(null) })
       }
 
+      // 技能备注：打开弹窗填一份本地笔记，跟着导出/导入走。
+      const openNote = (skill) => {
+        setNoteDraft(skill.note ?? '')
+        setNoteEditing(skill.name)
+      }
+      const saveNote = () => {
+        if (!noteEditing) return
+        write('/zhiyin/note', { name: noteEditing, note: noteDraft }).then((result) => {
+          if (result) setNoteEditing(null)
+        })
+      }
+
       // 备份列表（FR-025）：把导入/回滚留下的快照列出来，可任选一份退回。
       const loadBackups = React.useCallback(() => {
         fetch('/zhiyin/backups', { headers: { accept: 'application/json' } })
@@ -1598,17 +1705,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         if (unassigned > 0) {
           out.push({ key: 'unassigned', text: `${say('alertUnassigned', '合奏模式下有未编配技能不生效')}：${unassigned}` })
         }
+        // 只对「启用中的包」提醒，且按全部观测技能判断：被 .agents 开关挡住的技能仍然装着，不算未安装。
         for (const pack of data?.packs ?? []) {
-          const ghosts = (pack.members ?? []).filter((name) => !scopedNames.has(name))
+          if (pack.enabled === false) continue
+          const ghosts = (pack.members ?? []).filter((name) => !observedNames.has(name))
           if (ghosts.length > 0) {
             out.push({ key: 'ghost:' + pack.id, text: `${say('alertGhost', '技能包引用了未安装技能')} · ${pack.name}：${ghosts.slice(0, 4).join('、')}${ghosts.length > 4 ? ' …' : ''}` })
           }
         }
-        for (const pair of data?.packConflicts ?? []) {
-          out.push({ key: 'packconflict:' + pair.a.id + ':' + pair.b.id, text: `${say('alertPackConflict', '技能包冲突')}：${pair.a.name} × ${pair.b.name}` })
-        }
+
         return out
-      }, [data, scopedNames, say, intent, scoped])
+      }, [data, say, intent, scoped, observedNames])
 
       // 生效面矩阵（FR-020）：模型目录 / skill 工具 / /name 菜单 / 可信 get() 各自谁控制。
       // 数量按「当前作用域里真正生效的技能」取，与隐藏原因保持一致。
@@ -1806,46 +1913,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
-        // 生效面矩阵（FR-020）：四个生效面各自由谁控制，只列当前真正生效的技能数。
-        data
-          ? h(
-              'div',
-              { style: css.group },
-              h(
-                'div',
-                { style: css.groupRow },
-                h(
-                  'div',
-                  { style: css.groupMain },
-                  h('div', { style: css.groupTitle }, say('matrixTitle', '生效面矩阵')),
-                  h('div', { style: css.groupDesc }, say('matrixSub', '四个生效面各自由谁控制，别只盯着「已启用」')),
-                ),
-              ),
-              [matrix.catalog, matrix.tool, matrix.slash, matrix.get].map((row, index) =>
-                h(
-                  'div',
-                  { key: row.name, style: index === 3 ? css.matrixRowLast : css.matrixRow },
-                  h('span', { style: css.matrixName }, row.name),
-                  h(
-                    'span',
-                    { style: css.matrixBy, title: say('matrixMemberBy', '合奏成员：全部停用 / agents 开关 / 合奏 / 技能包 / 手动停用') },
-                    row.by,
-                  ),
-                  h('span', { style: css.matrixNum }, String(row.n)),
-                ),
-              ),
-              h('div', { style: { ...css.groupDesc, padding: '0 14px 10px' } }, say('matrixTaken', '技能包启用不会放宽源策略，最终取交集')),
-              h('div', { style: { ...css.groupDesc, padding: '0 14px 12px' } }, say('matrixUncontrolled', 'GUI 斜杠菜单由宿主另一个服务读取，织音默认不接管')),
-              data.counts?.readOnly > 0
-                ? h(
-                    'div',
-                    { style: { ...css.groupDesc, padding: '0 14px 12px' } },
-                    `${data.counts.readOnly} ${say('matrixReadOnly', '个技能属只读来源：只能启停，不改文件、不卸载')}`,
-                  )
-                : null,
-            )
-          : null,
-
         data
           ? h(
               'div',
@@ -1905,7 +1972,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 { style: css.seg },
                 h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, `${say('tabList', '技能')} ${counts.total}`),
                 h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, `${say('tabPacks', '技能包')} ${(data.packs ?? []).length}`),
-                h('button', { type: 'button', style: tab === 'combos' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('combos') }, `${say('tabCombos', '组合')} ${(data.combos ?? []).length}`),
+    
               ),
               tab === 'list'
                 ? h(
@@ -1980,6 +2047,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         setInstallPath('')
                         setInstallName('')
                         setInstallTarget('user')
+                        setInstallError('')
+                        setInstallCandidates([])
                         setInstalling(true)
                       },
                     },
@@ -2001,7 +2070,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 : null,
               visiblePacks.map((pack) => {
                 const status = packStatus(pack)
-                const ghosts = (pack.members ?? []).filter((name) => !scopedNames.has(name))
+                const ghosts = (pack.members ?? []).filter((name) => !observedNames.has(name))
+                const hiddenAgents = (pack.members ?? []).filter((name) => observedNames.has(name) && !scopedNames.has(name))
                 const openMembers = () => {
                   setDraftMembers(pack.members ?? [])
                   setMemberQuery('')
@@ -2022,9 +2092,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       intent.mode === 'orchestrated' && pack.enabled !== false && pack.active === false
                         ? h('span', { style: { ...css.badge(true), background: 'rgba(128,128,128,0.16)', opacity: 0.72 } }, say('packNotInCombo', '本组合未纳入'))
                         : null,
-                      (pack.conflictsWith?.length ?? 0) > 0
-                        ? h('span', { style: { ...css.badge(true), background: 'rgba(208,150,60,0.16)', color: '#c98a2e' }, title: (pack.conflictsWith ?? []).map((id) => packById.get(id)?.name ?? id).join('、') }, `${say('packConflictBadge', '冲突')} ${pack.conflictsWith.length}`)
-                        : null,
+
                       h('span', { style: { ...packStatusStyle(status), marginLeft: 'auto' } }, packStatusLabel(status)),
                     ),
                     pack.members?.length
@@ -2033,7 +2101,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           { style: css.desc },
                           pack.members.slice(0, 6).join(' · ') +
                             (pack.members.length > 6 ? ` … +${pack.members.length - 6}` : '') +
-                            (ghosts.length ? `  ·  ${say('packGhost', '未安装')} ${ghosts.length}` : ''),
+                            (ghosts.length ? `  ·  ${say('packGhost', '未安装')} ${ghosts.length}` : '') +
+                            (hiddenAgents.length ? `  ·  ${say('packHiddenAgents', '被 .agents 开关挡住')} ${hiddenAgents.length}` : ''),
                         )
                       : h('div', { style: css.desc }, say('packEmptyHint2', '还没有成员')),
                   ),
@@ -2071,7 +2140,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       ? h(
                           'div',
                           { style: css.menu, onClick: (event) => event.stopPropagation() },
-                          h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); openConflicts(pack) } }, say('packConflicts', '声明冲突包')),
+
                           h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); setRenaming({ id: pack.id, name: pack.name }) } }, say('packRename', '改名')),
                           h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); copyPack(pack) } }, say('packCopy', '复制')),
                           h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); openMembers() } }, say('packMembers', '管理成员')),
@@ -2226,20 +2295,25 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         h('span', { style: { ...css.hint, flex: '0 0 auto' } }, String(Math.min((skill.description ?? '').length, 500))),
                       ),
                       h('div', { style: css.cardDesc }, skill.description ?? ''),
+                      skill.note
+                        ? h('div', { style: css.cardNote, title: skill.note }, skill.note)
+                        : null,
                       h(
                         'div',
                         { style: css.cardFoot },
                         h('span', { style: css.dot(on) }),
                         h('span', { style: { fontSize: 11.5, opacity: 0.6 } },
                           on ? say('enabled', '已启用') : (reasonLabel(skill.hiddenReason) || say('disabledBadge', '已停用'))),
+                        h('span', { style: { flex: '1 1 auto' } }),
                         h('button', {
                           type: 'button',
-                          title: say('excludeHint', '从生效面排除这个技能；不改动任何技能包'),
-                          'aria-label': excludedNames.has(skill.name) ? say('includeBack', '恢复') : say('exclude', '排除'),
-                          style: { ...css.iconBtn, marginLeft: skill.uninstallable === true ? 0 : 'auto' },
+                          title: say('noteEdit', '编辑备注'),
+                          'aria-label': say('noteEdit', '编辑备注'),
+                          style: css.iconBtn,
                           disabled: busy,
-                          onClick: () => setIntentFlag(skill.name, 'excluded', !excludedNames.has(skill.name)),
-                        }, h(Icon, { name: excludedNames.has(skill.name) ? 'check' : 'ban', size: 14 })),
+                          onClick: () => openNote(skill),
+                        }, h(Icon, { name: 'edit', size: 14 })),
+
                         skill.refCount > 1
                           ? h(
                               'span',
@@ -2255,7 +2329,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               type: 'button',
                               title: say('uninstallHint', '移入归档目录，可恢复'),
                               'aria-label': say('uninstall', '卸载'),
-                              style: { ...css.iconBtn, marginLeft: 'auto' },
+                              style: css.iconBtn,
                               disabled: busy,
                               onClick: () => {
                                 if (window.confirm(say('uninstallAsk', '卸载并把技能移入归档目录？') + ' ' + skill.name)) {
@@ -2387,28 +2461,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         skill.description
                           ? h('div', { style: css.desc }, skill.description)
                           : null,
-                      ),
-                      excludedNames.has(skill.name)
-                        ? h('span', { style: css.badgeWarn }, say('excludedBadge', '已排除'))
-                        : alwaysOnNames.has(skill.name)
-                          ? h('span', { style: css.badge(true) }, say('alwaysOnBadge', '常驻'))
+                        skill.note
+                          ? h('div', { style: css.noteLine, title: skill.note }, skill.note)
                           : null,
+                      ),
+
                       h('button', {
                         type: 'button',
                         style: css.iconBtn,
-                        title: say('excludeHint', '从生效面排除这个技能；不改动任何技能包'),
-                        'aria-label': excludedNames.has(skill.name) ? say('includeBack', '恢复') : say('exclude', '排除'),
+                        title: say('noteEdit', '编辑备注'),
+                        'aria-label': say('noteEdit', '编辑备注'),
                         disabled: busy,
-                        onClick: () => setIntentFlag(skill.name, 'excluded', !excludedNames.has(skill.name)),
-                      }, h(Icon, { name: excludedNames.has(skill.name) ? 'check' : 'ban', size: 15 })),
-                      h('button', {
-                        type: 'button',
-                        style: css.iconBtn,
-                        title: say('alwaysOnHint', '不受包启停与组合影响，始终生效'),
-                        'aria-label': say('alwaysOn', '常驻'),
-                        disabled: busy,
-                        onClick: () => setIntentFlag(skill.name, 'alwaysOn', !alwaysOnNames.has(skill.name)),
-                      }, h(Icon, { name: 'pin', size: 15 })),
+                        onClick: () => openNote(skill),
+                      }, h(Icon, { name: 'edit', size: 15 })),
+
                       h(Toggle, {
                         checked: skill.enabled !== false,
                         disabled: busy,
@@ -2584,17 +2650,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 'div',
                 { style: { ...css.modal, ...css.modalMd } },
                 h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('install', '安装技能'))),
-                h('p', { style: css.hint }, say('installHint', '填一个含 SKILL.md 的文件夹绝对路径；安装只新建目录，不会改写已有技能')),
+                h('p', { style: css.hint }, say('installHint', '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能')),
                 h('input', {
                   style: css.field,
                   value: installPath,
-                  placeholder: say('installPath', '文件夹路径，如 D:\\skills\\my-skill'),
+                  placeholder: say('installPath', 'owner/repo、https://github.com/owner/repo 或 D:\\skills\\my-skill'),
                   onChange: (event) => setInstallPath(event.target.value),
                 }),
                 h('input', {
                   style: css.field,
                   value: installName,
-                  placeholder: say('installName', '技能名（留空则用文件夹名）'),
+                  placeholder: say('installName', '技能名（留空则用 SKILL.md 里的 name）'),
                   onChange: (event) => setInstallName(event.target.value),
                 }),
                 h(
@@ -2617,6 +2683,33 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     say('installProject', '项目 .dsh/skills'),
                   ),
                 ),
+                installCandidates.length > 0
+                  ? h(
+                      'div',
+                      { style: { marginTop: 10 } },
+                      h('div', { style: css.hint }, say('installMultiple', '这个仓库里有多个技能，选一个安装：')),
+                      h(
+                        'div',
+                        { style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 } },
+                        installCandidates.map((candidate) =>
+                          h(
+                            'button',
+                            {
+                              key: candidate.subpath,
+                              type: 'button',
+                              style: { ...css.btn, justifyContent: 'flex-start' },
+                              disabled: busy,
+                              onClick: () => runInstall(candidate.subpath),
+                            },
+                            candidate.name + (candidate.subpath ? ' · ' + candidate.subpath : ''),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+                installError
+                  ? h('p', { style: { ...css.hint, color: '#d05a4a' } }, say('installFailed', '安装失败：') + installError)
+                  : null,
                 h(
                   'div',
                   { style: css.modalFoot },
@@ -2627,14 +2720,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       type: 'button',
                       style: css.btn,
                       disabled: busy || installPath.trim() === '',
-                      onClick: () => {
-                        write('/zhiyin/install', {
-                          path: installPath.trim(),
-                          name: installName.trim(),
-                          target: installTarget,
-                        })
-                        setInstalling(false)
-                      },
+                      onClick: () => runInstall(),
                     },
                     say('install', '安装技能'),
                   ),
@@ -3016,6 +3102,44 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   'div',
                   { style: css.modalFoot },
                   h('button', { type: 'button', style: css.btn, onClick: () => setBackupsOpen(false) }, say('close', '关闭')),
+                ),
+              ),
+            )
+          : null,
+
+        noteEditing
+          ? h(
+              'div',
+              { style: css.overlay, onClick: () => setNoteEditing(null) },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalSm }, onClick: (event) => event.stopPropagation() },
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('div', { style: css.modalTitle }, `${say('noteEdit', '编辑备注')} · ${noteEditing}`),
+                  h('button', {
+                    type: 'button',
+                    style: css.iconBtn,
+                    title: say('close', '关闭'),
+                    'aria-label': say('close', '关闭'),
+                    onClick: () => setNoteEditing(null),
+                  }, h(Icon, { name: 'close', size: 15 })),
+                ),
+                h('p', { style: css.hint }, say('noteHint', '备注只存在本地配置里，不会写进技能文件；导出配置时会一起带走。')),
+                h('textarea', {
+                  style: { ...css.textarea, minHeight: 96, fontFamily: 'inherit' },
+                  maxLength: 500,
+                  value: noteDraft,
+                  placeholder: say('notePlaceholder', '例如：做前端评审时先留着；下个项目再用'),
+                  onChange: (event) => setNoteDraft(event.target.value),
+                }),
+                h('div', { style: { ...css.hint, marginTop: 6 } }, `${noteDraft.length} / 500`),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setNoteEditing(null) }, say('cancel', '取消')),
+                  h('button', { type: 'button', style: css.primaryBtn, disabled: busy, onClick: saveNote }, say('save', '保存')),
                 ),
               ),
             )
