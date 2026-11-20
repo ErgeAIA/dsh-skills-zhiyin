@@ -17,13 +17,23 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（AI Vault 可移植部分走 feat/aivault-port → 提交 67cee70 → 合并 17957b6 → 已推送 origin，分支已删）
-- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页，语义是「单技能开关是底线，包开关决定这一组是否上场」；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留，v2 迁移把旧状态归零）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
+- **当前分支**：main（SSOT + 包软链接走 feat/agents-ssot-links → 提交 60dc060 → 合并 2353953 → 已推送 origin，分支已删）
+- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；技能以 ~/.agents/skills 为 SSOT，启用包的成员软链接进 ~/.dsh/skills，DSH 只看到链接进来的技能；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 15:1x 移植 AI Vault 可移植部分（commit 67cee70，merge 17957b6）
+- **最后更新**：2026-11-20 16:2x 按用户设计意见改为「SSOT + 技能包驱动软链接」（commit 60dc060，merge 2353953）
+  - 设计口径（用户 m05143）：技能名就是 SKILL.md 的 name、也就是 DSH 调用标识（kebab-case），目录名必须同名，不能用中文；安装目标要能落到 ~/.agents/skills；技能包不再只是开关，而是「启用包 → 成员软链接进 ~/.dsh/skills」，DSH 只看到启用包的技能
+  - 安装：新增 target=agents（~/.agents/skills，默认）；技能名以 frontmatter name 为准，目录名同名；名字必须匹配 DSH 的 ^[a-z0-9]+(?:-[a-z0-9]+)*$；传入的 name 与 frontmatter 不一致直接 400；安装弹窗去掉「技能名」输入框，改为三段目标单选
+  - 链接模型：linkPlan 计算 current/desired/managed/add/remove/missing；applyLinks 用 junction 软链接到 SSOT；state.linked 记录织音自己创建的链接，删除包后仍能清理；不在任何包、也不是织音创建的旧链接不碰；allOff 时 desired 为空，链接全部收起
+  - 自动同步：包 toggle / members / delete / import、单技能开关、全部停用、安装、卸载、导入配置、回滚后都调用 applyLinks；新增 GET /zhiyin/links（只读计划）与 POST /zhiyin/links {apply:true}（手动兜底）；collectState 输出 links
+  - 设置页：技能包页顶部显示「已链接 N · 包期望 D · 待补 A · 待清 R」，缺失成员标黄，右侧「同步链接」按钮
+  - 干跑（隔离 USERPROFILE/DSH_HOME）：26 项 PASS——安装到 agents、中文名 400、名字不一致 400、frontmatter 优先、建包/成员自动链接、包关断开/包开重链、旧链接被包接管后包关即断、幽灵成员 missing、allOff 收起/恢复、删包清链接、手动 apply、user 目标直装；node --check 双半边 exit 0；渲染桩通过
+  - 真实状态只读计划：3 个包（test/test2/test3），desired=4、managed=6、current=96、add=0、remove=0、missing=0；92 条旧链接不属于任何包，按安全策略不碰。若要做到「只启用 test1 时 DSH 只有 test1」，这 92 条需要先接管或清理——待用户决定
+  - 待验收：完整重启 DSH 后看安装目标三段、包开关产生/移除软链接、全部停用收起链接；远程安装仍需真机网络
+
+- 上一轮：2026-11-20 15:1x 移植 AI Vault 可移植部分（commit 67cee70，merge 17957b6）
   - 用户明确 AIVault 是独立成熟工具，织音只移植可移植部分；个人项目在 D:\Workspace\Code，读码优先 CodeGraph MCP
   - 安装：粘贴地址 → 扫描仓库 → 多选技能 → 一次批量安装；前后端共用 10 分钟 repo clone 缓存；技能名优先 SKILL.md frontmatter name，1–64 字符且字母数字首尾；临时目录 + 原子 rename，过滤 .git/node_modules；失败候选保留，可重试（POST /zhiyin/install/batch）
   - 包成员：候选池 = 全部可见技能 + 已在包内但被 .agents 挡住/未安装的成员；搜索只过滤显示，不动已选；全选 = 未手动停用技能 + 包内隐藏成员，不受搜索影响；新建包默认选中未手动停用技能；保存去重
