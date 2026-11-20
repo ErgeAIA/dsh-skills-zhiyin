@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（观测自动刷新走 feat/observation-refresh → 提交 07faabd → 合并 98269f2 → 已推送 origin，分支已删）；上一轮「全部技能」默认包：6fc60b5 → 2e40df1
+- **当前分支**：main（提示竖排+全部技能计数修复走 fix/toast-and-allpack-count → 提交 2237e0d → 合并 1f7b1dc → 已推送 origin，分支已删）；上一轮观测自动刷新：07faabd → 98269f2
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 22:3x 观测自动刷新（FR-017）+ 干跑验证 + 统计卡计数修复（commit 07faabd→98269f2；e5e668c→99d9ee1）
+- **最后更新**：2026-11-20 23:1x 提示竖排修复 + 「全部技能」按可见世界计数 + 统计卡来源构成（commit 2237e0d，merge 1f7b1dc）
+  - 提示竖排真凶：刷新图标按钮在 state.loading 时把 say('loading')=「正在读取技能列表…」塞进 30×30 图标按钮 → 竖排；改为 SVG SMIL 旋转 spinner（不注入 CSS，规避 CSP），开关技能包触发 reload 时不再竖排
+  - 「全部技能」计数 bug：原按全量观测（177，含未开启的 .agents 66）算；改为按「此刻织音能看见的世界」——agentsRoot 关时排除 user-agents，得 111，与「技能总数」一致；宿主 collectState 与客户端显示双侧同口径（成本也按可见集算）
+  - 数字自解释：统计卡下补一行「来源：用户目录 96 · 内置 14 · 自定义 1」；技能总数 hint 改为「= 可自动调用 + 仅手动调用」，内置 hint 注明「已计入可自动调用，不额外相加」
+  - 实算：可见 111 = 用户目录 96（可自动 81 + 仅手动 15）+ 内置 14 + 自定义 1(dsh-doc)；可自动调用 96 = 81+14+1；仅手动 15 全来自用户目录
+  - node --check 双半边 exit 0；宿主模块加载冒烟 + hiddenReason 通过
+  - 待验收：F5 看到 spinner 与「来源」行、全部技能=111；「全部技能」数字完全生效需完整重启 DSH（宿主 collectState 改动）
+
+- 上一轮：2026-11-20 22:3x 观测自动刷新（FR-017）+ 干跑验证 + 统计卡计数修复（commit 07faabd→98269f2；e5e668c→99d9ee1）
   - FR-017：客户端在「切回页面 / 页面重新可见」时（window focus + document visibilitychange，3 秒节流）自动重取 /zhiyin/state；从别的工具（如 AI Vault）装/卸技能回来后列表自动更新，不必手动点刷新
   - 真代码单测 hiddenReason 11 项全 PASS：全部技能默认包开/关、在启用包、只在停用包、共享技能、手动停用优先、allOff 最高优先、bundled/custom 不受包约束、agents-root、unpacked
   - 干跑安装 13 项全 PASS：resolveGithubSource 解析 owner/repo、GitHub 链接、/tree、/blob …SKILL.md、npx skills add、gh repo clone、带引号路径、4 类非法输入；findSkillDirs 在合成多技能目录里只取 skills/alpha、skills/beta（跳过 .git/node_modules）；frontmatter 取 name（alpha / beta-x）；git ls-remote GitHub 通
