@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（全部技能默认包走 feat/all-skills-pack → 提交 6fc60b5 → 合并 2e40df1 → 已推送 origin，分支已删）；上一轮撤回软链接：e2ad0e1 → be6ec2b
+- **当前分支**：main（观测自动刷新走 feat/observation-refresh → 提交 07faabd → 合并 98269f2 → 已推送 origin，分支已删）；上一轮「全部技能」默认包：6fc60b5 → 2e40df1
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 21:4x 「全部技能」默认包 + 调用方式卡片改名（commit 6fc60b5，merge 2e40df1）
+- **最后更新**：2026-11-20 22:2x 观测自动刷新（FR-017）+ 干跑验证（commit 07faabd，merge 98269f2）
+  - FR-017：客户端在「切回页面 / 页面重新可见」时（window focus + document visibilitychange，3 秒节流）自动重取 /zhiyin/state；从别的工具（如 AI Vault）装/卸技能回来后列表自动更新，不必手动点刷新
+  - 真代码单测 hiddenReason 11 项全 PASS：全部技能默认包开/关、在启用包、只在停用包、共享技能、手动停用优先、allOff 最高优先、bundled/custom 不受包约束、agents-root、unpacked
+  - 干跑安装 13 项全 PASS：resolveGithubSource 解析 owner/repo、GitHub 链接、/tree、/blob …SKILL.md、npx skills add、gh repo clone、带引号路径、4 类非法输入；findSkillDirs 在合成多技能目录里只取 skills/alpha、skills/beta（跳过 .git/node_modules）；frontmatter 取 name（alpha / beta-x）；git ls-remote GitHub 通
+  - 运行态 /zhiyin/probe：两个 Agent 模型面 catalog.count=109、用户面 disabledVisible=[]（停用技能不泄漏到 / 菜单）
+  - __test 增补 resolveGithubSource / findSkillDirs / skillFrontmatterName 便于干跑
+  - 待验收：F5 设置页后切到别窗再切回，列表应自动刷新；完整重启 DSH 才加载宿主改动（本轮宿主只多导出测试符号，行为无变化）
+
+- 上一轮：2026-11-20 21:4x 「全部技能」默认包 + 调用方式卡片改名（commit 6fc60b5，merge 2e40df1）
   - 移植 AI Vault 的默认包：id `__all__`、名「全部技能」，成员随观测动态变化（不在 state 里存成员），不可改名 / 删除 / 编辑成员，只能启停
   - 默认开启：首次运行无 state.json 时直接给带默认包的初始状态；老状态 v3 迁移时补包并默认开启，同时把具体包关掉——保证升级后不会出现“什么都不可用”
   - 互斥：开「全部技能」→ 所有具体包自动关；开任一具体包 → 「全部技能」自动关；具体包之间可同时开（并集）
