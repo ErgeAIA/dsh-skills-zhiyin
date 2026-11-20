@@ -23,7 +23,16 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 00:1x 技能包引用计数 + 生效面矩阵 + 备份列表（commit e403b3e，merge e1bc4b8）：补齐 FR-008、FR-020，并给 FR-025 一个可点开的界面
+- **最后更新**：2026-11-20 12:3x 包冲突声明与三态一致性 + 不完整观测保护（commit 6cdcb09，merge 5417d0c）：补齐 FR-005、FR-022，收紧 FR-010 与 FR-019
+  - 技能包新增 conflictsWith：pack create/import/copy 默认空数组；新增 pack action=conflicts 设置互斥包（只留存在的包、去自身、去重）；collectState 每个包输出规范化 conflictsWith
+  - 冲突双向预检（FR-005）：新增 conflictPairsFor / activePackIds；启用包、应用/叠加组合前先算生效集合里的冲突对，命中默认 409 阻断，body.ack=true 才放行并 note('conflict-ack') 留痕（不落永久忽略）；preview 结果带回 conflicts
+  - 三态一致性（FR-022）：collectState 输出 consistency —— complete=false → degraded；包引用观测不到的技能 → drifted（带 drift 清单）；否则 synced；同时持久化 lastComplete / lastGoodAt。pending / failed 在同步投影模型下暂无对应态
+  - 常驻与排除冲突改为报错（FR-010）：/zhiyin/intent 不再静默互斥，命中时返回 400
+  - 不完整观测保护（FR-019）：上一次观测 lastComplete=false 时，全部停用、包停用、组合应用/叠加、多技能批量停用返回 409，提示先重新观测
+  - 设置页：元信息条加一致性胶囊（一致 / 观测不完整 / 有漂移，悬停出原因与漂移清单）；告警区新增「技能包冲突」条目；技能包卡显示「冲突 N」徽标，… 菜单加「声明冲突包」勾选弹窗；应用组合命中冲突时确认「仍然应用并留痕」
+  - 冒烟：冲突声明 → preview 报 1 对 → 无 ack apply 409 → ack apply 200 且 intent=orchestrated〔p1,p2〕；alwaysOn-on-excluded 400；incomplete 时 allOff / 包停用均 409；complete=false → degraded、幽灵成员 → drifted；导出带 conflictsWith；渲染桩跑通包页 + 冲突弹窗（含勾选框）；node --check 双半边 exit 0
+  - 待验收：宿主改动需完整重启 DSH 后验证冲突声明/阻断/仍然应用、一致性胶囊与不完整观测保护
+  - 上一轮：2026-11-20 00:1x 技能包引用计数 + 生效面矩阵 + 备份列表（commit e403b3e，merge e1bc4b8）：补齐 FR-008、FR-020，并给 FR-025 一个可点开的界面
   - collectState 给每个技能补 refCount / refs：列出含它的技能包名（FR-008），用于「停用不误关共享」——被多包引用的技能停用前能先看清
   - 技能卡与列表行：refCount > 1 时显示「引用 N」小徽标，悬浮列出具体包名
   - 设置页新增「生效面矩阵」区块（FR-020）：模型目录 / skill 工具 / /name 菜单 / 可信 get() 四行，各标注由谁控制与当前生效数量；注明技能包启用不放宽源策略、GUI 斜杠菜单默认不接管
