@@ -17,13 +17,24 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（撤回包驱动软链接走 fix/pack-effective-not-files → 提交 e2ad0e1 → 合并 be6ec2b → 已推送 origin，分支已删）；更早的 SSOT/软链接两轮已撤回
+- **当前分支**：main（全部技能默认包走 feat/all-skills-pack → 提交 6fc60b5 → 合并 2e40df1 → 已推送 origin，分支已删）；上一轮撤回软链接：e2ad0e1 → be6ec2b
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 19:5x 撤销「包驱动软链接」，改为「文件不动、包只决定生效面」（commit e2ad0e1，merge be6ec2b）
+- **最后更新**：2026-11-20 21:4x 「全部技能」默认包 + 调用方式卡片改名（commit 6fc60b5，merge 2e40df1）
+  - 移植 AI Vault 的默认包：id `__all__`、名「全部技能」，成员随观测动态变化（不在 state 里存成员），不可改名 / 删除 / 编辑成员，只能启停
+  - 默认开启：首次运行无 state.json 时直接给带默认包的初始状态；老状态 v3 迁移时补包并默认开启，同时把具体包关掉——保证升级后不会出现“什么都不可用”
+  - 互斥：开「全部技能」→ 所有具体包自动关；开任一具体包 → 「全部技能」自动关；具体包之间可同时开（并集）
+  - 生效：`hiddenReason` 先看默认包，开着就直接生效（仍受 allOff / agentsRoot / 单技能停用约束）
+  - 界面：默认包排在最前，显示「N 个技能」+「默认」徽标，状态按自身开关显示全部启用 / 全部停用；没有管理成员与 … 菜单
+  - 导入/导出：导出带默认包；导入时强制存在，导入的默认包开着则具体包一律关
+  - 统计卡改名（对齐 DSH 语义：modelInvocable = 未设 disable-model-invocation；userInvocable = 未设 user-invocable: false）：模型可用 →「可自动调用」；仅用户可用 →「仅手动调用」；仅内部可用 →「已停用」（原口径把被停用技能也算成两个入口都关，数字误导）；真正的「不可直接调用」（两个入口都关）只在 >0 时单独出现
+  - 冒烟：19 项 PASS（默认包存在且开、新建包自动关默认包、开默认包清具体包、两个具体包可并存、改/删/编成员默认包一律 400、导出含默认包、导入后默认包开且具体包关、默认包开时托管技能生效、手动停用优先、默认包关且无包 → unpacked、bundled 不受影响）；node --check 双半边 exit 0；渲染桩与 i18n 通过
+  - 待验收：完整重启 DSH 后看默认包是否排第一且开启、新建/切换包的互斥行为、统计卡新名字与「已停用」数字
+
+- 上一轮：2026-11-20 19:5x 撤销「包驱动软链接」，改为「文件不动、包只决定生效面」（commit e2ad0e1，merge be6ec2b）
   - 用户纠正：.dsh/skills 是 DSH 的可见目录，AI Vault 把 96 个技能软链到这里，这些就是可见技能；.agents/skills 勾选后是「两边全部可见」的管理视图；技能包决定的是「生效」，不是文件增删
   - 撤回：删掉 linkPlan / applyLinks / GET+POST /zhiyin/links / state.linked，以及包 toggle、全部停用、单技能开关、安装、卸载、导入配置、回滚里的全部链接写入；.dsh/skills 不再被包的开关改写
   - 已恢复：96 条软链接全部在位（AI Vault 重建），目标都指向 ~/.agents/skills，无断链
