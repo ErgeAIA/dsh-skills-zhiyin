@@ -11,9 +11,11 @@
  * 为什么不走 Remote：Typert 的客户端装配是构建期固定清单、生成器不随
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
-import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { basename, join, resolve, sep } from 'node:path'
+
 
 import { stateDir } from './paths.js'
 
@@ -23,6 +25,8 @@ export const inject = ['webServer', 'skills', 'agents', 'workingDirectory']
 /** 目录字符预算（PRD §6.8 默认值）。 */
 const BUDGET_CHARS = 8000
 const DESCRIPTION_MAX_LENGTH = 500
+/** 技能备注上限：本地笔记，不写技能文件，随导出/导入走。 */
+const NOTE_MAX = 500
 const PROVIDER_NAME = 'zhiyin'
 const PLUGIN_VERSION = (() => {
   try {
@@ -48,6 +52,7 @@ const EMPTY_STATE = {
   agentsRoot: true,
   allOff: false,
   disabled: {},
+  notes: {},
   packs: [],
   combos: [],
   intent: { ...EMPTY_INTENT },
@@ -515,38 +520,37 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, intent: next } }
   })
 
+  // 技能备注：只存本地 state，不写技能文件；清空即删除。
+  post(ctx, '/zhiyin/note', async (body) => {
+    const name = typeof body?.name === 'string' ? body.name.trim() : ''
+    if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+    const text = typeof body?.note === 'string' ? body.note.trim().slice(0, NOTE_MAX) : ''
+    const state = readState()
+    const notes = { ...(state.notes ?? {}) }
+    if (text) notes[name] = text
+    else delete notes[name]
+    state.notes = notes
+    saveState(state)
+    note('skill-note', { name, chars: text.length })
+    return { status: 200, body: { ok: true, name, note: text } }
+  })
+
   post(ctx, '/zhiyin/install', async (body) => {
-    const source = cleanPath(body?.path)
-    if (!source) return { status: 400, body: { ok: false, error: 'path is required' } }
+    // 统一入口：一个输入框既收本地文件夹，也收 GitHub / npx skills add / 直链。
+    if (typeof body?.text === 'string' && body.text.trim()) return installFromText(ctx, body)
+    const source = cleanPath(body?.path ?? body?.text)
+    if (!source) return { status: 400, body: { ok: false, error: '需要安装来源（链接或本地文件夹）' } }
     let stat
     try {
       stat = statSync(source)
-    } catch (error) {
-      return { status: 404, body: { ok: false, error: 'source not found' } }
+    } catch {
+      return { status: 404, body: { ok: false, error: '找不到这个文件夹：' + source } }
     }
-    if (!stat.isDirectory()) return { status: 400, body: { ok: false, error: 'source must be a directory' } }
+    if (!stat.isDirectory()) return { status: 400, body: { ok: false, error: '这个路径不是文件夹：' + source } }
     if (!existsSync(join(source, 'SKILL.md'))) {
-      return { status: 400, body: { ok: false, error: 'source has no SKILL.md' } }
+      return { status: 400, body: { ok: false, error: '这个文件夹里没有 SKILL.md' } }
     }
-    const name = (typeof body?.name === 'string' && body.name.trim()) || basename(source).replace(/[\\/]+$/, '')
-    if (!/^[a-z0-9][a-z0-9._-]*$/i.test(name)) {
-      return { status: 400, body: { ok: false, error: 'invalid skill name: ' + name } }
-    }
-    const root = installRoot(ctx, body?.target)
-    if (!root) return { status: 400, body: { ok: false, error: 'target root unavailable' } }
-    const dest = join(root, name)
-    if (existsSync(dest)) {
-      return { status: 409, body: { ok: false, error: 'already exists: ' + dest } }
-    }
-    try {
-      mkdirSync(root, { recursive: true })
-      cpSync(source, dest, { recursive: true, errorOnExist: true, force: false })
-    } catch (error) {
-      return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
-    }
-    note('skill-installed', { name, dest })
-    invalidateAll()
-    return { status: 200, body: { ok: true, name, dest } }
+    return installDirectory(ctx, body, source, basename(source).replace(/[\\/]+$/, ''))
   })
 
   post(ctx, '/zhiyin/uninstall', async (body) => {
@@ -591,6 +595,7 @@ export function apply(ctx) {
           agentsRoot: state.agentsRoot !== false,
           allOff: state.allOff === true,
           disabled: state.disabled ?? {},
+          notes: state.notes ?? {},
           packs: (state.packs ?? []).map((pack, index) => ({
             id: pack?.id,
             name: pack?.name,
@@ -666,6 +671,15 @@ export function apply(ctx) {
       if (typeof payload.agentsRoot === 'boolean') state.agentsRoot = payload.agentsRoot
       if (typeof payload.allOff === 'boolean') state.allOff = payload.allOff
       if (payload.disabled && typeof payload.disabled === 'object' && !Array.isArray(payload.disabled)) state.disabled = payload.disabled
+      // 备注跟着配置走：只收字符串值，逐条截断上限。
+      if (payload.notes && typeof payload.notes === 'object' && !Array.isArray(payload.notes)) {
+        state.notes = Object.fromEntries(
+          Object.entries(payload.notes)
+            .filter(([key, value]) => typeof key === 'string' && typeof value === 'string')
+            .map(([key, value]) => [key, value.trim().slice(0, NOTE_MAX)])
+            .filter(([, value]) => value.length > 0),
+        )
+      }
       // 组合引用的包可能在本机不存在：先落地，再把幽灵 ID 洗干净。
       if (incomingCombos !== null) {
         state.combos = combos.map((combo) => ({ ...combo, packIds: normalizePackIds(state, combo.packIds) }))
@@ -821,6 +835,169 @@ function installRoot(ctx, target) {
   return null
 }
 
+/** 从 SKILL.md 的 frontmatter 取 name；取不到返回空串。 */
+function skillFrontmatterName(file) {
+  try {
+    const text = readFileSync(file, 'utf8')
+    const head = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)
+    if (!head) return ''
+    for (const line of head[1].split(/\r?\n/)) {
+      const hit = /^\s*name\s*:\s*(.+?)\s*$/.exec(line)
+      if (hit) return hit[1].replace(/^["']|["']$/g, '').trim()
+    }
+  } catch {
+    /* 读不到就当没有名字 */
+  }
+  return ''
+}
+
+/** 在解压目录里找所有含 SKILL.md 的子目录（相对路径，'' 表示仓库根）。 */
+function findSkillDirs(base, rel = '', depth = 0, out = []) {
+  if (depth > 5) return out
+  const dir = rel ? join(base, rel) : base
+  let entries = []
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  if (entries.some((entry) => entry.isFile() && entry.name === 'SKILL.md')) {
+    out.push(rel)
+    return out
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (entry.name === '.git' || entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+    findSkillDirs(base, rel ? rel + '/' + entry.name : entry.name, depth + 1, out)
+  }
+  return out
+}
+
+/** 把 owner/repo、GitHub 链接、npx skills add、gh repo clone 统一成仓库坐标。 */
+function resolveGithubSource(text) {
+  let raw = String(text || '').trim()
+  raw = raw.replace(/^npx\s+skills\s+add\s+/i, '').replace(/^gh\s+repo\s+clone\s+/i, '').replace(/^git\s+clone\s+/i, '')
+  raw = raw.replace(/^["']|["']$/g, '').split(/[?#]/)[0]
+  if (/^https?:\/\//i.test(raw) && !/github\.com/i.test(raw)) return null
+  let rest = raw.replace(/^https?:\/\/(www\.)?github\.com\//i, '').replace(/\.git$/i, '')
+  rest = rest.replace(/\/+$/, '')
+  const parts = rest.split('/').filter(Boolean)
+  if (parts.length < 2) return null
+  if (!/^[\w.-]+$/.test(parts[0]) || !/^[\w.-]+$/.test(parts[1])) return null
+  const owner = parts[0]
+  const repo = parts[1]
+  let branch = ''
+  let subpath = ''
+  if (parts[2] === 'tree' || parts[2] === 'blob') {
+    branch = parts[3] ?? ''
+    subpath = parts.slice(4).join('/')
+    if (parts[2] === 'blob' && /SKILL\.md$/i.test(subpath)) subpath = subpath.replace(/\/?SKILL\.md$/i, '')
+  } else if (parts.length > 2) {
+    subpath = parts.slice(2).join('/')
+  }
+  return { owner, repo, repoUrl: 'https://github.com/' + owner + '/' + repo + '.git', branch, subpath }
+}
+
+/** 子路径必须落在仓库临时目录里，防止 ../ 越界。 */
+function safeJoin(base, rel) {
+  const target = resolve(base, rel || '.')
+  const root = resolve(base)
+  if (target !== root && !target.startsWith(root + sep)) return null
+  return target
+}
+
+/** 复制一个含 SKILL.md 的目录到安装根；冲突与非法名都在这里拦。 */
+function installDirectory(ctx, body, source, fallbackName) {
+  const fromFile = skillFrontmatterName(join(source, 'SKILL.md'))
+  const wanted = (typeof body?.name === 'string' && body.name.trim()) || fromFile || fallbackName || basename(source)
+  const name = String(wanted).trim()
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(name)) {
+    return { status: 400, body: { ok: false, error: '技能名不合法：' + name + '（用字母数字开头，可含 . _ -）' } }
+  }
+  const root = installRoot(ctx, body?.target)
+  if (!root) return { status: 400, body: { ok: false, error: '目标目录不可用' } }
+  const dest = join(root, name)
+  if (existsSync(dest)) return { status: 409, body: { ok: false, error: '已存在同名技能：' + dest } }
+  try {
+    mkdirSync(root, { recursive: true })
+    cpSync(source, dest, { recursive: true, errorOnExist: true, force: false })
+  } catch (error) {
+    return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
+  }
+  note('skill-installed', { name, dest })
+  invalidateAll()
+  return { status: 200, body: { ok: true, name, dest } }
+}
+
+/** 从直链 SKILL.md 安装：只接受纯文本，写完再走同一套目录安装。 */
+async function installRawSkill(ctx, body, url) {
+  let text = ''
+  try {
+    const response = await fetch(url, { redirect: 'follow' })
+    if (!response.ok) return { status: 400, body: { ok: false, error: '下载 SKILL.md 失败：HTTP ' + response.status } }
+    text = await response.text()
+  } catch (error) {
+    return { status: 400, body: { ok: false, error: '下载 SKILL.md 失败：' + String(error?.message ?? error) } }
+  }
+  if (!/^---/.test(text.trim())) return { status: 400, body: { ok: false, error: '这个直链不是 SKILL.md（缺少 frontmatter）' } }
+  const tmp = mkdtempSync(join(tmpdir(), 'zhiyin-skill-'))
+  try {
+    writeFileSync(join(tmp, 'SKILL.md'), text)
+    const fallback = decodeURIComponent((url.split('/').slice(-2, -1)[0] || '').trim())
+    return installDirectory(ctx, body, tmp, fallback)
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+
+/** 文本安装：GitHub 仓库 / npx skills add / 直链 SKILL.md。 */
+async function installFromText(ctx, body) {
+  const text = cleanPath(String(body?.text ?? ''))
+  if (/^([a-zA-Z]:[\\/]|\\\\|\/|\.\.?[\\/])/.test(text) && existsSync(text)) {
+    return installDirectory(ctx, body, cleanPath(text), '')
+  }
+  if (/^https?:\/\//i.test(text) && /\.md(\?|$)/i.test(text)) return installRawSkill(ctx, body, text)
+  const source = resolveGithubSource(text)
+  if (!source) {
+    return { status: 400, body: { ok: false, error: '看不懂这个来源：支持 owner/repo、GitHub 链接、npx skills add …、SKILL.md 直链或本地文件夹' } }
+  }
+  const tmp = mkdtempSync(join(tmpdir(), 'zhiyin-repo-'))
+  try {
+    try {
+      const args = ['clone', '--depth', '1']
+      if (source.branch) args.push('--branch', source.branch)
+      args.push(source.repoUrl, tmp)
+      execFileSync('git', args, { stdio: 'ignore', timeout: 120000 })
+    } catch {
+      return { status: 400, body: { ok: false, error: '拉取仓库失败：检查地址、网络或私有仓库权限' } }
+    }
+    const wanted = typeof body?.subpath === 'string' ? body.subpath.trim() : source.subpath
+    const rels = []
+    if (wanted) {
+      const dir = safeJoin(tmp, wanted)
+      if (!dir || !existsSync(join(dir, 'SKILL.md'))) {
+        return { status: 400, body: { ok: false, error: '这个目录里没有 SKILL.md：' + wanted } }
+      }
+      rels.push(wanted)
+    } else {
+      rels.push(...findSkillDirs(tmp))
+      if (rels.length === 0 && existsSync(join(tmp, 'SKILL.md'))) rels.push('')
+    }
+    if (rels.length === 0) return { status: 400, body: { ok: false, error: '仓库里没有找到 SKILL.md' } }
+    if (rels.length > 1) {
+      const candidates = rels.slice(0, 30).map((rel) => ({
+        subpath: rel,
+        name: skillFrontmatterName(join(tmp, rel, 'SKILL.md')) || basename(rel) || source.repo,
+      }))
+      return { status: 409, body: { ok: false, error: 'multiple', repo: source.owner + '/' + source.repo, count: rels.length, candidates } }
+    }
+    const sourceDir = join(tmp, rels[0])
+    return installDirectory(ctx, body, sourceDir, basename(rels[0]) || source.repo)
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+
 function post(ctx, path, run, limit = 65536) {
   try {
     ctx.effect(() =>
@@ -942,7 +1119,15 @@ function readState() {
   if (cache) return cache
   try {
     const parsed = JSON.parse(readFileSync(configFile(), 'utf8'))
-    cache = { ...EMPTY_STATE, ...parsed, disabled: parsed?.disabled ?? {}, known: parsed?.known ?? {} }
+    const next = { ...EMPTY_STATE, ...parsed, disabled: parsed?.disabled ?? {}, notes: parsed?.notes ?? {}, known: parsed?.known ?? {} }
+    // v2 简化：只保留「技能包启用 = 成员可见」。清掉合奏/排除/常驻/冲突声明，避免旧状态把技能卡在不可见。
+    if (next.v !== 2) {
+      next.v = 2
+      next.intent = { ...EMPTY_INTENT }
+      next.combos = []
+      next.packs = (next.packs ?? []).map((pack) => ({ ...pack, conflictsWith: [] }))
+    }
+    cache = next
   } catch {
     cache = { ...EMPTY_STATE }
   }
@@ -1474,6 +1659,7 @@ async function collectState(ctx) {
         hiddenReason: reason,
         refCount: refs.length,
         refs,
+        note: typeof current.notes?.[skill.name] === 'string' ? current.notes[skill.name] : '',
         uninstallable: uninstallRoots.some((root) => existsSync(join(root, skill.name))),
         readOnly: !uninstallRoots.some((root) => existsSync(join(root, skill.name))),
         readOnlyReason:
