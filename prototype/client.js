@@ -1138,6 +1138,20 @@ function Icon({ name, size = 15 }) {
   )
 }
 
+function Spinner({ size = 15 }) {
+  // 旋转小圈：替代把长文本塞进 30x30 图标按钮（会竖排）的做法。用 SVG SMIL，无需注入 CSS。
+  return h('svg', {
+    width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': 'true',
+    style: { display: 'block', flex: '0 0 auto' },
+  },
+    h('g', null,
+      h('animateTransform', { attributeName: 'transform', type: 'rotate', from: '0 12 12', to: '360 12 12', dur: '0.9s', repeatCount: 'indefinite' }),
+      h('circle', { cx: 12, cy: 12, r: 9, fill: 'none', stroke: 'currentColor', strokeWidth: 2.4, strokeOpacity: 0.25 }),
+      h('path', { d: 'M21 12a9 9 0 0 0-9-9', fill: 'none', stroke: 'currentColor', strokeWidth: 2.4, strokeLinecap: 'round' }),
+    ),
+  )
+}
+
 function Switch({ label, hint, checked, disabled, onChange }) {
       return h(
         'label',
@@ -1501,13 +1515,30 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           if (m && u) both += 1
           if (!m && !u) neither += 1
         }
-        const bundled = scoped.filter((skill) => skill.source === 'bundled').length
+        const bySource = { userDsh: 0, userAgents: 0, bundled: 0, custom: 0 }
+        for (const skill of scoped) {
+          if (skill.source === 'user-dsh') bySource.userDsh += 1
+          else if (skill.source === 'user-agents') bySource.userAgents += 1
+          else if (skill.source === 'bundled') bySource.bundled += 1
+          else bySource.custom += 1
+        }
+        const bundled = bySource.bundled
         // 已停用 = 被总开关/.agents 开关/技能包/单技能开关挡住的（文件仍在盘上）。
         const disabled = scoped.filter((skill) => skill.enabled === false).length
         // 不可直接调用 = 两个入口都关、但技能本身仍在生效（源限制），与"已停用"区分开。
         const internal = scoped.filter((skill) => skill.enabled !== false && !skill.model && !skill.user).length
-        return { total: scoped.length, model, user, both, neither, bundled, disabled, internal }
+        // 「全部技能」的目录字符成本按可见世界算，与卡片同口径。
+        const allCost = scoped.reduce((total, skill) => total + Math.min((skill.description ?? '').length, 500), 0)
+        return { total: scoped.length, model, user, both, neither, bundled, disabled, internal, bySource, allCost }
       }, [scoped])
+
+      // 来源构成：解释「技能总数」怎么来的（用户目录 / .agents 目录 / 内置 / 自定义）。
+      const srcLine = [
+        ['用户目录', counts.bySource.userDsh],
+        ['.agents 目录', counts.bySource.userAgents],
+        ['内置', counts.bySource.bundled],
+        ['自定义', counts.bySource.custom],
+      ].filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(' · ')
 
       const skills = React.useMemo(() => {
         const needle = query.trim().toLowerCase()
@@ -2026,8 +2057,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         data
           ? h(
               'div',
-              { style: css.grid },
-              statCards(data, counts, say, filter, setFilter),
+              null,
+              h('div', { style: { ...css.grid, marginTop: 18 } }, statCards(data, counts, say, filter, setFilter)),
+              h('div', { style: { ...css.hint, marginTop: 8 } }, `${say('statBySource', '来源')}：${srcLine}`),
             )
           : null,
 
@@ -2099,7 +2131,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 'aria-label': say('refresh', '重新观测'),
                 onClick: load,
                 disabled: state.loading,
-              }, state.loading ? say('loading', '观测中') : h(Icon, { name: 'refresh', size: 14 })),
+              }, state.loading ? h(Spinner, { size: 15 }) : h(Icon, { name: 'refresh', size: 14 })),
             )
           : null,
 
@@ -2198,9 +2230,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       'div',
                       { style: css.itemHead },
                       h('span', { style: css.name }, pack.name),
-                      h('span', { style: css.badge(true) }, `${pack.memberCount ?? pack.members?.length ?? 0} 个技能`),
+                      h('span', { style: css.badge(true) }, `${pack.all ? counts.total : (pack.memberCount ?? pack.members?.length ?? 0)} 个技能`),
                       pack.all ? h('span', { style: { ...css.badge(true), opacity: 0.7 } }, say('packDefault', '默认')) : null,
-                      pack.cost > 0 ? h('span', { style: css.metaText }, `${pack.cost} ${say('packCostUnit', '字符')}`) : null,
+                      (pack.all ? counts.allCost : pack.cost) > 0 ? h('span', { style: css.metaText }, `${pack.all ? counts.allCost : pack.cost} ${say('packCostUnit', '字符')}`) : null,
                       intent.mode === 'orchestrated' && pack.enabled !== false && pack.active === false
                         ? h('span', { style: { ...css.badge(true), background: 'rgba(128,128,128,0.16)', opacity: 0.72 } }, say('packNotInCombo', '本组合未纳入'))
                         : null,
@@ -3341,7 +3373,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
     function statCards(data, counts, say, filter, setFilter) {
       const items = [
-        { key: 'statTotal', label: '技能总数', value: counts.total, filter: 'all', hint: '当前作用域下观测到的全部技能（按名称去重）' },
+        { key: 'statTotal', label: '技能总数', value: counts.total, filter: 'all', hint: '此刻织音能看见的全部技能（= 可自动调用 + 仅手动调用）' },
         { key: 'statModel', label: '可自动调用', value: counts.model, filter: 'model', hint: 'Agent 会在对话里自己选用的技能（modelInvocable）；手动调用的也在其中' },
         {
           key: 'statUser',
@@ -3351,7 +3383,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           hint: '只能用 /名字 手动唤起，模型不会自己选（disable-model-invocation: true）',
         },
         { key: 'statDisabled', label: '已停用', value: counts.disabled, filter: 'disabled', hint: '被总开关、.agents 开关、技能包或单技能开关挡住的技能；文件仍在盘上，随时能打开' },
-        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随 DSH 插件内置（bundled 来源）的技能' },
+        { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随 DSH 内置的技能，已计入「可自动调用」，不额外相加' },
       ]
       if ((counts.internal ?? 0) > 0) {
         items.push({ key: 'statInternal', label: '不可直接调用', value: counts.internal, filter: 'internal', hint: '模型与 / 菜单两个入口都关了（disable-model-invocation: true 且 user-invocable: false），只能被别的技能引用' })
