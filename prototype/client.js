@@ -189,6 +189,19 @@ window.__ModuleLoader__.load({
         batchDisable: '批量停用',
         batchClear: '清除选择',
         alertUnassigned: '合奏模式下有未编配技能不生效',
+        alertPackConflict: '技能包冲突',
+        comboConflictAsk: '这些技能包互相冲突',
+        comboConflictStill: '仍然应用并留痕？',
+        packConflicts: '声明冲突包',
+        packConflictBadge: '冲突',
+        conflictsHint: '勾选与这个包互斥的其它包；任一方声明即视为冲突，应用/启用前会阻断，可选择仍然应用',
+        conflictsEmpty: '没有其它技能包可供声明',
+        consistencySynced: '一致',
+        consistencyDegraded: '观测不完整',
+        consistencyDrifted: '有漂移',
+        consistencyHintSynced: '观测与投影一致',
+        consistencyHintDegraded: '上次观测不完整，保留上次成功投影',
+        consistencyHintDrifted: '有技能被外部改动或来源切换，与投影不一致',
         matrixTitle: '生效面矩阵',
         matrixSub: '四个生效面各自由谁控制，别只盯着「已启用」',
         matrixCatalog: '模型目录',
@@ -394,6 +407,19 @@ window.__ModuleLoader__.load({
         batchDisable: 'Disable all',
         batchClear: 'Clear',
         alertUnassigned: 'Some unassigned skills do not play in orchestrated mode',
+        alertPackConflict: 'Pack conflict',
+        comboConflictAsk: 'These packs conflict',
+        comboConflictStill: 'Apply anyway and log it?',
+        packConflicts: 'Declare conflicts',
+        packConflictBadge: 'Conflict',
+        conflictsHint: 'Tick the packs that conflict with this one; a conflict is mutual, and apply/enable is blocked unless you choose to apply anyway',
+        conflictsEmpty: 'No other packs to declare against',
+        consistencySynced: 'In sync',
+        consistencyDegraded: 'Degraded',
+        consistencyDrifted: 'Drifted',
+        consistencyHintSynced: 'Observation matches projection',
+        consistencyHintDegraded: 'Last observation was incomplete; last good projection kept',
+        consistencyHintDrifted: 'Some skills changed externally or moved source; out of sync with projection',
         matrixTitle: 'Effective-surface matrix',
         matrixSub: 'What controls each of the four surfaces — do not read "enabled" alone',
         matrixCatalog: 'Model catalog',
@@ -1100,6 +1126,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [comboRenaming, setComboRenaming] = React.useState(null)    // 组合改名：{ id, name }
       const [backups, setBackups] = React.useState(null)               // 配置备份列表
       const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
+      const [conflictPicking, setConflictPicking] = React.useState(null)      // 声明冲突包弹窗：包 id
+      const [conflictDraft, setConflictDraft] = React.useState([])            // 冲突包勾选草稿
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1439,8 +1467,24 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const runCombo = (combo, stack) => {
         setComboPreview(null)
         setBusy(true)
-        comboRequest({ action: stack ? 'stack' : 'apply', id: combo.id })
-          .then(() => load())
+        const send = (ack) =>
+          fetch('/zhiyin/combo', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ action: stack ? 'stack' : 'apply', id: combo.id, ack }),
+          })
+            .then((response) => response.json())
+            .then((result) => {
+              if (result && result.ok === false && result.error === 'conflict' && Array.isArray(result.conflicts) && ack !== true) {
+                const names = result.conflicts.map((pair) => `${pair.a.name} × ${pair.b.name}`).join('、')
+                if (window.confirm(`${say('comboConflictAsk', '这些技能包互相冲突')}：${names}\n${say('comboConflictStill', '仍然应用并留痕？')}`)) return send(true)
+                return null
+              }
+              if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
+              return result
+            })
+        send(false)
+          .then((result) => { if (result) load() })
           .catch(fail)
           .finally(() => setBusy(false))
       }
@@ -1455,6 +1499,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           })
           .catch(fail)
           .finally(() => setBusy(false))
+      }
+      // 声明冲突包（FR-005）：选与这个包互斥的其它包，写进包的 conflictsWith。
+      const openConflicts = (pack) => {
+        setConflictDraft(Array.isArray(pack.conflictsWith) ? [...pack.conflictsWith] : [])
+        setConflictPicking(pack.id)
+      }
+      const saveConflicts = () => {
+        if (!conflictPicking) return
+        write('/zhiyin/pack', { action: 'conflicts', id: conflictPicking, conflictsWith: conflictDraft })
+          .then((result) => { if (result) setConflictPicking(null) })
       }
 
       // 备份列表（FR-025）：把导入/回滚留下的快照列出来，可任选一份退回。
@@ -1510,6 +1564,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           if (ghosts.length > 0) {
             out.push({ key: 'ghost:' + pack.id, text: `${say('alertGhost', '技能包引用了未安装技能')} · ${pack.name}：${ghosts.slice(0, 4).join('、')}${ghosts.length > 4 ? ' …' : ''}` })
           }
+        }
+        for (const pair of data?.packConflicts ?? []) {
+          out.push({ key: 'packconflict:' + pair.a.id + ':' + pair.b.id, text: `${say('alertPackConflict', '技能包冲突')}：${pair.a.name} × ${pair.b.name}` })
         }
         return out
       }, [data, scopedNames, say, intent, scoped])
@@ -1639,6 +1696,23 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h('span', null, `@local/dsh-zhiyin-proto v${data.version ?? '0.0.0'}`),
               h('span', { style: css.metaDot }, '·'),
               h('span', null, `${say('observedAt', '观测于')} ${formatTime(data.at)}`),
+              h(
+                'span',
+                {
+                  style: { ...css.pill(data.consistency?.status === 'synced'), cursor: 'default' },
+                  title:
+                    data.consistency?.status === 'degraded'
+                      ? say('consistencyHintDegraded', '上次观测不完整，保留上次成功投影')
+                      : data.consistency?.status === 'drifted'
+                        ? `${say('consistencyHintDrifted', '有技能被外部改动或来源切换，与投影不一致')}：${(data.consistency?.drift ?? []).slice(0, 4).join('、')}`
+                        : say('consistencyHintSynced', '观测与投影一致'),
+                },
+                data.consistency?.status === 'degraded'
+                  ? say('consistencyDegraded', '观测不完整')
+                  : data.consistency?.status === 'drifted'
+                    ? say('consistencyDrifted', '有漂移')
+                    : say('consistencySynced', '一致'),
+              ),
               h(
                 'button',
                 {
@@ -1889,6 +1963,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       intent.mode === 'orchestrated' && pack.enabled !== false && pack.active === false
                         ? h('span', { style: { ...css.badge(true), background: 'rgba(128,128,128,0.16)', opacity: 0.72 } }, say('packNotInCombo', '本组合未纳入'))
                         : null,
+                      (pack.conflictsWith?.length ?? 0) > 0
+                        ? h('span', { style: { ...css.badge(true), background: 'rgba(208,150,60,0.16)', color: '#c98a2e' }, title: (pack.conflictsWith ?? []).map((id) => packById.get(id)?.name ?? id).join('、') }, `${say('packConflictBadge', '冲突')} ${pack.conflictsWith.length}`)
+                        : null,
                       h('span', { style: { ...packStatusStyle(status), marginLeft: 'auto' } }, packStatusLabel(status)),
                     ),
                     pack.members?.length
@@ -1935,6 +2012,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       ? h(
                           'div',
                           { style: css.menu, onClick: (event) => event.stopPropagation() },
+                          h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); openConflicts(pack) } }, say('packConflicts', '声明冲突包')),
                           h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); setRenaming({ id: pack.id, name: pack.name }) } }, say('packRename', '改名')),
                           h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); copyPack(pack) } }, say('packCopy', '复制')),
                           h('button', { type: 'button', style: css.menuItem, onClick: () => { setMenuOpen(null); openMembers() } }, say('packMembers', '管理成员')),
@@ -2741,6 +2819,48 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         .finally(() => setBusy(false))
                     },
                   }, say('save', '保存')),
+                ),
+              ),
+            )
+          : null,
+
+        // 声明冲突包（FR-005）：勾选与这个包互斥的其它包。
+        conflictPicking
+          ? h(
+              'div',
+              { style: css.overlay },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalMd } },
+                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packConflicts', '声明冲突包'))),
+                h('p', { style: css.hint }, say('conflictsHint', '勾选与这个包互斥的其它包；任一方声明即视为冲突，应用/启用前会阻断，可选择仍然应用')),
+                (data?.packs ?? []).filter((pack) => pack.id !== conflictPicking).length === 0
+                  ? h('p', { style: css.hint }, say('conflictsEmpty', '没有其它技能包可供声明'))
+                  : h(
+                      'div',
+                      { style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflow: 'auto', marginTop: 4 } },
+                      (data?.packs ?? [])
+                        .filter((pack) => pack.id !== conflictPicking)
+                        .map((pack) =>
+                          h(
+                            'label',
+                            { key: pack.id, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '4px 2px' } },
+                            h('input', {
+                              type: 'checkbox',
+                              checked: conflictDraft.includes(pack.id),
+                              onChange: () =>
+                                setConflictDraft((prev) => (prev.includes(pack.id) ? prev.filter((id) => id !== pack.id) : [...prev, pack.id])),
+                            }),
+                            h('span', null, pack.name),
+                            h('span', { style: { ...css.hint, marginLeft: 'auto' } }, `${pack.members?.length ?? 0}`),
+                          ),
+                        ),
+                    ),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setConflictPicking(null) }, say('cancel', '取消')),
+                  h('button', { type: 'button', style: css.primaryBtn, disabled: busy, onClick: saveConflicts }, say('save', '保存')),
                 ),
               ),
             )

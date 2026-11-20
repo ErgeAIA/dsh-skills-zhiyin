@@ -125,6 +125,61 @@ function memberPacks(state, skillName) {
   )
 }
 
+/** 规范化包的冲突声明：只保留存在且非自身的包 ID，去重（FR-005）。 */
+function normalizeConflicts(state, packId, input) {
+  const available = new Set((state.packs ?? []).map((pack) => pack.id))
+  const seen = new Set()
+  const out = []
+  for (const entry of Array.isArray(input) ? input : []) {
+    if (typeof entry !== "string") continue
+    const id = entry.trim()
+    if (!id || id === packId || seen.has(id) || !available.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+/** 当前处于生效状态的包 ID 列表。 */
+function activePackIds(state, intent) {
+  const plan = intent ?? normalizeIntent(state)
+  return (state.packs ?? []).filter((pack) => packActive(state, pack, plan)).map((pack) => pack.id)
+}
+
+/** 指定生效集合里两两冲突的包对；冲突是双向语义，任一方声明即成立（FR-005）。 */
+function conflictPairsFor(state, activeIds) {
+  const active = new Set(activeIds)
+  const byId = new Map((state.packs ?? []).map((pack) => [pack.id, pack]))
+  const out = []
+  const seen = new Set()
+  for (const pack of state.packs ?? []) {
+    if (!active.has(pack.id)) continue
+    for (const otherId of normalizeConflicts(state, pack.id, pack.conflictsWith)) {
+      if (!active.has(otherId)) continue
+      const key = [pack.id, otherId].sort().join("::")
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({ a: { id: pack.id, name: pack.name }, b: { id: otherId, name: byId.get(otherId)?.name ?? otherId } })
+    }
+  }
+  return out
+}
+
+/** 观测不完整时阻止批量停用（FR-019）：仅在上一次观测明确不完整时生效。 */
+function incompleteGuard(state) {
+  if (state && state.lastComplete === false) {
+    return {
+      status: 409,
+      body: {
+        ok: false,
+        error: "上次观测不完整，为避免误停用已阻止本次批量变更；请先重新观测后再试",
+        incomplete: true,
+      },
+    }
+  }
+  return null
+}
+
 /** 应用前预览：只算差异，不写 state，也不改任何技能包。 */
 async function previewIntent(ctx, state, packIds, stack) {
   const base = normalizeIntent(state)
@@ -150,6 +205,7 @@ async function previewIntent(ctx, state, packIds, stack) {
   return {
     mode: 'orchestrated',
     activePackIds: next.activePackIds,
+    conflicts: conflictPairsFor(state, packsAfter),
     // 生效面用「最终集合」而不是增量：用户看的是应用后哪些包在场上。
     packsOn: packsAfter,
     packsOff: allPackIds.filter((id) => !packsAfter.includes(id)),
@@ -196,6 +252,10 @@ export function apply(ctx) {
     const incoming = Array.isArray(body?.names) ? body.names : [body?.name]
     const names = [...new Set(incoming.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim()))]
     if (names.length === 0) return { status: 400, body: { ok: false, error: 'name is required' } }
+    if (body.enabled === false && names.length > 1) {
+      const guard = incompleteGuard(state)
+      if (guard) return guard
+    }
     const at = new Date().toISOString()
     for (const skillName of names) {
       if (names.length === 1 && body.description && !state.known[skillName]) {
@@ -214,6 +274,10 @@ export function apply(ctx) {
 
   post(ctx, '/zhiyin/settings', async (body) => {
     const state = readState()
+    if (body?.allOff === true) {
+      const guard = incompleteGuard(state)
+      if (guard) return guard
+    }
     if (typeof body?.agentsRoot === 'boolean') state.agentsRoot = body.agentsRoot
     if (typeof body?.allOff === 'boolean') state.allOff = body.allOff
     saveState(state)
@@ -255,7 +319,7 @@ export function apply(ctx) {
       if (names.length === 0) return { status: 400, body: { ok: false, error: 'no skill names found' } }
       const name = (typeof body?.name === 'string' ? body.name.trim() : '') || title || '导入的技能包'
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-      packs.push({ id: newId, name, enabled: true, members: names, order: packs.length })
+      packs.push({ id: newId, name, enabled: true, members: names, conflictsWith: [], order: packs.length })
       saveState(state)
       invalidateAll()
       return { status: 200, body: { ok: true, id: newId, members: names.length, names } }
@@ -267,7 +331,7 @@ export function apply(ctx) {
       if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '技能包名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
       if (packNameTaken(packs, name)) return { status: 400, body: { ok: false, error: '已有同名技能包' } }
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-      packs.push({ id: newId, name, enabled: true, members: [], order: packs.length })
+      packs.push({ id: newId, name, enabled: true, members: [], conflictsWith: [], order: packs.length })
       saveState(state)
       invalidateAll()
       return { status: 200, body: { ok: true, id: newId } }
@@ -283,10 +347,28 @@ export function apply(ctx) {
       if (packNameTaken(packs, name, pack.id)) return { status: 400, body: { ok: false, error: '已有同名技能包' } }
       pack.name = name
     } else if (action === 'toggle') {
-      pack.enabled = body?.enabled === true
+      const turningOn = body?.enabled === true
+      if (!turningOn) {
+        const guard = incompleteGuard(state)
+        if (guard) return guard
+      }
+      if (turningOn) {
+        const plan = normalizeIntent(state)
+        const activeAfter = (state.packs ?? [])
+          .filter((candidate) => packActive(state, candidate.id === pack.id ? { ...candidate, enabled: true } : candidate, plan))
+          .map((candidate) => candidate.id)
+        const conflicts = conflictPairsFor(state, activeAfter)
+        if (conflicts.length > 0 && body?.ack !== true) {
+          return { status: 409, body: { ok: false, error: 'conflict', conflicts } }
+        }
+        if (conflicts.length > 0) {
+          note('conflict-ack', { scope: 'pack-toggle', pack: pack.id, revision: plan.revision, pairs: conflicts.map((pair) => [pair.a.id, pair.b.id]) })
+        }
+      }
+      pack.enabled = turningOn
     } else if (action === 'copy') {
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-      packs.push({ id: newId, name: (pack.name || '未命名') + ' 副本', enabled: false, members: [...(pack.members ?? [])], order: packs.length })
+      packs.push({ id: newId, name: (pack.name || '未命名') + ' 副本', enabled: false, members: [...(pack.members ?? [])], conflictsWith: [], order: packs.length })
       saveState(state)
       invalidateAll()
       return { status: 200, body: { ok: true, id: newId } }
@@ -307,6 +389,8 @@ export function apply(ctx) {
         if (target) target.order = i
       }
       packs.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    } else if (action === 'conflicts') {
+      pack.conflictsWith = normalizeConflicts(state, pack.id, body?.conflictsWith)
     } else {
       return { status: 400, body: { ok: false, error: 'unknown action: ' + action } }
     }
@@ -369,12 +453,25 @@ export function apply(ctx) {
     } else if (action === 'delete') {
       combos.splice(index, 1)
     } else if (action === 'apply' || action === 'stack') {
+      const guard = incompleteGuard(state)
+      if (guard) return guard
       const current = normalizeIntent(state)
       const active = action === 'stack' ? [...current.activePackIds, ...combo.packIds] : combo.packIds
+      const nextActive = normalizePackIds(state, active)
+      const activeAfter = (state.packs ?? [])
+        .filter((pack) => nextActive.includes(pack.id) && pack.enabled !== false)
+        .map((pack) => pack.id)
+      const conflicts = conflictPairsFor(state, activeAfter)
+      if (conflicts.length > 0 && body?.ack !== true) {
+        return { status: 409, body: { ok: false, error: 'conflict', conflicts } }
+      }
+      if (conflicts.length > 0) {
+        note('conflict-ack', { scope: action, combo: combo.id, revision: current.revision, pairs: conflicts.map((pair) => [pair.a.id, pair.b.id]) })
+      }
       state.intent = {
         ...current,
         mode: 'orchestrated',
-        activePackIds: normalizePackIds(state, active),
+        activePackIds: nextActive,
         revision: current.revision + 1,
         updatedAt: now,
       }
@@ -397,14 +494,18 @@ export function apply(ctx) {
     const field = body?.field === 'alwaysOn' ? 'alwaysOnSkillNames' : 'excludedSkillNames'
     const on = body?.value === true
     const current = normalizeIntent(state)
+    // 常驻与排除互斥（FR-010）：冲突时报错，不静默改写。
+    if (on && field === 'excludedSkillNames' && current.alwaysOnSkillNames.includes(name)) {
+      return { status: 400, body: { ok: false, error: '该技能已设为常驻，不能同时排除；请先取消常驻' } }
+    }
+    if (on && field === 'alwaysOnSkillNames' && current.excludedSkillNames.includes(name)) {
+      return { status: 400, body: { ok: false, error: '该技能已被排除，不能同时设为常驻；请先取消排除' } }
+    }
     const next = { ...current }
     const names = new Set(current[field])
     if (on) names.add(name)
     else names.delete(name)
     next[field] = [...names]
-    // 常驻与排除互斥：设一个就清掉另一个，免得同一技能既常驻又被排除。
-    if (on && field === 'excludedSkillNames') next.alwaysOnSkillNames = current.alwaysOnSkillNames.filter((entry) => entry !== name)
-    if (on && field === 'alwaysOnSkillNames') next.excludedSkillNames = current.excludedSkillNames.filter((entry) => entry !== name)
     next.revision = current.revision + 1
     next.updatedAt = new Date().toISOString()
     state.intent = next
@@ -495,6 +596,7 @@ export function apply(ctx) {
             name: pack?.name,
             enabled: pack?.enabled !== false,
             members: Array.isArray(pack?.members) ? pack.members : [],
+            conflictsWith: Array.isArray(pack?.conflictsWith) ? pack.conflictsWith : [],
             order: typeof pack?.order === 'number' ? pack.order : index,
           })),
           // 不导出 known：它是观测缓存（可随时由 collectState 重建），且会让文件涨到 80KB+，
@@ -533,6 +635,7 @@ export function apply(ctx) {
             members: Array.isArray(pack.members)
               ? [...new Set(pack.members.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim()))]
               : [],
+            conflictsWith: Array.isArray(pack.conflictsWith) ? pack.conflictsWith.filter((entry) => typeof entry === 'string') : [],
             order: typeof pack.order === 'number' ? pack.order : index,
           }))
     // 组合同样规范化：缺 id/order 补默认值，成员只留字符串。
@@ -555,7 +658,10 @@ export function apply(ctx) {
     const backup = backupState()
     const state = readState()
     // 只有确实带了 packs 数组才覆盖：粘贴的 JSON 缺 packs 时不清空现有技能包。
-    if (incomingPacks !== null) state.packs = packs
+    if (incomingPacks !== null) {
+      state.packs = packs
+      for (const pack of state.packs) pack.conflictsWith = normalizeConflicts(state, pack.id, pack.conflictsWith)
+    }
     if (payload && typeof payload === 'object') {
       if (typeof payload.agentsRoot === 'boolean') state.agentsRoot = payload.agentsRoot
       if (typeof payload.allOff === 'boolean') state.allOff = payload.allOff
@@ -1316,6 +1422,26 @@ async function collectState(ctx) {
 
   const current = readState()
   const intent = normalizeIntent(current)
+  // 一致性（FR-022）：观测不完整 → degraded；包引用了观测不到的技能 → drifted；否则 synced。
+  const observedNames = new Set(skills.map((skill) => skill.name))
+  const ghostMembers = [
+    ...new Set(
+      (current.packs ?? []).flatMap((pack) =>
+        (Array.isArray(pack.members) ? pack.members : []).filter((name) => !observedNames.has(name)),
+      ),
+    ),
+  ]
+  // 记录上一次观测是否完整与最近一次成功时间，供批量停用保护与 UI 展示。
+  const lifecycle = {}
+  if (current.lastComplete !== complete) lifecycle.lastComplete = complete
+  if (complete && (current.lastGoodAt == null || current.lastComplete === false)) lifecycle.lastGoodAt = new Date().toISOString()
+  if (Object.keys(lifecycle).length > 0) saveState({ ...current, ...lifecycle })
+  const lastGoodAt = lifecycle.lastGoodAt ?? current.lastGoodAt ?? null
+  const consistency = !complete
+    ? { status: 'degraded', lastGoodAt }
+    : ghostMembers.length > 0
+      ? { status: 'drifted', drift: ghostMembers, lastGoodAt }
+      : { status: 'synced', lastGoodAt }
   // 每个包的目录成本（FR-021）：按已知描述截断到 500 字符累加，用来判断这个包值不值。
   const packsOut = (current.packs ?? []).map((pack) => {
     const members = Array.isArray(pack.members) ? pack.members : []
@@ -1323,7 +1449,7 @@ async function collectState(ctx) {
       const description = current.known?.[name]?.description
       return total + Math.min(typeof description === 'string' ? description.length : 0, DESCRIPTION_MAX_LENGTH)
     }, 0)
-    return { ...pack, members, active: packActive(current, pack, intent), cost }
+    return { ...pack, members, conflictsWith: normalizeConflicts(current, pack.id, pack.conflictsWith), active: packActive(current, pack, intent), cost }
   })
   const combosOut = (current.combos ?? []).map((combo, index) => ({ ...combo, order: combo.order ?? index }))
   return {
@@ -1354,5 +1480,7 @@ async function collectState(ctx) {
     packs: packsOut,
     combos: combosOut,
     intent,
+    packConflicts: conflictPairsFor(current, activePackIds(current, intent)),
+    consistency,
   }
 }
