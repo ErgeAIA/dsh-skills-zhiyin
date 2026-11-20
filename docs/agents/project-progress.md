@@ -17,13 +17,23 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（旧链接收口走 feat/prune-legacy-links → 提交 899fac3 → 合并 a286901 → 已推送 origin，分支已删）；上一轮 SSOT + 包软链接：60dc060 → 2353953
-- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；技能以 ~/.agents/skills 为 SSOT，启用包的成员软链接进 ~/.dsh/skills，DSH 只看到链接进来的技能（旧的全量链接已收口，~/.dsh/skills 现为 4 条启用包成员）；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
+- **当前分支**：main（撤回包驱动软链接走 fix/pack-effective-not-files → 提交 e2ad0e1 → 合并 be6ec2b → 已推送 origin，分支已删）；更早的 SSOT/软链接两轮已撤回
+- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 18:0x 旧链接收口（B 方案）：~/.dsh/skills 只剩启用包成员（commit 899fac3，merge a286901）
+- **最后更新**：2026-11-20 19:5x 撤销「包驱动软链接」，改为「文件不动、包只决定生效面」（commit e2ad0e1，merge be6ec2b）
+  - 用户纠正：.dsh/skills 是 DSH 的可见目录，AI Vault 把 96 个技能软链到这里，这些就是可见技能；.agents/skills 勾选后是「两边全部可见」的管理视图；技能包决定的是「生效」，不是文件增删
+  - 撤回：删掉 linkPlan / applyLinks / GET+POST /zhiyin/links / state.linked，以及包 toggle、全部停用、单技能开关、安装、卸载、导入配置、回滚里的全部链接写入；.dsh/skills 不再被包的开关改写
+  - 已恢复：96 条软链接全部在位（AI Vault 重建），目标都指向 ~/.agents/skills，无断链
+  - 新语义：hiddenReason 对托管来源（user-dsh / user-agents）先判包——不在任何包里 → unpacked（未加入技能包，不生效）；在包里但包全停 → pack；bundled / custom 不受包约束；单技能停用仍是 manual 优先；allOff / agentsRoot 优先级不变
+  - 界面：卡片与列表对 unpacked 显示「未加入技能包」，开关置灰并提示「先加进一个启用的技能包」；告警区新增「有 N 个技能未加入技能包，当前不生效」；技能包页的链接状态行与「同步链接 / 清理旧链接」按钮全部移除
+  - 安装：target=agents 装进 ~/.agents/skills 后顺手在 ~/.dsh/skills 建一条软链接（否则 DSH 看不到），target=user 直接放 .dsh/skills；只建不删
+  - 冒烟：10 项 PASS（user-dsh / user-agents 未入包 → unpacked；bundled / custom → 可见；启用包 → 可见；停用包 → pack；manual / allOff / agents-root 优先级正确）；node --check 双半边 exit 0；渲染桩通过；i18n 无缺键
+  - 后果（预期）：重启后只有启用包成员的托管技能生效；92 个未入包技能仍在 .dsh/skills 与列表里，但不再进模型面；要用就把它们加进包
+
+- 上一轮（已撤回）：2026-11-20 18:0x 旧链接收口（B 方案）：~/.dsh/skills 只剩启用包成员（commit 899fac3，merge a286901）
   - 背景：软链接模型要求「启用包 → 成员链接」，但历史遗留 96 条全量链接里有 92 条不属于任何包，导致关包不生效（DSH 仍能看到 96 个技能）
   - 清单核对：92 条全部是软链接、目标都在 ~/.agents/skills、都能解析；保留 4 条 = test + test2 的启用成员（academy-guide / accessibility-a11y / ask-matt / brainstorming）；完整清单落在 `<stateDir>/legacy-links-2026-11-20T09-55-15-445Z.json`，可按清单重建
   - 安全前提：只删「不在任何包、也不是织音创建」的链接；删除前逐条校验仍是软链、目标在 ~/.agents/skills 内、未被新包接管
