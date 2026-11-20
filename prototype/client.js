@@ -1502,7 +1502,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           if (!m && !u) neither += 1
         }
         const bundled = scoped.filter((skill) => skill.source === 'bundled').length
-        return { total: scoped.length, model, user, both, neither, bundled }
+        // 已停用 = 被总开关/.agents 开关/技能包/单技能开关挡住的（文件仍在盘上）。
+        const disabled = scoped.filter((skill) => skill.enabled === false).length
+        // 不可直接调用 = 两个入口都关、但技能本身仍在生效（源限制），与"已停用"区分开。
+        const internal = scoped.filter((skill) => skill.enabled !== false && !skill.model && !skill.user).length
+        return { total: scoped.length, model, user, both, neither, bundled, disabled, internal }
       }, [scoped])
 
       const skills = React.useMemo(() => {
