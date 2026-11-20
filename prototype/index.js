@@ -25,6 +25,8 @@ export const inject = ['webServer', 'skills', 'agents', 'workingDirectory']
 /** 目录字符预算（PRD §6.8 默认值）。 */
 const BUDGET_CHARS = 8000
 const DESCRIPTION_MAX_LENGTH = 500
+// 托管来源：必须挂在启用的技能包上才生效；内置/自定义来源不受包约束。
+const PACK_GATED_SOURCES = new Set(['user-dsh', 'user-agents'])
 /** 技能备注上限：本地笔记，不写技能文件，随导出/导入走。 */
 const NOTE_MAX = 500
 const PROVIDER_NAME = 'zhiyin'
@@ -57,7 +59,6 @@ const EMPTY_STATE = {
   combos: [],
   intent: { ...EMPTY_INTENT },
   known: {},
-  linked: [],
 }
 
 /** 技能包名规则：1–40 字符，允许中日韩、空格、下划线、连字符；重名拒绝。 */
@@ -273,7 +274,6 @@ export function apply(ctx) {
       if (body.enabled === true) delete state.disabled[skillName]
       else state.disabled[skillName] = { at }
     }
-    applyLinks(state)
     saveState(state)
     invalidateAll()
     return { status: 200, body: { ok: true, applied: names.length, disabled: Object.keys(state.disabled).length } }
@@ -287,7 +287,6 @@ export function apply(ctx) {
     }
     if (typeof body?.agentsRoot === 'boolean') state.agentsRoot = body.agentsRoot
     if (typeof body?.allOff === 'boolean') state.allOff = body.allOff
-    applyLinks(state)
     saveState(state)
     invalidateAll()
     return { status: 200, body: { ok: true, agentsRoot: state.agentsRoot, allOff: state.allOff === true } }
@@ -328,7 +327,6 @@ export function apply(ctx) {
       const name = (typeof body?.name === 'string' ? body.name.trim() : '') || title || '导入的技能包'
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
       packs.push({ id: newId, name, enabled: true, members: names, conflictsWith: [], order: packs.length })
-      applyLinks(state)
       saveState(state)
       invalidateAll()
       return { status: 200, body: { ok: true, id: newId, members: names.length, names } }
@@ -404,7 +402,6 @@ export function apply(ctx) {
       return { status: 400, body: { ok: false, error: 'unknown action: ' + action } }
     }
 
-    applyLinks(state)
     saveState(state)
     invalidateAll()
     return { status: 200, body: { ok: true, packs: packs.length } }
@@ -590,29 +587,9 @@ export function apply(ctx) {
     } catch {
       /* 没有链接就跳过 */
     }
-    const linkState = readState()
-    if (Array.isArray(linkState.linked)) linkState.linked = linkState.linked.filter((entry) => entry !== name)
-    saveState(linkState)
     note('skill-archived', { name, from, to })
     invalidateAll()
     return { status: 200, body: { ok: true, name, to } }
-  })
-
-  // 链接状态：包启用 → 成员软链接进 ~/.dsh/skills；只读计划，apply 时才真正落盘。
-  ctx.effect(() =>
-    ctx.webServer.register({
-      kind: 'exact',
-      path: '/zhiyin/links',
-      resource: async () => json(linkPlan(readState())),
-    }),
-  )
-
-  post(ctx, '/zhiyin/links', async (body) => {
-    const state = readState()
-    const result = body?.apply === true ? applyLinks(state, { pruneLegacy: body?.pruneLegacy === true }) : linkPlan(state)
-    if (body?.apply === true) saveState(state)
-    invalidateAll()
-    return { status: 200, body: { ok: true, ...result } }
   })
 
   // 导出配置：只导出可移植的编排状态（包 / 停用项 / 总开关），
@@ -729,7 +706,6 @@ export function apply(ctx) {
         state.known = { ...payload.known, ...state.known }
       }
     }
-    applyLinks(state)
     saveState(state)
     invalidateAll()
     // 导入后实际生效的技能包（粘贴的 JSON 没带 packs 时就是原有那些）。
@@ -773,9 +749,6 @@ export function apply(ctx) {
       return { status: 500, body: { ok: false, error: '回滚失败：' + String(error?.message ?? error) } }
     }
     cache = null // 下一位读者必须重新读盘，而不是继续用内存里的旧状态。
-    const linkState = readState()
-    applyLinks(linkState)
-    saveState(linkState)
     invalidateAll()
     note('state-rolled-back', { file: target, safety })
     return { status: 200, body: { ok: true, file: target, safety } }
@@ -890,100 +863,6 @@ function installRoot(ctx, target) {
 function ssotDir(name) {
   const dir = join(agentsRoot(), name)
   return existsSync(join(dir, 'SKILL.md')) ? dir : null
-}
-
-/**
- * 链接计划：技能包是唯一开关。
- * - owned：织音自己创建过的链接（state.linked）
- * - managed：技能包成员 + 自己创建过的链接（织音只碰这些）
- * - desired：被启用包引用的技能，再扣掉被单独停用的
- * - add / remove：相对 ~/.dsh/skills 当前状态要补/要清的链接
- * 不在任何包、也不是织音创建的旧链接不碰，避免误删用户已有环境。
- */
-function linkPlan(state) {
-  const root = dshSkillsRoot()
-  const current = new Set()
-  try {
-    for (const entry of readdirSync(root, { withFileTypes: true })) {
-      try {
-        if (lstatSync(join(root, entry.name)).isSymbolicLink()) current.add(entry.name)
-      } catch {
-        /* 读不到就当不是链接 */
-      }
-    }
-  } catch {
-    /* 目录还不存在：current 为空 */
-  }
-  const owned = new Set(Array.isArray(state.linked) ? state.linked : [])
-  const managed = new Set(owned)
-  const desired = new Set()
-  for (const pack of state.packs ?? []) {
-    for (const name of Array.isArray(pack.members) ? pack.members : []) {
-      if (typeof name !== 'string' || !name.trim()) continue
-      managed.add(name)
-      if (state.allOff !== true && pack.enabled !== false && !state.disabled?.[name]) desired.add(name)
-    }
-  }
-  const add = [...desired].filter((name) => !current.has(name) && ssotDir(name)).sort()
-  const remove = [...current].filter((name) => managed.has(name) && !desired.has(name)).sort()
-  const missing = [...desired].filter((name) => !current.has(name) && !ssotDir(name)).sort()
-  // legacy：既不在任何包里、也不是织音创建的旧链接。默认不碰，pruneLegacy 时才收口。
-  const legacy = [...current].filter((name) => !managed.has(name)).sort()
-  return { root, current: [...current].sort(), desired: [...desired].sort(), managed: [...managed].sort(), add, remove, missing, legacy }
-}
-
-/**
- * 执行链接计划：软链接到 SSOT；只清自己管理且已不在启用包里的那些。
- * pruneLegacy=true 时额外清掉「不在任何包、也不是织音创建」的旧链接（一次性收口）。
- */
-function applyLinks(state, options = {}) {
-  const plan = linkPlan(state)
-  const owned = new Set(Array.isArray(state.linked) ? state.linked : [])
-  const errors = []
-  try {
-    mkdirSync(plan.root, { recursive: true })
-  } catch (error) {
-    return { ...plan, errors: [String(error?.message ?? error)] }
-  }
-  for (const name of plan.add) {
-    const dir = ssotDir(name)
-    if (!dir) continue
-    const link = join(plan.root, name)
-    try {
-      if (existsSync(link)) {
-        if (lstatSync(link).isSymbolicLink()) owned.add(name)
-        continue
-      }
-      symlinkSync(dir, link, 'junction')
-      owned.add(name)
-    } catch (error) {
-      errors.push(name + ': ' + String(error?.message ?? error))
-    }
-  }
-  for (const name of plan.remove) {
-    try {
-      unlinkSync(join(plan.root, name))
-      owned.delete(name)
-    } catch (error) {
-      errors.push(name + ': ' + String(error?.message ?? error))
-    }
-  }
-  let pruned = 0
-  if (options.pruneLegacy === true) {
-    for (const name of plan.legacy) {
-      try {
-        unlinkSync(join(plan.root, name))
-        pruned += 1
-      } catch (error) {
-        errors.push(name + ': ' + String(error?.message ?? error))
-      }
-    }
-  }
-  state.linked = [...owned].sort()
-  if (plan.add.length || plan.remove.length || pruned) {
-    note('links-applied', { add: plan.add.length, remove: plan.remove.length, pruned, errors: errors.length })
-  }
-  return { ...plan, pruned, errors }
 }
 
 /** 从 SKILL.md 的 frontmatter 取 name；取不到返回空串。 */
@@ -1141,9 +1020,16 @@ function installDirectory(ctx, body, source, fallbackName) {
     return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
   }
   note('skill-installed', { name, dest })
-  const linkState = readState()
-  applyLinks(linkState)
-  saveState(linkState)
+  // 装进技能库（.agents）后顺手在 .dsh/skills 建一条软链接，否则 DSH 看不到它。
+  if (body?.target === 'agents') {
+    try {
+      const link = join(dshSkillsRoot(), name)
+      mkdirSync(dshSkillsRoot(), { recursive: true })
+      if (!existsSync(link)) symlinkSync(dest, link, 'junction')
+    } catch (error) {
+      note('skill-link-failed', { name, error: String(error?.message ?? error) })
+    }
+  }
   invalidateAll()
   return { status: 200, body: { ok: true, name, dest } }
 }
@@ -1432,7 +1318,10 @@ function hiddenReason(state, skillName, source) {
     if (!packs.some((pack) => packActive(state, pack, intent))) return 'combo'
     return null
   }
-  if (packs.length > 0 && !packs.some((pack) => pack.enabled !== false)) return 'pack'
+  // 技能包就是生效集：托管目录（.dsh / .agents）里的技能必须挂在启用包上才生效；
+  // 内置与自定义来源不归包管。文件永远不因包的开关而增删。
+  if (packs.length === 0) return PACK_GATED_SOURCES.has(String(source)) ? 'unpacked' : null
+  if (!packs.some((pack) => pack.enabled !== false)) return 'pack'
   return null
 }
 
@@ -1691,7 +1580,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, linkPlan }
+export const __test = { hiddenReason, shadowCandidates, agentKey }
 
 function invalidateAll() {
   for (const entry of registrations) {
@@ -1889,7 +1778,6 @@ async function collectState(ctx) {
 
   const current = readState()
   const intent = normalizeIntent(current)
-  const links = linkPlan(current)
   // 一致性（FR-022）：观测不完整 → degraded；包引用了观测不到的技能 → drifted；否则 synced。
   const observedNames = new Set(skills.map((skill) => skill.name))
   const ghostMembers = [
@@ -1950,7 +1838,6 @@ async function collectState(ctx) {
     combos: combosOut,
     intent,
     packConflicts: conflictPairsFor(current, activePackIds(current, intent)),
-    links,
     consistency,
   }
 }

@@ -65,7 +65,7 @@ window.__ModuleLoader__.load({
         install: '安装技能',
         installHint: '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；技能名以 SKILL.md 的 name 为准，目录名同名',
         installPath: 'owner/repo、https://github.com/owner/repo 或 D:\skills\my-skill',
-        installAgents: 'SSOT 技能源 ~/.agents/skills（技能包从这里取）',
+        installAgents: '技能库 ~/.agents/skills（装好会链接进 .dsh，DSH 可见）',
         installMultiple: '这个仓库里有多个技能，勾选后一起安装：',
         installSelected: '安装选中',
         installSelectedCount: '已选 {n} / {m}',
@@ -75,14 +75,9 @@ window.__ModuleLoader__.load({
         installDone: '已安装 {n} 个技能',
         installPartial: '部分安装失败：',
         installFailed: '安装失败：',
-        installUser: '用户目录 ~/.dsh/skills（直接可见，绕过技能包）',
+        installUser: '用户目录 ~/.dsh/skills（直接放这里，不走技能库）',
         installProject: '项目 .dsh/skills',
-        linkStatus: '已链接 {n} · 包期望 {d} · 待补 {a} · 待清 {r}',
-        linkMissing: '{n} 个包成员不在 ~/.agents/skills，链接不了',
-        linkSync: '同步链接',
-        linkLegacy: '{n} 条旧链接不在任何包里',
-        linkPrune: '清理旧链接',
-        linkPruneAsk: '清理 {n} 条旧链接？技能本体仍在 ~/.agents/skills，之后加入技能包会重新链接。',
+
         uninstall: '卸载',
         uninstallAsk: '卸载并把技能移入归档目录？',
         uninstallHint: '移入归档目录，可恢复',
@@ -106,9 +101,11 @@ window.__ModuleLoader__.load({
         toggleFailed: '开关失败：',
         reasonManual: '手动停用',
         reasonPack: '技能包停用',
+        reasonUnpacked: '未加入技能包',
         reasonAgents: 'agents 开关关闭',
         toggleHint: '点开关立即生效',
         toggleBlocked: '上层开关已停用；先打开技能包或总开关',
+        toggleUnpacked: '先把它加进一个启用的技能包；单技能开关只负责组内关掉',
         exportConfig: '导出配置',
         exportConfigHint: '导出一份可移植的 JSON 配置（技能包 / 停用项）',
         exportConfigFailed: '导出失败：',
@@ -207,6 +204,7 @@ window.__ModuleLoader__.load({
         batchDisable: '批量停用',
         batchClear: '清除选择',
         alertUnassigned: '合奏模式下有未编配技能不生效',
+        alertUnpacked: '有技能未加入技能包，当前不生效',
         alertPackConflict: '技能包冲突',
         note: '备注',
         noteEdit: '编辑备注',
@@ -319,7 +317,7 @@ window.__ModuleLoader__.load({
         install: 'Install',
         installHint: 'Paste a GitHub repo, skill folder, npx skills add command, raw SKILL.md link, or a local folder path; the skill name and its directory both follow the SKILL.md name',
         installPath: 'owner/repo, https://github.com/owner/repo, or D:\skills\my-skill',
-        installAgents: 'SSOT source ~/.agents/skills (packs pick from here)',
+        installAgents: 'Library ~/.agents/skills (linked into .dsh on install)',
         installMultiple: 'This repo has several skills; tick the ones to install:',
         installSelected: 'Install selected',
         installSelectedCount: '{n} of {m} selected',
@@ -329,14 +327,9 @@ window.__ModuleLoader__.load({
         installDone: 'Installed {n} skills',
         installPartial: 'Some installs failed: ',
         installFailed: 'Install failed: ',
-        installUser: 'User ~/.dsh/skills (visible directly, bypasses packs)',
+        installUser: 'User ~/.dsh/skills (installed directly)',
         installProject: 'Project .dsh/skills',
-        linkStatus: 'Linked {n} · wanted {d} · to add {a} · to remove {r}',
-        linkMissing: '{n} pack members are not in ~/.agents/skills and cannot be linked',
-        linkSync: 'Sync links',
-        linkLegacy: '{n} links belong to no pack',
-        linkPrune: 'Prune old links',
-        linkPruneAsk: 'Remove {n} old links? The skills stay in ~/.agents/skills and relink when added to a pack.',
+
         uninstall: 'Uninstall',
         uninstallAsk: 'Move this skill into the archive directory?',
         uninstallHint: 'Moves into the archive directory; recoverable',
@@ -360,9 +353,11 @@ window.__ModuleLoader__.load({
         toggleFailed: 'Toggle failed: ',
         reasonManual: 'disabled manually',
         reasonPack: 'pack disabled',
+        reasonUnpacked: 'not in a pack',
         reasonAgents: 'agents switch off',
         toggleHint: 'Takes effect immediately',
         toggleBlocked: 'Blocked by a group switch: re-enable its pack or the master switch first',
+        toggleUnpacked: 'Add it to an enabled pack first; the switch only turns it off inside a pack',
         exportConfig: 'Export config',
         exportConfigHint: 'Download a portable JSON snapshot (packs / disabled items)',
         exportConfigFailed: 'Export failed: ',
@@ -461,6 +456,7 @@ window.__ModuleLoader__.load({
         batchDisable: 'Disable all',
         batchClear: 'Clear',
         alertUnassigned: 'Some unassigned skills do not play in orchestrated mode',
+        alertUnpacked: 'Some skills are not in any pack and do not play',
         alertPackConflict: 'Pack conflict',
         note: 'Note',
         noteEdit: 'Edit note',
@@ -1528,6 +1524,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       }
       const reasonLabel = (reason) => {
         if (reason === 'manual') return say('reasonManual', '手动停用')
+        if (reason === 'unpacked') return say('reasonUnpacked', '未加入技能包')
         if (reason === 'pack') return say('reasonPack', '技能包停用')
         if (reason === 'agents-root') return say('reasonAgents', 'agents 开关关闭')
         if (reason === 'all-off') return say('reasonAllOff', '全部停用')
@@ -1733,41 +1730,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         })
       }
 
-      // 链接同步：包开关后端会自动落链接，这里给一个手动兜底（例如手工删过目录）。
-      const syncLinks = () => {
-        setBusy(true)
-        fetch('/zhiyin/links', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ apply: true }),
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
-            load()
-          })
-          .catch(fail)
-          .finally(() => setBusy(false))
-      }
-
-      // 旧链接收口：只清「不在任何包、也不是织音创建」的软链接，让 DSH 只看到包里的技能。
-      const pruneLinks = (count) => {
-        if (!window.confirm(say('linkPruneAsk', '清理 {n} 条旧链接？技能本体仍在 ~/.agents/skills，之后加入技能包会重新链接。').replace('{n}', String(count)))) return
-        setBusy(true)
-        fetch('/zhiyin/links', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ apply: true, pruneLegacy: true }),
-        })
-          .then((response) => response.json())
-          .then((result) => {
-            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
-            load()
-          })
-          .catch(fail)
-          .finally(() => setBusy(false))
-      }
-
       // 备份列表（FR-025）：把导入/回滚留下的快照列出来，可任选一份退回。
       const loadBackups = React.useCallback(() => {
         fetch('/zhiyin/backups', { headers: { accept: 'application/json' } })
@@ -1815,6 +1777,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           : 0
         if (unassigned > 0) {
           out.push({ key: 'unassigned', text: `${say('alertUnassigned', '合奏模式下有未编配技能不生效')}：${unassigned}` })
+        }
+        const unpacked = scoped.filter((skill) => skill.hiddenReason === 'unpacked').length
+        if (unpacked > 0) {
+          out.push({ key: 'unpacked', text: `${say('alertUnpacked', '有技能未加入技能包，当前不生效')}：${unpacked}` })
         }
         // 只对「启用中的包」提醒，且按全部观测技能判断：被 .agents 开关挡住的技能仍然装着，不算未安装。
         for (const pack of data?.packs ?? []) {
@@ -2180,27 +2146,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               visiblePacks.length === 0 && (data.packs ?? []).length > 0
                 ? h('div', { style: css.hint }, say('packNoMatch', '没有匹配技能包'))
                 : null,
-              data.links
-                ? h(
-                    'div',
-                    { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 } },
-                    h('span', {}, say('linkStatus', '已链接 {n} · 包期望 {d} · 待补 {a} · 待清 {r}')
-                      .replace('{n}', String((data.links.current ?? []).length))
-                      .replace('{d}', String((data.links.desired ?? []).length))
-                      .replace('{a}', String((data.links.add ?? []).length))
-                      .replace('{r}', String((data.links.remove ?? []).length))),
-                    (data.links.missing ?? []).length
-                      ? h('span', { style: { color: '#d0a040' } }, say('linkMissing', '{n} 个包成员不在 ~/.agents/skills，链接不了').replace('{n}', String(data.links.missing.length)))
-                      : null,
-                    (data.links.legacy ?? []).length
-                      ? h('span', { style: { color: '#d0a040' } }, say('linkLegacy', '{n} 条旧链接不在任何包里').replace('{n}', String(data.links.legacy.length)))
-                      : null,
-                    (data.links.legacy ?? []).length
-                      ? h('button', { type: 'button', style: { ...css.btn, padding: '2px 9px', fontSize: 12 }, disabled: busy, onClick: () => pruneLinks((data.links.legacy ?? []).length) }, say('linkPrune', '清理旧链接'))
-                      : null,
-                    h('button', { type: 'button', style: { ...css.btn, padding: '2px 9px', fontSize: 12 }, disabled: busy, onClick: syncLinks }, say('linkSync', '同步链接')),
-                  )
-                : null,
               visiblePacks.map((pack) => {
                 const status = packStatus(pack)
                 const ghosts = (pack.members ?? []).filter((name) => !observedNames.has(name))
@@ -2473,8 +2418,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           : null,
                         h(Toggle, {
                           checked: on,
-                          disabled: busy || skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off',
-                          title: skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off' ? say('toggleBlocked', '上层开关已停用；先打开技能包或总开关') : skill.hiddenReason ? reasonLabel(skill.hiddenReason) : say('toggleHint', '点开关立即生效'),
+                          disabled: busy || skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off' || skill.hiddenReason === 'unpacked',
+                          title: skill.hiddenReason === 'unpacked' ? say('toggleUnpacked', '先把它加进一个启用的技能包；单技能开关只负责组内关掉') : skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off' ? say('toggleBlocked', '上层开关已停用；先打开技能包或总开关') : skill.hiddenReason ? reasonLabel(skill.hiddenReason) : say('toggleHint', '点开关立即生效'),
                           onChange: () => write('/zhiyin/skill', {
                             name: skill.name,
                             enabled: !on,
@@ -2610,8 +2555,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
                       h(Toggle, {
                         checked: skill.enabled !== false,
-                        disabled: busy || skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off',
-                        title: skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off'
+                        disabled: busy || skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off' || skill.hiddenReason === 'unpacked',
+                        title: skill.hiddenReason === 'unpacked'
+                          ? say('toggleUnpacked', '先把它加进一个启用的技能包；单技能开关只负责组内关掉')
+                          : skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off'
                           ? say('toggleBlocked', '上层开关已停用；先打开技能包或总开关')
                           : skill.hiddenReason
                             ? reasonLabel(skill.hiddenReason)
@@ -2817,7 +2764,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       checked: installTarget === 'agents',
                       onChange: () => setInstallTarget('agents'),
                     }),
-                    say('installAgents', 'SSOT 技能源 ~/.agents/skills（技能包从这里取）'),
+                    say('installAgents', '技能库 ~/.agents/skills（装好会链接进 .dsh）'),
                   ),
                   h('label', { style: { display: 'flex', gap: 5, alignItems: 'center' } },
                     h('input', {
