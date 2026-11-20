@@ -80,6 +80,9 @@ window.__ModuleLoader__.load({
         linkStatus: '已链接 {n} · 包期望 {d} · 待补 {a} · 待清 {r}',
         linkMissing: '{n} 个包成员不在 ~/.agents/skills，链接不了',
         linkSync: '同步链接',
+        linkLegacy: '{n} 条旧链接不在任何包里',
+        linkPrune: '清理旧链接',
+        linkPruneAsk: '清理 {n} 条旧链接？技能本体仍在 ~/.agents/skills，之后加入技能包会重新链接。',
         uninstall: '卸载',
         uninstallAsk: '卸载并把技能移入归档目录？',
         uninstallHint: '移入归档目录，可恢复',
@@ -331,6 +334,9 @@ window.__ModuleLoader__.load({
         linkStatus: 'Linked {n} · wanted {d} · to add {a} · to remove {r}',
         linkMissing: '{n} pack members are not in ~/.agents/skills and cannot be linked',
         linkSync: 'Sync links',
+        linkLegacy: '{n} links belong to no pack',
+        linkPrune: 'Prune old links',
+        linkPruneAsk: 'Remove {n} old links? The skills stay in ~/.agents/skills and relink when added to a pack.',
         uninstall: 'Uninstall',
         uninstallAsk: 'Move this skill into the archive directory?',
         uninstallHint: 'Moves into the archive directory; recoverable',
@@ -1744,6 +1750,24 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .finally(() => setBusy(false))
       }
 
+      // 旧链接收口：只清「不在任何包、也不是织音创建」的软链接，让 DSH 只看到包里的技能。
+      const pruneLinks = (count) => {
+        if (!window.confirm(say('linkPruneAsk', '清理 {n} 条旧链接？技能本体仍在 ~/.agents/skills，之后加入技能包会重新链接。').replace('{n}', String(count)))) return
+        setBusy(true)
+        fetch('/zhiyin/links', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ apply: true, pruneLegacy: true }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
+            load()
+          })
+          .catch(fail)
+          .finally(() => setBusy(false))
+      }
+
       // 备份列表（FR-025）：把导入/回滚留下的快照列出来，可任选一份退回。
       const loadBackups = React.useCallback(() => {
         fetch('/zhiyin/backups', { headers: { accept: 'application/json' } })
@@ -2167,6 +2191,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       .replace('{r}', String((data.links.remove ?? []).length))),
                     (data.links.missing ?? []).length
                       ? h('span', { style: { color: '#d0a040' } }, say('linkMissing', '{n} 个包成员不在 ~/.agents/skills，链接不了').replace('{n}', String(data.links.missing.length)))
+                      : null,
+                    (data.links.legacy ?? []).length
+                      ? h('span', { style: { color: '#d0a040' } }, say('linkLegacy', '{n} 条旧链接不在任何包里').replace('{n}', String(data.links.legacy.length)))
+                      : null,
+                    (data.links.legacy ?? []).length
+                      ? h('button', { type: 'button', style: { ...css.btn, padding: '2px 9px', fontSize: 12 }, disabled: busy, onClick: () => pruneLinks((data.links.legacy ?? []).length) }, say('linkPrune', '清理旧链接'))
                       : null,
                     h('button', { type: 'button', style: { ...css.btn, padding: '2px 9px', fontSize: 12 }, disabled: busy, onClick: syncLinks }, say('linkSync', '同步链接')),
                   )
