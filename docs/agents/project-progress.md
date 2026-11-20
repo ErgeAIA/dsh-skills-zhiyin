@@ -23,12 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 22:2x 观测自动刷新（FR-017）+ 干跑验证（commit 07faabd，merge 98269f2）
+- **最后更新**：2026-11-20 22:3x 观测自动刷新（FR-017）+ 干跑验证 + 统计卡计数修复（commit 07faabd→98269f2；e5e668c→99d9ee1）
   - FR-017：客户端在「切回页面 / 页面重新可见」时（window focus + document visibilitychange，3 秒节流）自动重取 /zhiyin/state；从别的工具（如 AI Vault）装/卸技能回来后列表自动更新，不必手动点刷新
   - 真代码单测 hiddenReason 11 项全 PASS：全部技能默认包开/关、在启用包、只在停用包、共享技能、手动停用优先、allOff 最高优先、bundled/custom 不受包约束、agents-root、unpacked
   - 干跑安装 13 项全 PASS：resolveGithubSource 解析 owner/repo、GitHub 链接、/tree、/blob …SKILL.md、npx skills add、gh repo clone、带引号路径、4 类非法输入；findSkillDirs 在合成多技能目录里只取 skills/alpha、skills/beta（跳过 .git/node_modules）；frontmatter 取 name（alpha / beta-x）；git ls-remote GitHub 通
   - 运行态 /zhiyin/probe：两个 Agent 模型面 catalog.count=109、用户面 disabledVisible=[]（停用技能不泄漏到 / 菜单）
   - __test 增补 resolveGithubSource / findSkillDirs / skillFrontmatterName 便于干跑
+  - 修复：统计卡「已停用」漏算 disabled 导致显示 undefined；补齐 counts.disabled / counts.internal（「不可直接调用」卡仅在 >0 时出现）
+  - 术语终稿：可自动调用（Agent 自己选用）/ 仅手动调用（只能 /名字，均带 disable-model-invocation: true）/ 已停用（被开关挡住，文件仍在）；locale 未覆盖这些键，显示以组件字面量为准
   - 待验收：F5 设置页后切到别窗再切回，列表应自动刷新；完整重启 DSH 才加载宿主改动（本轮宿主只多导出测试符号，行为无变化）
 
 - 上一轮：2026-11-20 21:4x 「全部技能」默认包 + 调用方式卡片改名（commit 6fc60b5，merge 2e40df1）
