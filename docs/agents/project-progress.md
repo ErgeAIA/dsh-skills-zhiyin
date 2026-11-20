@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（简化界面 + 安装入口走 feat/simplify-install-ux → 提交 bcbd302 → 合并 2a38d8c → 已推送 origin，分支已删）
-- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——2026-11-20 起界面只留「技能 / 技能包」两页，语义是「包开关 = 成员对 agent 可见」；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留，v2 迁移把旧状态归零）；UI 还待整体精修
+- **当前分支**：main（AI Vault 可移植部分走 feat/aivault-port → 提交 67cee70 → 合并 17957b6 → 已推送 origin，分支已删）
+- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页，语义是「单技能开关是底线，包开关决定这一组是否上场」；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留，v2 迁移把旧状态归零）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-20 14:3x 简化界面 + 重做安装入口（commit bcbd302，merge 2a38d8c）
+- **最后更新**：2026-11-20 15:1x 移植 AI Vault 可移植部分（commit 67cee70，merge 17957b6）
+  - 用户明确 AIVault 是独立成熟工具，织音只移植可移植部分；个人项目在 D:\Workspace\Code，读码优先 CodeGraph MCP
+  - 安装：粘贴地址 → 扫描仓库 → 多选技能 → 一次批量安装；前后端共用 10 分钟 repo clone 缓存；技能名优先 SKILL.md frontmatter name，1–64 字符且字母数字首尾；临时目录 + 原子 rename，过滤 .git/node_modules；失败候选保留，可重试（POST /zhiyin/install/batch）
+  - 包成员：候选池 = 全部可见技能 + 已在包内但被 .agents 挡住/未安装的成员；搜索只过滤显示，不动已选；全选 = 未手动停用技能 + 包内隐藏成员，不受搜索影响；新建包默认选中未手动停用技能；保存去重
+  - 单技能开关成为底线：hiddenReason 先判 manual 再判包；包只决定组是否上场，不替成员强行打开；被包/总开关挡住的开关置灰，提示先开上层
+  - 备注：卡片与列表的备注可点开看全文（最高 60vh、保留换行），可转编辑；沿用本地 notes 字段
+  - 冒烟：隔离 USERPROFILE 下 9 项 PASS（manual 优先、包停用、批量空/非 GitHub 400、非法名、原子安装）；渲染桩 baseline 与成员/安装/备注弹窗均通过；node --check 双半边 exit 0
+  - 待验收：完整重启 DSH 后验证真实 GitHub 单/多技能安装、成员全选与保存、备注查看/编辑；远程安装依赖本机 git 与网络
+- 上一轮：2026-11-20 14:3x 简化界面 + 重做安装入口（commit bcbd302，merge 2a38d8c）
   - 用户反馈「一件简单的事做得看不懂」：界面收敛为「技能 / 技能包」两页；移除组合/合奏页签、包冲突徽标与声明入口、排除/常驻按钮、生效面矩阵；底部提示改为「技能包开关决定包内技能是否对 agent 可见」
   - v2 状态迁移：readState 检测 v!=2 时把 intent 归零为兼容模式、清空 combos 与包的 conflictsWith（路由保留，只为兼容旧导出）
   - 安装弹窗改成一个输入框：支持 owner/repo、GitHub 链接（含 /tree /blob）、npx skills add、gh repo clone、SKILL.md 直链、本地文件夹；后端 git clone --depth 1 到临时目录找 SKILL.md，多技能列出候选，名字优先 frontmatter name
