@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（安装交互与图标优化走 fix/install-ux-icons → 提交 f8cda87 → 合并 62949f7 → 已推送 origin，分支已删）；上一轮提示竖排+全部技能计数：2237e0d → 1f7b1dc
+- **当前分支**：main（备注内联操作+弹窗统一X+死代码清理走 fix/note-inline-and-deadcode → 提交 5d7ecb7 → 合并 80b1dc2 → 已推送 origin，分支已删）；上一轮安装按钮状态机+图标：f8cda87 → 62949f7
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 00:3x 安装按钮状态机 + 图标化 + 排序下拉可见性（commit f8cda87，merge 62949f7）
+- **最后更新**：2026-11-21 01:0x 备注编辑改为编辑框内联操作 + 全部弹窗统一右上角 X + 死代码清理（commit 5d7ecb7，merge 80b1dc2）
+  - 备注编辑弹窗：去掉底部「取消/保存」，改为编辑框内右下角并排两个图标——X=清空已输入、✓=保存（保存中显示 spinner）；仅编辑态出现；右上角 X 仍为关闭
+  - 弹窗统一 X：新建技能包 / 改名 / 导入技能包 / 导入配置 / 备份 / 备注，全部在标题右侧加关闭 X，并移除底部「取消/关闭」文字按钮；有主操作的只留主操作
+  - 死代码清理（-472 行）：移除组合/合奏页（tab、状态、comboRequest/openComboPreview/runCombo、4 个组合弹窗、渲染块）、包冲突声明弹窗、排除/常驻 setIntentFlag 等已从 UI 移除的残留（后端路由按 DEC 保留）；仅剩未使用的 combo 文案键（纯数据，不影响运行）
+  - node --check client exit 0；删除后逐块校验标记唯一、无残留代码引用（仅 locale 文案键）
+  - 待验收：F5 后点技能备注看内联 X/✓、各弹窗右上角 X、页面不再有组合页痕迹
+
+- 上一轮：2026-11-21 00:3x 安装按钮状态机 + 图标化 + 排序下拉可见性（commit f8cda87，merge 62949f7）
   - 安装按钮状态机（/tuyi motion-statemachine）：runInstall / runInstallSelected 期间按钮显示旋转 spinner + 「安装中…」并禁用，防重复提交；成功关闭弹窗，失败回退可重试；多选时「全选/全不选」一并禁用
   - 安装弹窗：左下「取消」移除，右上角加 X 关闭图标（busy 时禁用，避免安装中误关）
   - 排序下拉看不见：原生 <option> 弹层不继承 select 样式，深色主题白底浅字；给每个 option 显式深底浅字（VS Code 主题变量），并在「排序」前加 sort 图标
