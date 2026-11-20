@@ -780,6 +780,15 @@ window.__ModuleLoader__.load({
         fontSize: 12,
         resize: 'vertical',
       },
+      // 备注编辑：清除/保存在编辑框内右下角并排，不弹外围按钮。
+      noteEditWrap: { position: 'relative' },
+      noteEditActions: { position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 4 },
+      noteActBtn: {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
+        background: 'rgba(128,128,128,0.16)', color: 'inherit', opacity: 0.85,
+      },
+      noteActSave: { background: 'rgba(224,116,60,0.18)', color: 'var(--zhiyin-accent, #e0743c)' },
       btn: {
         padding: '6px 14px',
         borderRadius: 10,
@@ -1270,21 +1279,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       })
       const [menuOpen, setMenuOpen] = React.useState(null)   // 技能包行尾 … 菜单
       const [renaming, setRenaming] = React.useState(null)   // 改名弹窗：{ id, name }
-      const [comboCreating, setComboCreating] = React.useState(false)
-      const [comboDraftName, setComboDraftName] = React.useState('')
-      const [comboPicking, setComboPicking] = React.useState(null)      // 选包弹窗：组合 id
-      const [comboDraftPacks, setComboDraftPacks] = React.useState([])
-      const [comboPreview, setComboPreview] = React.useState(null)      // 预览弹窗：{ combo, stack, preview }
-      const [comboMenu, setComboMenu] = React.useState(null)            // 组合行尾 … 菜单
       const [selectedNames, setSelectedNames] = React.useState([])      // 批量提交选中的技能名
-      const [comboRenaming, setComboRenaming] = React.useState(null)    // 组合改名：{ id, name }
       const [noteEditing, setNoteEditing] = React.useState(null)       // 正在编辑备注的技能名；null 表示关闭
       const [noteDraft, setNoteDraft] = React.useState('')
       const [noteViewing, setNoteViewing] = React.useState(null)     // 查看完整备注的技能；null 表示关闭
       const [backups, setBackups] = React.useState(null)               // 配置备份列表
       const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
-      const [conflictPicking, setConflictPicking] = React.useState(null)      // 声明冲突包弹窗：包 id
-      const [conflictDraft, setConflictDraft] = React.useState([])            // 冲突包勾选草稿
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1502,11 +1502,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       // 点空白处收起技能包 … 菜单
       React.useEffect(() => {
-        if (!menuOpen && !comboMenu) return undefined
-        const close = () => { setMenuOpen(null); setComboMenu(null) }
+        if (!menuOpen) return undefined
+        const close = () => setMenuOpen(null)
         window.addEventListener('click', close)
         return () => window.removeEventListener('click', close)
-      }, [menuOpen, comboMenu])
+      }, [menuOpen])
 
       const data = state.data
 
@@ -1705,38 +1705,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         })
       }
 
-      // 组合（一组包）与合奏意图（此刻谁生效）。
+      // 合奏意图：组合页已移除，此处仅保留给告警文案判断是否接管。
       const intent = data?.intent ?? { mode: 'compat', activePackIds: [], alwaysOnSkillNames: [], excludedSkillNames: [] }
-      const combos = data?.combos ?? []
-      const packById = React.useMemo(() => new Map((data?.packs ?? []).map((pack) => [pack.id, pack])), [data])
-      const excludedNames = React.useMemo(() => new Set(intent.excludedSkillNames ?? []), [intent])
-      const alwaysOnNames = React.useMemo(() => new Set(intent.alwaysOnSkillNames ?? []), [intent])
-      const packName = (id) => packById.get(id)?.name ?? id
-      // 组合是否就是当前生效的那一组（与顺序无关）。
-      const comboActive = (combo) => {
-        if (intent.mode !== 'orchestrated') return false
-        const active = intent.activePackIds ?? []
-        const want = combo.packIds ?? []
-        if (active.length === 0 || want.length !== active.length) return false
-        return want.every((id) => active.includes(id))
-      }
-      const visibleCombos = React.useMemo(() => {
-        const needle = query.trim().toLowerCase()
-        if (needle === '') return combos
-        return combos.filter((combo) =>
-          String(combo?.name ?? '').toLowerCase().includes(needle) ||
-          (combo?.packIds ?? []).some((id) => String(packById.get(id)?.name ?? '').toLowerCase().includes(needle)),
-        )
-      }, [combos, query, packById])
 
-      // 预览与应用共用后端语义，保证「预览看到什么就应用什么」。
-      const comboRequest = (body) =>
-        fetch('/zhiyin/combo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-          .then((response) => response.json())
-          .then((result) => {
-            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
-            return result
-          })
       const fail = (error) => setState((prev) => ({ ...prev, error: String(error?.message ?? error) }))
       // 批量提交（FR-023）：多个开关只发一次请求，宿主一次写盘、一次投影。
       const toggleSelected = (name) =>
@@ -1758,60 +1729,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .catch(fail)
           .finally(() => setBusy(false))
       }
-      const openComboPreview = (combo, stack) => {
-        setBusy(true)
-        comboRequest({ action: 'preview', id: combo.id, stack })
-          .then((result) => setComboPreview({ combo, stack, preview: result.preview }))
-          .catch(fail)
-          .finally(() => setBusy(false))
-      }
-      const runCombo = (combo, stack) => {
-        setComboPreview(null)
-        setBusy(true)
-        const send = (ack) =>
-          fetch('/zhiyin/combo', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ action: stack ? 'stack' : 'apply', id: combo.id, ack }),
-          })
-            .then((response) => response.json())
-            .then((result) => {
-              if (result && result.ok === false && result.error === 'conflict' && Array.isArray(result.conflicts) && ack !== true) {
-                const names = result.conflicts.map((pair) => `${pair.a.name} × ${pair.b.name}`).join('、')
-                if (window.confirm(`${say('comboConflictAsk', '这些技能包互相冲突')}：${names}\n${say('comboConflictStill', '仍然应用并留痕？')}`)) return send(true)
-                return null
-              }
-              if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
-              return result
-            })
-        send(false)
-          .then((result) => { if (result) load() })
-          .catch(fail)
-          .finally(() => setBusy(false))
-      }
-      // 排除 / 常驻：只改合奏意图，不动任何技能包。
-      const setIntentFlag = (name, field, value) => {
-        setBusy(true)
-        fetch('/zhiyin/intent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, field, value }) })
-          .then((response) => response.json())
-          .then((result) => {
-            if (!result || result.ok !== true) throw new Error(result?.error ?? 'rejected')
-            load()
-          })
-          .catch(fail)
-          .finally(() => setBusy(false))
-      }
-      // 声明冲突包（FR-005）：选与这个包互斥的其它包，写进包的 conflictsWith。
-      const openConflicts = (pack) => {
-        setConflictDraft(Array.isArray(pack.conflictsWith) ? [...pack.conflictsWith] : [])
-        setConflictPicking(pack.id)
-      }
-      const saveConflicts = () => {
-        if (!conflictPicking) return
-        write('/zhiyin/pack', { action: 'conflicts', id: conflictPicking, conflictsWith: conflictDraft })
-          .then((result) => { if (result) setConflictPicking(null) })
-      }
-
       // 技能备注：打开弹窗填一份本地笔记，跟着导出/导入走。
       const openNote = (skill) => {
         setNoteDraft(skill.note ?? '')
@@ -2158,14 +2075,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           ? h(
               'div',
               { style: css.toolbar },
-              tab === 'packs' || tab === 'combos'
+              tab === 'packs'
                 ? h('span', { style: { display: 'inline-flex', gap: 6 } },
-                    tab === 'packs'
-                      ? h('button', { type: 'button', style: css.iconBtn, title: say('packNew', '新建技能包'), 'aria-label': say('packNew', '新建技能包'), onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 }))
-                      : h('button', { type: 'button', style: css.iconBtn, title: say('comboNew', '新建组合'), 'aria-label': say('comboNew', '新建组合'), onClick: () => { setComboDraftName(''); setComboCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 })),
-                    tab === 'packs'
-                      ? h('button', { type: 'button', style: css.iconBtn, title: say('packImport', '导入 txt 技能包'), 'aria-label': say('packImport', '导入 txt 技能包'), onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, h(Icon, { name: 'import', size: 14 }))
-                      : null,
+                    h('button', { type: 'button', style: css.iconBtn, title: say('packNew', '新建技能包'), 'aria-label': say('packNew', '新建技能包'), onClick: () => { setDraftName(''); setCreating(true) }, disabled: busy }, h(Icon, { name: 'plus', size: 14 })),
+                    h('button', { type: 'button', style: css.iconBtn, title: say('packImport', '导入 txt 技能包'), 'aria-label': say('packImport', '导入 txt 技能包'), onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, h(Icon, { name: 'import', size: 14 })),
                   )
                 : null,
               h('input', {
@@ -2174,9 +2087,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 placeholder:
                   tab === 'list'
                     ? say('search', '按名称或描述搜索')
-                    : tab === 'combos'
-                      ? say('searchCombos', '搜组合名或其中的包')
-                      : say('searchPacks', '搜技能包名或成员'),
+                    : say('searchPacks', '搜技能包名或成员'),
                 onChange: (event) => setQueryInput(event.target.value),
               }),
               tab === 'list'
@@ -2252,9 +2163,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       h('span', { style: css.badge(true) }, `${pack.all ? counts.total : (pack.memberCount ?? pack.members?.length ?? 0)} 个技能`),
                       pack.all ? h('span', { style: { ...css.badge(true), opacity: 0.7 } }, say('packDefault', '默认')) : null,
                       (pack.all ? counts.allCost : pack.cost) > 0 ? h('span', { style: css.metaText }, `${pack.all ? counts.allCost : pack.cost} ${say('packCostUnit', '字符')}`) : null,
-                      intent.mode === 'orchestrated' && pack.enabled !== false && pack.active === false
-                        ? h('span', { style: { ...css.badge(true), background: 'rgba(128,128,128,0.16)', opacity: 0.72 } }, say('packNotInCombo', '本组合未纳入'))
-                        : null,
 
                       h('span', { style: { ...packStatusStyle(status), marginLeft: 'auto' } }, packStatusLabel(status)),
                     ),
@@ -2324,110 +2232,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     title: pack.enabled === false ? say('packOff', '已停用') : say('packOn', '启用中'),
                     onChange: () => write('/zhiyin/pack', { action: 'toggle', id: pack.id, enabled: pack.enabled === false }),
                   }),
-                )
-              }),
-            )
-          : null,
-
-        // 组合页：一个组合 = 一组技能包；应用前先预览差异，再决定替换还是叠加。
-        data && tab === 'combos'
-          ? h(
-              'div',
-              { style: css.list },
-              h(
-                'div',
-                { style: { ...css.item, gap: 8 } },
-                h('span', { style: css.pill(intent.mode === 'orchestrated') }, intent.mode === 'orchestrated' ? say('comboModeOrchestrated', '合奏模式') : say('comboModeCompat', '兼容模式')),
-                h('span', { style: css.hint }, intent.mode === 'orchestrated'
-                  ? `${say('comboModeHintOrchestrated', '生效面由当前组合决定')} · ${(intent.activePackIds ?? []).map(packName).join('、') || '—'}`
-                  : say('comboModeHintCompat', '只观测，不接管生效面')),
-                intent.mode === 'orchestrated'
-                  ? h('button', {
-                      type: 'button',
-                      style: { ...css.btn, marginLeft: 'auto' },
-                      disabled: busy,
-                      onClick: () => {
-                        setBusy(true)
-                        comboRequest({ action: 'exit' }).then(() => load()).catch(fail).finally(() => setBusy(false))
-                      },
-                    }, say('comboExit', '退出合奏'))
-                  : null,
-              ),
-              combos.length === 0
-                ? h('div', { style: css.hint }, say('comboEmptyHint', '还没有组合。组合 = 按场景挑几个技能包；应用前会先给你看差异'))
-                : null,
-              visibleCombos.length === 0 && combos.length > 0
-                ? h('div', { style: css.hint }, say('comboNoMatch', '没有匹配组合'))
-                : null,
-              visibleCombos.map((combo) => {
-                const active = comboActive(combo)
-                const names = (combo.packIds ?? []).map(packName)
-                return h(
-                  'div',
-                  { key: combo.id, style: css.item },
-                  h(
-                    'div',
-                    { style: css.itemMain },
-                    h(
-                      'div',
-                      { style: css.itemHead },
-                      h('span', { style: css.name }, combo.name),
-                      h('span', { style: css.badge(true) }, `${names.length} ${say('comboPacksCount', '个技能包')}`),
-                      active
-                        ? h('span', { style: { ...css.pill(true), marginLeft: 'auto' } }, say('comboApplied', '生效中'))
-                        : h('span', { style: { ...css.pill(false), marginLeft: 'auto' } }, say('comboIdle', '未生效')),
-                    ),
-                    h('div', { style: css.desc }, names.length
-                      ? names.slice(0, 6).join(' · ') + (names.length > 6 ? ` … +${names.length - 6}` : '')
-                      : say('comboEmptyHint2', '还没有选包，点「选择包」')),
-                  ),
-                  h('button', {
-                    type: 'button',
-                    style: css.iconBtn,
-                    title: say('comboChoosePacks', '选择包'),
-                    'aria-label': say('comboChoosePacks', '选择包'),
-                    disabled: busy,
-                    onClick: () => {
-                      setComboDraftPacks([...(combo.packIds ?? [])])
-                      setComboPicking(combo.id)
-                    },
-                  }, h(Icon, { name: 'layers', size: 14 })),
-                  h('button', {
-                    type: 'button',
-                    style: css.iconBtn,
-                    title: say('comboPreviewTitle', '应用前预览'),
-                    'aria-label': say('comboPreviewTitle', '应用前预览'),
-                    disabled: busy,
-                    onClick: () => openComboPreview(combo, false),
-                  }, h(Icon, { name: 'eye', size: 14 })),
-                  h(
-                    'div',
-                    { style: css.menuWrap },
-                    h('button', {
-                      type: 'button',
-                      style: { ...css.iconBtn, fontWeight: 700, lineHeight: 1 },
-                      title: say('comboMenu', '更多操作'),
-                      'aria-label': say('comboMenu', '更多操作'),
-                      disabled: busy,
-                      onClick: (event) => {
-                        event.stopPropagation()
-                        setComboMenu(comboMenu === combo.id ? null : combo.id)
-                      },
-                    }, '…'),
-                    comboMenu === combo.id
-                      ? h(
-                          'div',
-                          { style: css.menu, onClick: (event) => event.stopPropagation() },
-                          h('button', { type: 'button', style: css.menuItem, onClick: () => { setComboMenu(null); setComboRenaming({ id: combo.id, name: combo.name }) } }, say('comboRename', '改名')),
-                          h('button', { type: 'button', style: { ...css.menuItem, color: '#d06464' }, onClick: () => {
-                            setComboMenu(null)
-                            if (window.confirm(say('comboDeleteAsk', '删除组合？技能包和技能都不会受影响。') + ' ' + combo.name)) {
-                              comboRequest({ action: 'delete', id: combo.id }).then(() => load()).catch(fail)
-                            }
-                          } }, say('comboDelete', '删除')),
-                        )
-                      : null,
-                  ),
                 )
               }),
             )
@@ -2752,7 +2556,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: { ...css.modal, ...css.modalSm } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packNew', '新建技能包'))),
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('packNew', '新建技能包')),
+                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setCreating(false) }, h(Icon, { name: 'close', size: 13 })),
+                ),
                 h('input', {
                   style: css.field,
                   maxLength: 40,
@@ -2763,7 +2572,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setCreating(false) }, say('cancel', '取消')),
                   h(
                     'button',
                     {
@@ -2796,7 +2604,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: { ...css.modal, ...css.modalSm } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packRename', '改名'))),
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('packRename', '改名')),
+                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setRenaming(null) }, h(Icon, { name: 'close', size: 13 })),
+                ),
                 h('input', {
                   style: css.field,
                   maxLength: 40,
@@ -2808,7 +2621,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setRenaming(null) }, say('cancel', '取消')),
                   h(
                     'button',
                     {
@@ -2962,7 +2774,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: css.modal },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('importTitle', '导入技能包'))),
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('importTitle', '导入技能包')),
+                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setImporting(false) }, h(Icon, { name: 'close', size: 13 })),
+                ),
                 h('div', { style: css.hint }, say('importHint', '支持 AI Vault 导出的技能包 txt：每行「目录名 | 来源 | owner/repo | 分支 | 子目录」，# 开头的行会被忽略。')),
                 h('input', {
                   style: css.field,
@@ -2985,7 +2802,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setImporting(false) }, say('cancel', '取消')),
                   h(
                     'button',
                     {
@@ -3009,240 +2825,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
-        // 新建组合：名字 1–40 字符，重名由后端拒绝。
-        comboCreating
-          ? h(
-              'div',
-              { style: css.overlay },
-              h(
-                'div',
-                { style: { ...css.modal, ...css.modalSm } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('comboNew', '新建组合'))),
-                h('input', {
-                  style: css.field,
-                  maxLength: 40,
-                  value: comboDraftName,
-                  placeholder: say('comboNamePlaceholder', '组合名称'),
-                  onChange: (event) => setComboDraftName(event.target.value),
-                }),
-                h('div', { style: css.hint }, say('comboNameRule', '1–40 个字符；仅限中文、字母、数字、空格、下划线、连字符')),
-                h(
-                  'div',
-                  { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setComboCreating(false) }, say('cancel', '取消')),
-                  h('button', {
-                    type: 'button',
-                    style: css.btn,
-                    disabled: busy || comboDraftName.trim() === '',
-                    onClick: () => {
-                      setBusy(true)
-                      comboRequest({ action: 'create', name: comboDraftName.trim() })
-                        .then(() => { setComboCreating(false); load() })
-                        .catch(fail)
-                        .finally(() => setBusy(false))
-                    },
-                  }, say('save', '保存')),
-                ),
-              ),
-            )
-          : null,
-
-        // 选包：组合只保存包 ID；成员变化仍以技能包为准。
-        comboPicking
-          ? (function renderComboPacks() {
-              const combo = combos.find((entry) => entry.id === comboPicking)
-              if (!combo) return null
-              const packs = data.packs ?? []
-              return h(
-                'div',
-                { style: css.overlay },
-                h(
-                  'div',
-                  { style: css.modal },
-                  h(
-                    'div',
-                    { style: css.modalHead },
-                    h('span', { style: css.modalTitle }, combo.name + ' · ' + say('comboChoosePacks', '选择包')),
-                    h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setComboPicking(null) }, h(Icon, { name: 'close', size: 13 })),
-                  ),
-                  packs.length === 0
-                    ? h('div', { style: css.hint }, say('comboNoPacks', '还没有技能包；先到「技能包」建一个'))
-                    : h(
-                        'div',
-                        { style: css.modalBody },
-                        packs.map((pack) =>
-                          h(
-                            'label',
-                            { key: pack.id, style: css.cbRow },
-                            h('input', {
-                              type: 'checkbox',
-                              checked: comboDraftPacks.includes(pack.id),
-                              onChange: (event) =>
-                                setComboDraftPacks(
-                                  event.target.checked
-                                    ? [...comboDraftPacks, pack.id]
-                                    : comboDraftPacks.filter((id) => id !== pack.id),
-                                ),
-                            }),
-                            h('span', { style: css.name }, pack.name),
-                            h('span', { style: css.metaText }, `${pack.members?.length ?? 0} 个技能`),
-                            h('span', { style: { ...css.hint, marginLeft: 'auto' } }, `${pack.cost ?? 0} ${say('packCostUnit', '字符')}`),
-                          ),
-                        ),
-                      ),
-                  h(
-                    'div',
-                    { style: css.modalFoot },
-                    h('button', { type: 'button', style: css.btn, onClick: () => setComboPicking(null) }, say('cancel', '取消')),
-                    h('button', {
-                      type: 'button',
-                      style: css.btn,
-                      disabled: busy,
-                      onClick: () => {
-                        setBusy(true)
-                        comboRequest({ action: 'setPacks', id: combo.id, packIds: comboDraftPacks })
-                          .then(() => { setComboPicking(null); load() })
-                          .catch(fail)
-                          .finally(() => setBusy(false))
-                      },
-                    }, say('save', '保存')),
-                  ),
-                ),
-              )
-            })()
-          : null,
-
-        // 应用前预览：先看清包的进出与技能的进出，再决定替换还是叠加。
-        comboPreview
-          ? (function renderComboPreview() {
-              const { combo, stack, preview } = comboPreview
-              const nameList = (ids, empty) =>
-                ids.length === 0
-                  ? h('span', { style: css.hint }, empty)
-                  : h('div', { style: css.previewList }, ids.map((id) => h('span', { key: id, style: css.mono }, packName(id))))
-              const skillList = (names) =>
-                names.length === 0
-                  ? h('span', { style: css.hint }, say('comboPreviewNone', '没有可见变化'))
-                  : h('div', { style: css.previewList }, names.map((name) => h('span', { key: name, style: css.mono }, name)))
-              return h(
-                'div',
-                { style: css.overlay },
-                h(
-                  'div',
-                  { style: { ...css.modal, ...css.modalMd } },
-                  h(
-                    'div',
-                    { style: css.modalHead },
-                    h('span', { style: css.modalTitle }, say('comboPreviewTitle', '应用前预览') + ' · ' + combo.name + (stack ? ' · ' + say('comboRunStack', '叠加到当前') : '')),
-                    h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setComboPreview(null) }, h(Icon, { name: 'close', size: 13 })),
-                  ),
-                  h('span', { style: css.sectionLabel }, say('comboPreviewOn', '将生效的包')),
-                  nameList(preview.packsOn ?? [], '—'),
-                  h('span', { style: css.sectionLabel }, say('comboPreviewOff', '将停用的包')),
-                  nameList(preview.packsOff ?? [], '—'),
-                  h('span', { style: css.sectionLabel }, say('comboPreviewEnable', '将加入')),
-                  skillList(preview.enable ?? []),
-                  h('span', { style: css.sectionLabel }, say('comboPreviewHide', '将退出')),
-                  skillList(preview.hide ?? []),
-                  preview.unassigned > 0
-                    ? h('div', { style: css.hint }, `${preview.unassigned} ${say('comboPreviewUnassigned', '个未编配技能不会生效')}`)
-                    : null,
-                  h('div', { style: css.hint }, `${say('comboPreviewChars', '目录字符数')} ${preview.catalogChars} / ${preview.budgetChars}`),
-                  h(
-                    'div',
-                    { style: css.modalFoot },
-                    h('button', { type: 'button', style: css.btn, onClick: () => setComboPreview(null) }, say('cancel', '取消')),
-                    stack
-                      ? h('button', { type: 'button', style: css.primaryBtn, disabled: busy, onClick: () => runCombo(combo, true) }, say('comboRunStack', '叠加到当前'))
-                      : [
-                          h('button', { key: 'stack', type: 'button', style: css.btn, disabled: busy, onClick: () => openComboPreview(combo, true) }, say('comboRunStack', '叠加到当前')),
-                          h('button', { key: 'apply', type: 'button', style: css.primaryBtn, disabled: busy, onClick: () => runCombo(combo, false) }, say('comboRunApply', '应用组合')),
-                        ],
-                  ),
-                ),
-              )
-            })()
-          : null,
-
-        // 组合改名
-        comboRenaming
-          ? h(
-              'div',
-              { style: css.overlay },
-              h(
-                'div',
-                { style: { ...css.modal, ...css.modalSm } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('comboRename', '改名'))),
-                h('input', {
-                  style: css.field,
-                  maxLength: 40,
-                  value: comboRenaming.name,
-                  onChange: (event) => setComboRenaming({ id: comboRenaming.id, name: event.target.value }),
-                }),
-                h('div', { style: css.hint }, say('comboNameRule', '1–40 个字符；仅限中文、字母、数字、空格、下划线、连字符')),
-                h(
-                  'div',
-                  { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setComboRenaming(null) }, say('cancel', '取消')),
-                  h('button', {
-                    type: 'button',
-                    style: css.btn,
-                    disabled: busy || comboRenaming.name.trim() === '',
-                    onClick: () => {
-                      setBusy(true)
-                      comboRequest({ action: 'rename', id: comboRenaming.id, name: comboRenaming.name.trim() })
-                        .then(() => { setComboRenaming(null); load() })
-                        .catch(fail)
-                        .finally(() => setBusy(false))
-                    },
-                  }, say('save', '保存')),
-                ),
-              ),
-            )
-          : null,
-
-        // 声明冲突包（FR-005）：勾选与这个包互斥的其它包。
-        conflictPicking
-          ? h(
-              'div',
-              { style: css.overlay },
-              h(
-                'div',
-                { style: { ...css.modal, ...css.modalMd } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('packConflicts', '声明冲突包'))),
-                h('p', { style: css.hint }, say('conflictsHint', '勾选与这个包互斥的其它包；任一方声明即视为冲突，应用/启用前会阻断，可选择仍然应用')),
-                (data?.packs ?? []).filter((pack) => pack.id !== conflictPicking).length === 0
-                  ? h('p', { style: css.hint }, say('conflictsEmpty', '没有其它技能包可供声明'))
-                  : h(
-                      'div',
-                      { style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflow: 'auto', marginTop: 4 } },
-                      (data?.packs ?? [])
-                        .filter((pack) => pack.id !== conflictPicking)
-                        .map((pack) =>
-                          h(
-                            'label',
-                            { key: pack.id, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '4px 2px' } },
-                            h('input', {
-                              type: 'checkbox',
-                              checked: conflictDraft.includes(pack.id),
-                              onChange: () =>
-                                setConflictDraft((prev) => (prev.includes(pack.id) ? prev.filter((id) => id !== pack.id) : [...prev, pack.id])),
-                            }),
-                            h('span', null, pack.name),
-                            h('span', { style: { ...css.hint, marginLeft: 'auto' } }, `${pack.members?.length ?? 0}`),
-                          ),
-                        ),
-                    ),
-                h(
-                  'div',
-                  { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setConflictPicking(null) }, say('cancel', '取消')),
-                  h('button', { type: 'button', style: css.primaryBtn, disabled: busy, onClick: saveConflicts }, say('save', '保存')),
-                ),
-              ),
-            )
-          : null,
-
         // 导入配置弹窗：粘贴此前导出的 JSON；导入前后端自动备份旧配置。
         importingConfig
           ? h(
@@ -3251,7 +2833,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: { ...css.modal, ...css.modalMd } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('importConfig', '导入配置'))),
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('importConfig', '导入配置')),
+                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setImportingConfig(false) }, h(Icon, { name: 'close', size: 13 })),
+                ),
                 h('p', { style: css.hint }, say('importConfigHint2', '粘贴此前「导出配置」得到的 JSON。导入会覆盖当前的技能包与停用项；旧配置会先自动备份到插件状态目录。')),
                 h('textarea', {
                   style: css.textarea,
@@ -3270,7 +2857,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setImportingConfig(false) }, say('cancel', '取消')),
                   h(
                     'button',
                     {
@@ -3294,7 +2880,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: { ...css.modal, ...css.modalMd } },
-                h('div', { style: css.modalHead }, h('span', { style: css.modalTitle }, say('backupsTitle', '配置备份'))),
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('backupsTitle', '配置备份')),
+                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setBackupsOpen(false) }, h(Icon, { name: 'close', size: 13 })),
+                ),
                 h('p', { style: css.hint }, say('backupsHint', '导入配置或回滚时自动留下；最多保留 20 份，新的在前')),
                 backups
                   ? Array.isArray(backups)
@@ -3324,11 +2915,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         )
                     : h('p', { style: css.hint }, String(backups.error ?? ''))
                   : null,
-                h(
-                  'div',
-                  { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setBackupsOpen(false) }, say('close', '关闭')),
-                ),
               ),
             )
           : null,
@@ -3354,7 +2940,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setNoteViewing(null) }, say('close', '关闭')),
                   h('button', { type: 'button', style: css.primaryBtn, onClick: () => { const target = noteViewing; setNoteViewing(null); openNote(target) } }, say('noteEdit', '编辑备注')),
                 ),
               ),
@@ -3381,20 +2966,38 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   }, h(Icon, { name: 'close', size: 15 })),
                 ),
                 h('p', { style: css.hint }, say('noteHint', '备注只存在本地配置里，不会写进技能文件；导出配置时会一起带走。')),
-                h('textarea', {
-                  style: { ...css.textarea, minHeight: 96, fontFamily: 'inherit' },
-                  maxLength: 500,
-                  value: noteDraft,
-                  placeholder: say('notePlaceholder', '例如：做前端评审时先留着；下个项目再用'),
-                  onChange: (event) => setNoteDraft(event.target.value),
-                }),
-                h('div', { style: { ...css.hint, marginTop: 6 } }, `${noteDraft.length} / 500`),
                 h(
                   'div',
-                  { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.btn, onClick: () => setNoteEditing(null) }, say('cancel', '取消')),
-                  h('button', { type: 'button', style: css.primaryBtn, disabled: busy, onClick: saveNote }, say('save', '保存')),
+                  { style: css.noteEditWrap },
+                  h('textarea', {
+                    style: { ...css.textarea, width: '100%', boxSizing: 'border-box', minHeight: 96, paddingBottom: 34, fontFamily: 'inherit' },
+                    maxLength: 500,
+                    value: noteDraft,
+                    placeholder: say('notePlaceholder', '例如：做前端评审时先留着；下个项目再用'),
+                    onChange: (event) => setNoteDraft(event.target.value),
+                  }),
+                  h(
+                    'div',
+                    { style: css.noteEditActions },
+                    h('button', {
+                      type: 'button',
+                      style: css.noteActBtn,
+                      title: say('noteClear', '清除内容'),
+                      'aria-label': say('noteClear', '清除内容'),
+                      disabled: busy || noteDraft === '',
+                      onClick: () => setNoteDraft(''),
+                    }, h(Icon, { name: 'close', size: 14 })),
+                    h('button', {
+                      type: 'button',
+                      style: { ...css.noteActBtn, ...css.noteActSave },
+                      title: say('save', '保存'),
+                      'aria-label': say('save', '保存'),
+                      disabled: busy,
+                      onClick: saveNote,
+                    }, busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'check', size: 14 })),
+                  ),
                 ),
+                h('div', { style: { ...css.hint, marginTop: 6 } }, `${noteDraft.length} / 500`),
               ),
             )
           : null,
