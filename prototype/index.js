@@ -553,6 +553,9 @@ export function apply(ctx) {
     return installDirectory(ctx, body, source, basename(source).replace(/[\\/]+$/, ''))
   })
 
+  // 批量安装：扫描出多个技能后，客户端把勾选的子目录一次交回来。
+  post(ctx, '/zhiyin/install/batch', async (body) => installBatch(ctx, body))
+
   post(ctx, '/zhiyin/uninstall', async (body) => {
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
@@ -906,22 +909,83 @@ function safeJoin(base, rel) {
   return target
 }
 
+const repoCache = new Map()
+
+/** 同一仓库 10 分钟内复用一次 clone：多技能勾选安装不再反复拉取。 */
+function cloneRepo(source) {
+  const key = source.repoUrl + '#' + (source.branch || '')
+  const hit = repoCache.get(key)
+  if (hit && existsSync(hit.dir) && Date.now() - hit.at < 10 * 60 * 1000) {
+    hit.at = Date.now()
+    return { dir: hit.dir }
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'zhiyin-repo-'))
+  try {
+    const args = ['clone', '--depth', '1']
+    if (source.branch) args.push('--branch', source.branch)
+    args.push(source.repoUrl, dir)
+    execFileSync('git', args, { stdio: 'ignore', timeout: 120000 })
+  } catch {
+    rmSync(dir, { recursive: true, force: true })
+    return { error: '拉取仓库失败：检查地址、网络或私有仓库权限' }
+  }
+  for (const [oldKey, entry] of repoCache) {
+    if (Date.now() - entry.at > 10 * 60 * 1000) {
+      try { rmSync(entry.dir, { recursive: true, force: true }) } catch {}
+      repoCache.delete(oldKey)
+    }
+  }
+  repoCache.set(key, { dir, at: Date.now() })
+  return { dir }
+}
+
+/** 批量安装：一次 clone，多个子目录逐个装入，返回成功与失败清单。 */
+function installBatch(ctx, body) {
+  const text = cleanPath(String(body?.text ?? ''))
+  const source = resolveGithubSource(text)
+  if (!source) return { status: 400, body: { ok: false, error: '批量安装只接受 GitHub 仓库地址' } }
+  const subpaths = Array.isArray(body?.subpaths)
+    ? body.subpaths.filter((item) => typeof item === 'string' && item.trim()).slice(0, 50)
+    : []
+  if (subpaths.length === 0) return { status: 400, body: { ok: false, error: '没有选中要安装的技能' } }
+  const clone = cloneRepo(source)
+  if (clone.error) return { status: 400, body: { ok: false, error: clone.error } }
+  const installed = []
+  const failed = []
+  for (const rel of subpaths) {
+    const dir = safeJoin(clone.dir, rel)
+    if (!dir || !existsSync(join(dir, 'SKILL.md'))) {
+      failed.push({ subpath: rel, name: basename(rel) || source.repo, error: '这个目录里没有 SKILL.md' })
+      continue
+    }
+    const result = installDirectory(ctx, { ...body, name: '' }, dir, basename(rel) || source.repo)
+    if (result.status === 200) installed.push(result.body)
+    else failed.push({ subpath: rel, name: basename(rel) || source.repo, error: result.body?.error ?? '安装失败' })
+  }
+  const ok = installed.length > 0
+  return { status: ok ? 200 : 400, body: { ok, installed, failed } }
+}
+
 /** 复制一个含 SKILL.md 的目录到安装根；冲突与非法名都在这里拦。 */
 function installDirectory(ctx, body, source, fallbackName) {
   const fromFile = skillFrontmatterName(join(source, 'SKILL.md'))
   const wanted = (typeof body?.name === 'string' && body.name.trim()) || fromFile || fallbackName || basename(source)
   const name = String(wanted).trim()
-  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(name)) {
-    return { status: 400, body: { ok: false, error: '技能名不合法：' + name + '（用字母数字开头，可含 . _ -）' } }
+  if (name.length > 64 || !/^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/i.test(name)) {
+    return { status: 400, body: { ok: false, error: '技能名不合法：' + name + '（1–64 字符，字母数字开头结尾，可含 . _ -）' } }
   }
   const root = installRoot(ctx, body?.target)
   if (!root) return { status: 400, body: { ok: false, error: '目标目录不可用' } }
   const dest = join(root, name)
   if (existsSync(dest)) return { status: 409, body: { ok: false, error: '已存在同名技能：' + dest } }
+  // 先落到同目录临时名，再原子 rename：中途失败不会留下半个技能目录。
+  const tmpDest = dest + '.zhiyin-tmp-' + Date.now().toString(36)
   try {
     mkdirSync(root, { recursive: true })
-    cpSync(source, dest, { recursive: true, errorOnExist: true, force: false })
+    cpSync(source, tmpDest, { recursive: true, errorOnExist: true, force: false, filter: (entry) => !/(^|[\\/])(\.git|node_modules)([\\/]|$)/.test(entry) })
+    renameSync(tmpDest, dest)
   } catch (error) {
+    try { rmSync(tmpDest, { recursive: true, force: true }) } catch {}
     return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
   }
   note('skill-installed', { name, dest })
@@ -961,41 +1025,32 @@ async function installFromText(ctx, body) {
   if (!source) {
     return { status: 400, body: { ok: false, error: '看不懂这个来源：支持 owner/repo、GitHub 链接、npx skills add …、SKILL.md 直链或本地文件夹' } }
   }
-  const tmp = mkdtempSync(join(tmpdir(), 'zhiyin-repo-'))
-  try {
-    try {
-      const args = ['clone', '--depth', '1']
-      if (source.branch) args.push('--branch', source.branch)
-      args.push(source.repoUrl, tmp)
-      execFileSync('git', args, { stdio: 'ignore', timeout: 120000 })
-    } catch {
-      return { status: 400, body: { ok: false, error: '拉取仓库失败：检查地址、网络或私有仓库权限' } }
+  // 扫描与随后勾选安装共用同一份 clone，避免一个仓库拉两遍。
+  const clone = cloneRepo(source)
+  if (clone.error) return { status: 400, body: { ok: false, error: clone.error } }
+  const tmp = clone.dir
+  const wanted = typeof body?.subpath === 'string' ? body.subpath.trim() : source.subpath
+  const rels = []
+  if (wanted) {
+    const dir = safeJoin(tmp, wanted)
+    if (!dir || !existsSync(join(dir, 'SKILL.md'))) {
+      return { status: 400, body: { ok: false, error: '这个目录里没有 SKILL.md：' + wanted } }
     }
-    const wanted = typeof body?.subpath === 'string' ? body.subpath.trim() : source.subpath
-    const rels = []
-    if (wanted) {
-      const dir = safeJoin(tmp, wanted)
-      if (!dir || !existsSync(join(dir, 'SKILL.md'))) {
-        return { status: 400, body: { ok: false, error: '这个目录里没有 SKILL.md：' + wanted } }
-      }
-      rels.push(wanted)
-    } else {
-      rels.push(...findSkillDirs(tmp))
-      if (rels.length === 0 && existsSync(join(tmp, 'SKILL.md'))) rels.push('')
-    }
-    if (rels.length === 0) return { status: 400, body: { ok: false, error: '仓库里没有找到 SKILL.md' } }
-    if (rels.length > 1) {
-      const candidates = rels.slice(0, 30).map((rel) => ({
-        subpath: rel,
-        name: skillFrontmatterName(join(tmp, rel, 'SKILL.md')) || basename(rel) || source.repo,
-      }))
-      return { status: 409, body: { ok: false, error: 'multiple', repo: source.owner + '/' + source.repo, count: rels.length, candidates } }
-    }
-    const sourceDir = join(tmp, rels[0])
-    return installDirectory(ctx, body, sourceDir, basename(rels[0]) || source.repo)
-  } finally {
-    rmSync(tmp, { recursive: true, force: true })
+    rels.push(wanted)
+  } else {
+    rels.push(...findSkillDirs(tmp))
+    if (rels.length === 0 && existsSync(join(tmp, 'SKILL.md'))) rels.push('')
   }
+  if (rels.length === 0) return { status: 400, body: { ok: false, error: '仓库里没有找到 SKILL.md' } }
+  if (rels.length > 1) {
+    const candidates = rels.slice(0, 30).map((rel) => ({
+      subpath: rel,
+      name: skillFrontmatterName(join(tmp, rel, 'SKILL.md')) || basename(rel) || source.repo,
+    }))
+    return { status: 409, body: { ok: false, error: 'multiple', repo: source.owner + '/' + source.repo, count: rels.length, candidates } }
+  }
+  const sourceDir = join(tmp, rels[0])
+  return installDirectory(ctx, body, sourceDir, basename(rels[0]) || source.repo)
 }
 
 function post(ctx, path, run, limit = 65536) {
@@ -1214,17 +1269,15 @@ function hiddenReason(state, skillName, source) {
   // 常驻技能（FR-010）：不受包启停与组合约束。
   if (alwaysOn) return null
   const packs = memberPacks(state, skillName)
+  // 单技能开关是底线：包只决定「这一组能不能上场」，不会替成员强行打开。
+  if (state.disabled?.[skillName]) return 'manual'
   if (intent.mode === 'orchestrated') {
     // 接管后：未编配的技能不自动生效；编配了但组合没纳入的包也不生效。
     if (packs.length === 0) return 'unassigned'
     if (!packs.some((pack) => packActive(state, pack, intent))) return 'combo'
     return null
   }
-  if (packs.length > 0) {
-    if (!packs.some((pack) => pack.enabled !== false)) return 'pack'
-  } else if (state.disabled?.[skillName]) {
-    return 'manual'
-  }
+  if (packs.length > 0 && !packs.some((pack) => pack.enabled !== false)) return 'pack'
   return null
 }
 

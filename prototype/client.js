@@ -41,6 +41,7 @@ window.__ModuleLoader__.load({
         packNew: '+ 新建技能包',
         packMembers: '管理成员',
         packMembersTitle: '选择成员',
+        packSelectedCount: '已选 {n} / {m}',
         packEmpty: '还没有成员',
         packDeleteAsk: '删除技能包？包内技能不会被卸载。',
         packOn: '启用中',
@@ -65,7 +66,14 @@ window.__ModuleLoader__.load({
         installHint: '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能',
         installPath: 'owner/repo、https://github.com/owner/repo 或 D:\skills\my-skill',
         installName: '技能名（留空则用 SKILL.md 里的 name）',
-        installMultiple: '这个仓库里有多个技能，选一个安装：',
+        installMultiple: '这个仓库里有多个技能，勾选后一起安装：',
+        installSelected: '安装选中',
+        installSelectedCount: '已选 {n} / {m}',
+        installAll: '全选',
+        installNone: '全不选',
+        installProgress: '正在安装 {i}/{n}…',
+        installDone: '已安装 {n} 个技能',
+        installPartial: '部分安装失败：',
         installFailed: '安装失败：',
         installUser: '用户目录 ~/.dsh/skills',
         installProject: '项目 .dsh/skills',
@@ -94,6 +102,7 @@ window.__ModuleLoader__.load({
         reasonPack: '技能包停用',
         reasonAgents: 'agents 开关关闭',
         toggleHint: '点开关立即生效',
+        toggleBlocked: '上层开关已停用；先打开技能包或总开关',
         exportConfig: '导出配置',
         exportConfigHint: '导出一份可移植的 JSON 配置（技能包 / 停用项）',
         exportConfigFailed: '导出失败：',
@@ -195,6 +204,8 @@ window.__ModuleLoader__.load({
         alertPackConflict: '技能包冲突',
         note: '备注',
         noteEdit: '编辑备注',
+        noteView: '查看完整备注',
+        noteViewTitle: '技能备注',
         noteAdd: '加备注',
         noteHint: '备注只存在本地配置里，不会写进技能文件；导出配置时会一起带走。',
         notePlaceholder: '例如：做前端评审时先留着；下个项目再用',
@@ -278,6 +289,7 @@ window.__ModuleLoader__.load({
         packNew: 'New pack',
         packMembers: 'Members',
         packMembersTitle: 'Pick members',
+        packSelectedCount: '{n} of {m} selected',
         packEmpty: 'No members yet',
         packDeleteAsk: 'Delete this pack? Its skills stay installed.',
         packOn: 'on',
@@ -302,8 +314,14 @@ window.__ModuleLoader__.load({
         installHint: 'Paste a GitHub repo, skill folder, npx skills add command, raw SKILL.md link, or a local folder path; install only creates a new directory',
         installPath: 'owner/repo, https://github.com/owner/repo, or D:\skills\my-skill',
         installName: 'Skill name (blank = name from SKILL.md)',
-        installMultiple: 'This repo has several skills; pick one:',
-        installFailed: 'Install failed: ',
+        installMultiple: 'This repo has several skills; tick the ones to install:',
+        installSelected: 'Install selected',
+        installSelectedCount: '{n} of {m} selected',
+        installAll: 'All',
+        installNone: 'None',
+        installProgress: 'Installing {i}/{n}…',
+        installDone: 'Installed {n} skills',
+        installPartial: 'Some installs failed: ',
         installUser: 'User ~/.dsh/skills',
         installProject: 'Project .dsh/skills',
         uninstall: 'Uninstall',
@@ -331,6 +349,7 @@ window.__ModuleLoader__.load({
         reasonPack: 'pack disabled',
         reasonAgents: 'agents switch off',
         toggleHint: 'Takes effect immediately',
+        toggleBlocked: 'Blocked by a group switch: re-enable its pack or the master switch first',
         exportConfig: 'Export config',
         exportConfigHint: 'Download a portable JSON snapshot (packs / disabled items)',
         exportConfigFailed: 'Export failed: ',
@@ -432,6 +451,8 @@ window.__ModuleLoader__.load({
         alertPackConflict: 'Pack conflict',
         note: 'Note',
         noteEdit: 'Edit note',
+        noteView: 'View full note',
+        noteViewTitle: 'Skill note',
         noteAdd: 'Add note',
         noteHint: 'Notes live in the local config only, never in skill files, and travel with config export.',
         notePlaceholder: 'e.g. keep for frontend reviews; revisit next project',
@@ -1139,7 +1160,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
     function Toggle({ checked, disabled, title, onChange }) {
       return h(
         'label',
-        { style: { flex: '0 0 auto', cursor: 'pointer', display: 'inline-flex' }, title: title ?? undefined },
+        { style: { flex: '0 0 auto', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1, display: 'inline-flex' }, title: title ?? undefined },
         h(
           'span',
           { style: { ...css.track, ...(checked ? css.trackOn : null) } },
@@ -1178,6 +1199,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [installTarget, setInstallTarget] = React.useState('user')
       const [installError, setInstallError] = React.useState('')
       const [installCandidates, setInstallCandidates] = React.useState([])
+      const [installSelected, setInstallSelected] = React.useState([])
+      const [installProgress, setInstallProgress] = React.useState('')
       const [importingConfig, setImportingConfig] = React.useState(false)
       const [importConfigText, setImportConfigText] = React.useState('')
       const [importResult, setImportResult] = React.useState(null)
@@ -1201,6 +1224,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [comboRenaming, setComboRenaming] = React.useState(null)    // 组合改名：{ id, name }
       const [noteEditing, setNoteEditing] = React.useState(null)       // 正在编辑备注的技能名；null 表示关闭
       const [noteDraft, setNoteDraft] = React.useState('')
+      const [noteViewing, setNoteViewing] = React.useState(null)     // 查看完整备注的技能；null 表示关闭
       const [backups, setBackups] = React.useState(null)               // 配置备份列表
       const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
       const [conflictPicking, setConflictPicking] = React.useState(null)      // 声明冲突包弹窗：包 id
@@ -1256,7 +1280,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         [load],
       )
 
-      // 安装：一个输入框收链接或本地路径；返回多个技能时列出来让用户选。
+      // 安装：一个输入框收链接或本地路径；返回多个技能时列出来，勾选后一次装完。
+      const clearInstall = () => {
+        setInstallCandidates([])
+        setInstallSelected([])
+        setInstallProgress('')
+        setInstallError('')
+        setInstalling(false)
+        setInstallPath('')
+        setInstallName('')
+      }
+
       const runInstall = (subpath) => {
         const text = installPath.trim()
         if (!text) return
@@ -1275,18 +1309,50 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .then((response) => response.json())
           .then((result) => {
             if (result?.ok === true) {
-              setInstallCandidates([])
-              setInstalling(false)
-              setInstallPath('')
-              setInstallName('')
+              clearInstall()
               load()
               return
             }
             if (result?.error === 'multiple') {
-              setInstallCandidates(result.candidates ?? [])
+              const candidates = result.candidates ?? []
+              setInstallCandidates(candidates)
+              setInstallSelected(candidates.map((candidate) => candidate.subpath))
               return
             }
             setInstallError(result?.error ?? '安装失败')
+          })
+          .catch((error) => setInstallError(String(error?.message ?? error)))
+          .finally(() => setBusy(false))
+      }
+
+      // 多技能：一次 clone 后端批量装入，勾选顺序即安装顺序。
+      const runInstallSelected = () => {
+        const text = installPath.trim()
+        if (!text || installSelected.length === 0) return
+        setBusy(true)
+        setInstallError('')
+        setInstallProgress(say('installProgress', '正在安装 {i}/{n}…').replace('{i}', '1').replace('{n}', String(installSelected.length)))
+        fetch('/zhiyin/install/batch', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text, subpaths: installSelected, target: installTarget }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            const done = result?.installed?.length ?? 0
+            const failed = result?.failed ?? []
+            load()
+            if (failed.length === 0) {
+              clearInstall()
+              return
+            }
+            const detail = failed.map((item) => `${item.subpath || '(root)'}：${item.error}`).join('；')
+            setInstallProgress(`${say('installDone', '已安装 {n} 个技能').replace('{n}', String(done))}`)
+            setInstallError(`${say('installPartial', '部分安装失败：')}${detail}`)
+            setInstallCandidates((previous) =>
+              previous.filter((candidate) => failed.some((item) => item.subpath === candidate.subpath)),
+            )
+            setInstallSelected(failed.map((item) => item.subpath).filter(Boolean))
           })
           .catch((error) => setInstallError(String(error?.message ?? error)))
           .finally(() => setBusy(false))
@@ -2049,6 +2115,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         setInstallTarget('user')
                         setInstallError('')
                         setInstallCandidates([])
+                        setInstallSelected([])
+                        setInstallProgress('')
                         setInstalling(true)
                       },
                     },
@@ -2296,7 +2364,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       ),
                       h('div', { style: css.cardDesc }, skill.description ?? ''),
                       skill.note
-                        ? h('div', { style: css.cardNote, title: skill.note }, skill.note)
+                        ? h('div', { style: { ...css.cardNote, cursor: 'pointer' }, title: say('noteView', '查看完整备注'), onClick: () => setNoteViewing(skill) }, skill.note)
                         : null,
                       h(
                         'div',
@@ -2340,8 +2408,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           : null,
                         h(Toggle, {
                           checked: on,
-                          disabled: busy,
-                          title: skill.hiddenReason ? reasonLabel(skill.hiddenReason) : say('toggleHint', '点开关立即生效'),
+                          disabled: busy || skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off',
+                          title: skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off' ? say('toggleBlocked', '上层开关已停用；先打开技能包或总开关') : skill.hiddenReason ? reasonLabel(skill.hiddenReason) : say('toggleHint', '点开关立即生效'),
                           onChange: () => write('/zhiyin/skill', {
                             name: skill.name,
                             enabled: !on,
@@ -2462,7 +2530,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           ? h('div', { style: css.desc }, skill.description)
                           : null,
                         skill.note
-                          ? h('div', { style: css.noteLine, title: skill.note }, skill.note)
+                          ? h('div', { style: { ...css.noteLine, cursor: 'pointer' }, title: say('noteView', '查看完整备注'), onClick: () => setNoteViewing(skill) }, skill.note)
                           : null,
                       ),
 
@@ -2477,10 +2545,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
                       h(Toggle, {
                         checked: skill.enabled !== false,
-                        disabled: busy,
-                        title: skill.hiddenReason
-                          ? reasonLabel(skill.hiddenReason)
-                          : say('toggleHint', '点开关立即生效'),
+                        disabled: busy || skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off',
+                        title: skill.hiddenReason === 'pack' || skill.hiddenReason === 'all-off'
+                          ? say('toggleBlocked', '上层开关已停用；先打开技能包或总开关')
+                          : skill.hiddenReason
+                            ? reasonLabel(skill.hiddenReason)
+                            : say('toggleHint', '点开关立即生效'),
                         onChange: () =>
                           write('/zhiyin/skill', {
                             name: skill.name,
@@ -2499,9 +2569,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               const pack = (data.packs ?? []).find((candidate) => candidate.id === editing)
               if (!pack) return null
               const needle = memberQuery.trim().toLowerCase()
-              const pool = scoped.filter(
-                (skill) => needle === '' || skill.name.toLowerCase().includes(needle),
-              )
+              const match = (name) => needle === '' || String(name).toLowerCase().includes(needle)
+              // 搜索只过滤显示，不动已选：包内被 .agents 挡住的成员也要能看见并取消。
+              const keptHidden = draftMembers.filter((name) => !scopedNames.has(name))
+              const rows = [
+                ...scoped.filter((skill) => match(skill.name)).map((skill) => ({ name: skill.name, source: sourceLabel(skill) + (skill.hiddenReason === 'manual' ? ' · ' + say('disabledBadge', '已停用') : ''), ghost: false })),
+                ...keptHidden.filter((name) => match(name)).map((name) => ({
+                  name,
+                  source: observedNames.has(name) ? say('packHiddenAgents', '被 .agents 开关挡住') : say('packGhost', '未安装'),
+                  ghost: true,
+                })),
+              ]
+              const poolSize = scoped.length + keptHidden.length
               return h(
                 'div',
                 { style: css.overlay },
@@ -2520,33 +2599,33 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     placeholder: say('search', '按名称搜索'),
                     onChange: (event) => setMemberQuery(event.target.value),
                   }),
+                  h('div', { style: { ...css.hint, marginTop: 6 } }, say('packSelectedCount', '已选 {n} / {m}').replace('{n}', String(draftMembers.length)).replace('{m}', String(poolSize))),
                   h(
                     'div',
                     { style: css.modalBody },
-                    pool.map((skill) =>
+                    rows.map((row) =>
                       h(
                         'label',
-                        { key: skill.name, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0' } },
+                        { key: row.name, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0', opacity: row.ghost ? 0.72 : 1 } },
                         h('input', {
                           type: 'checkbox',
-                          style: css.switch,
-                          checked: draftMembers.includes(skill.name),
+                          checked: draftMembers.includes(row.name),
                           onChange: () =>
                             setDraftMembers((previous) =>
-                              previous.includes(skill.name)
-                                ? previous.filter((name) => name !== skill.name)
-                                : [...previous, skill.name],
+                              previous.includes(row.name)
+                                ? previous.filter((name) => name !== row.name)
+                                : [...previous, row.name],
                             ),
                         }),
-                        h('span', { style: css.name }, skill.name),
-                        h('span', { style: { ...css.hint, marginLeft: 'auto' } }, sourceLabel(skill)),
+                        h('span', { style: css.name }, row.name),
+                        h('span', { style: { ...css.hint, marginLeft: 'auto' } }, row.source),
                       ),
                     ),
                   ),
                   h(
                     'div',
                     { style: css.modalFoot },
-                    h('button', { type: 'button', style: css.btn, onClick: () => setDraftMembers(pool.map((skill) => skill.name)) }, say('selectAll', '全选')),
+                    h('button', { type: 'button', style: css.btn, onClick: () => setDraftMembers(Array.from(new Set([...scoped.filter((skill) => skill.hiddenReason !== 'manual').map((skill) => skill.name), ...keptHidden]))) }, say('selectAll', '全选')),
                     h('button', { type: 'button', style: css.btn, onClick: () => setDraftMembers([]) }, say('selectNone', '全不选')),
                     h(
                       'button',
@@ -2555,7 +2634,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         style: css.btn,
                         disabled: busy,
                         onClick: () => {
-                          write('/zhiyin/pack', { action: 'members', id: editing, members: draftMembers })
+                          write('/zhiyin/pack', { action: 'members', id: editing, members: Array.from(new Set(draftMembers)) })
                           setEditing(null)
                         },
                       },
@@ -2593,7 +2672,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       style: css.btn,
                       disabled: busy || draftName.trim() === '',
                       onClick: () => {
-                        write('/zhiyin/pack', { action: 'create', name: draftName.trim() })
+                        // AI Vault：新包默认把当前技能全选进来，先建组再排除比逐个勾更快。
+                        write('/zhiyin/pack', { action: 'create', name: draftName.trim() }).then((result) => {
+                          if (result?.id) {
+                            setDraftMembers(scoped.filter((skill) => skill.hiddenReason !== 'manual').map((skill) => skill.name))
+                            setMemberQuery('')
+                            setEditing(result.id)
+                          }
+                        })
                         setCreating(false)
                       },
                     },
@@ -2687,25 +2773,34 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   ? h(
                       'div',
                       { style: { marginTop: 10 } },
-                      h('div', { style: css.hint }, say('installMultiple', '这个仓库里有多个技能，选一个安装：')),
+                      h('div', { style: css.hint }, say('installMultiple', '这个仓库里有多个技能，勾选后一起安装：')),
+                      h('div', { style: { ...css.hint, marginTop: 2 } }, say('installSelectedCount', '已选 {n} / {m}').replace('{n}', String(installSelected.length)).replace('{m}', String(installCandidates.length))),
                       h(
                         'div',
-                        { style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 } },
+                        { style: { ...css.previewList, marginTop: 6 } },
                         installCandidates.map((candidate) =>
                           h(
-                            'button',
-                            {
-                              key: candidate.subpath,
-                              type: 'button',
-                              style: { ...css.btn, justifyContent: 'flex-start' },
-                              disabled: busy,
-                              onClick: () => runInstall(candidate.subpath),
-                            },
-                            candidate.name + (candidate.subpath ? ' · ' + candidate.subpath : ''),
+                            'label',
+                            { key: candidate.subpath, style: css.cbRow },
+                            h('input', {
+                              type: 'checkbox',
+                              checked: installSelected.includes(candidate.subpath),
+                              onChange: () =>
+                                setInstallSelected((previous) =>
+                                  previous.includes(candidate.subpath)
+                                    ? previous.filter((item) => item !== candidate.subpath)
+                                    : [...previous, candidate.subpath],
+                                ),
+                            }),
+                            h('span', { style: css.name }, candidate.name),
+                            h('span', { style: { ...css.hint, marginLeft: 'auto' } }, candidate.subpath || '(root)'),
                           ),
                         ),
                       ),
                     )
+                  : null,
+                installProgress
+                  ? h('p', { style: css.hint }, installProgress)
                   : null,
                 installError
                   ? h('p', { style: { ...css.hint, color: '#d05a4a' } }, say('installFailed', '安装失败：') + installError)
@@ -2714,16 +2809,33 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   'div',
                   { style: css.modalFoot },
                   h('button', { type: 'button', style: css.btn, onClick: () => setInstalling(false) }, say('cancel', '取消')),
-                  h(
-                    'button',
-                    {
-                      type: 'button',
-                      style: css.btn,
-                      disabled: busy || installPath.trim() === '',
-                      onClick: () => runInstall(),
-                    },
-                    say('install', '安装技能'),
-                  ),
+                  installCandidates.length > 0
+                    ? h(
+                        'div',
+                        { style: { display: 'flex', gap: 8, marginLeft: 'auto' } },
+                        h('button', { type: 'button', style: css.btn, onClick: () => setInstallSelected(installCandidates.map((candidate) => candidate.subpath)) }, say('installAll', '全选')),
+                        h('button', { type: 'button', style: css.btn, onClick: () => setInstallSelected([]) }, say('installNone', '全不选')),
+                        h(
+                          'button',
+                          {
+                            type: 'button',
+                            style: css.primaryBtn,
+                            disabled: busy || installSelected.length === 0,
+                            onClick: runInstallSelected,
+                          },
+                          `${say('installSelected', '安装选中')} (${installSelected.length})`,
+                        ),
+                      )
+                    : h(
+                        'button',
+                        {
+                          type: 'button',
+                          style: css.primaryBtn,
+                          disabled: busy || installPath.trim() === '',
+                          onClick: () => runInstall(),
+                        },
+                        say('install', '安装技能'),
+                      ),
                 ),
               ),
             )
@@ -3102,6 +3214,34 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   'div',
                   { style: css.modalFoot },
                   h('button', { type: 'button', style: css.btn, onClick: () => setBackupsOpen(false) }, say('close', '关闭')),
+                ),
+              ),
+            )
+          : null,
+
+        noteViewing
+          ? h(
+              'div',
+              { style: css.overlay, onClick: () => setNoteViewing(null) },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalMd }, onClick: (event) => event.stopPropagation() },
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('div', { style: css.modalTitle }, `${say('noteViewTitle', '技能备注')} · ${noteViewing.name}`),
+                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setNoteViewing(null) }, h(Icon, { name: 'close', size: 15 })),
+                ),
+                h(
+                  'div',
+                  { style: { ...css.previewList, maxHeight: '60vh', whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.65 } },
+                  noteViewing.note,
+                ),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.btn, onClick: () => setNoteViewing(null) }, say('close', '关闭')),
+                  h('button', { type: 'button', style: css.primaryBtn, onClick: () => { const target = noteViewing; setNoteViewing(null); openNote(target) } }, say('noteEdit', '编辑备注')),
                 ),
               ),
             )
