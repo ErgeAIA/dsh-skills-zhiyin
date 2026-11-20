@@ -609,7 +609,7 @@ export function apply(ctx) {
 
   post(ctx, '/zhiyin/links', async (body) => {
     const state = readState()
-    const result = body?.apply === true ? applyLinks(state) : linkPlan(state)
+    const result = body?.apply === true ? applyLinks(state, { pruneLegacy: body?.pruneLegacy === true }) : linkPlan(state)
     if (body?.apply === true) saveState(state)
     invalidateAll()
     return { status: 200, body: { ok: true, ...result } }
@@ -927,11 +927,16 @@ function linkPlan(state) {
   const add = [...desired].filter((name) => !current.has(name) && ssotDir(name)).sort()
   const remove = [...current].filter((name) => managed.has(name) && !desired.has(name)).sort()
   const missing = [...desired].filter((name) => !current.has(name) && !ssotDir(name)).sort()
-  return { root, current: [...current].sort(), desired: [...desired].sort(), managed: [...managed].sort(), add, remove, missing }
+  // legacy：既不在任何包里、也不是织音创建的旧链接。默认不碰，pruneLegacy 时才收口。
+  const legacy = [...current].filter((name) => !managed.has(name)).sort()
+  return { root, current: [...current].sort(), desired: [...desired].sort(), managed: [...managed].sort(), add, remove, missing, legacy }
 }
 
-/** 执行链接计划：软链接到 SSOT；只清自己管理且已不在启用包里的那些。 */
-function applyLinks(state) {
+/**
+ * 执行链接计划：软链接到 SSOT；只清自己管理且已不在启用包里的那些。
+ * pruneLegacy=true 时额外清掉「不在任何包、也不是织音创建」的旧链接（一次性收口）。
+ */
+function applyLinks(state, options = {}) {
   const plan = linkPlan(state)
   const owned = new Set(Array.isArray(state.linked) ? state.linked : [])
   const errors = []
@@ -963,11 +968,22 @@ function applyLinks(state) {
       errors.push(name + ': ' + String(error?.message ?? error))
     }
   }
-  state.linked = [...owned].sort()
-  if (plan.add.length || plan.remove.length) {
-    note('links-applied', { add: plan.add.length, remove: plan.remove.length, errors: errors.length })
+  let pruned = 0
+  if (options.pruneLegacy === true) {
+    for (const name of plan.legacy) {
+      try {
+        unlinkSync(join(plan.root, name))
+        pruned += 1
+      } catch (error) {
+        errors.push(name + ': ' + String(error?.message ?? error))
+      }
+    }
   }
-  return { ...plan, errors }
+  state.linked = [...owned].sort()
+  if (plan.add.length || plan.remove.length || pruned) {
+    note('links-applied', { add: plan.add.length, remove: plan.remove.length, pruned, errors: errors.length })
+  }
+  return { ...plan, pruned, errors }
 }
 
 /** 从 SKILL.md 的 frontmatter 取 name；取不到返回空串。 */
