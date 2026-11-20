@@ -1437,6 +1437,25 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         load()
       }, [load])
 
+      // FR-017 观测刷新：从别的窗口/工具（如 AI Vault）装完或删掉技能后，
+      // 切回本页或页面重新可见时自动重取，不必手动点刷新。3 秒节流，避免反复切换窗口时反复拉取。
+      React.useEffect(() => {
+        let last = 0
+        const refresh = () => {
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+          const now = Date.now()
+          if (now - last < 3000) return
+          last = now
+          load()
+        }
+        window.addEventListener('focus', refresh)
+        document.addEventListener('visibilitychange', refresh)
+        return () => {
+          window.removeEventListener('focus', refresh)
+          document.removeEventListener('visibilitychange', refresh)
+        }
+      }, [load])
+
       // 点空白处收起技能包 … 菜单
       React.useEffect(() => {
         if (!menuOpen && !comboMenu) return undefined
