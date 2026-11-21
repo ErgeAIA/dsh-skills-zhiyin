@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（去重徽标 + 导入包互斥走 fix/badge-and-import-exclusive → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮瀑布流卡片：c44c3d6 → 1bb7b38
+- **当前分支**：main（安装按钮文案 + 统计口径走 fix/install-label-and-count → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮徽标+互斥：26bf60a → 8b9a32c
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:5x 去掉重复「已安装」徽标 + 修复导入技能包与「全部技能」同时启用
+- **最后更新**：2026-11-22 00:2x 市场安装按钮收窄 + 修复技能总数随 .agents 开关抖动
+  - 安装按钮：「安装技能」在窄卡片里换行，改为「图标 + 安装」（安装中显示「安装中…」），并加 whiteSpace: nowrap 禁止折行。
+  - 统计口径（BUG-009）：磁盘实测 ~/.dsh/skills 有 96 个目录，其中 92 个是指向 ~/.agents/skills 的软链；两处同名技能在合并时只算一次。但 shadowCandidates 直接遍历 state.known（只增不减的观测历史，实测 179 条）生成影子候选，把已从磁盘删除的陈旧条目也当成技能，导致「全部技能」开关前后总数差 1（111 vs 112）。
+  - 修复：新增模块级 observedNames（collectState 每轮写入），shadowCandidates 跳过本轮已观测到的名字，陈旧条目不参与统计。
+  - 另加来源行说明：当用户目录技能与 .agents 同名（软链）时，提示「其中 N 个用户目录技能是 .agents 的软链，同名只算一次」，解释开关前后数字为何几乎不变。
+  - node --check 双半边 exit 0；影子过滤实测：known 有 3 条、观测为空时只产出未被来源规则挡住的条目。
+  - 待验收：重启后市场「安装」按钮单行显示；开关「加载 ~/.agents/skills」时技能总数不再出现 ±1 的跳变；来源行出现软链说明。
+
+- 上一轮：2026-11-22 00:5x 去掉重复「已安装」徽标 + 修复导入技能包与「全部技能」同时启用
   - 重复徽标：市场卡片右上角原本也渲染「已安装」，与底部操作区重复。现右上角只保留「托管」这类需警示状态，「已安装」只出现在底部操作区（含重装按钮）。
   - 互斥漏洞：POST /zhiyin/pack action=import 新建包后直接 enabled: true，漏了关闭「全部技能」这一步（action=create 有），导致导入后两个包同时亮着、与互斥规则冲突。已在 import 分支补 importAllPack.enabled = false，与新建行为一致。
   - 静态校验：import 与 create 两个分支均包含关闭全部技能；enabled: true 仅出现在这两个入口与默认状态初始化。
