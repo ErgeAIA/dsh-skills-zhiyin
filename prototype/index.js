@@ -22,8 +22,6 @@ import { stateDir } from './paths.js'
 export const name = 'zhiyin-host'
 export const inject = ['webServer', 'skills', 'agents', 'workingDirectory']
 
-/** 目录字符预算（PRD §6.8 默认值）。 */
-const BUDGET_CHARS = 8000
 const DESCRIPTION_MAX_LENGTH = 500
 // 托管来源：必须挂在启用的技能包上才生效；内置/自定义来源不受包约束。
 const PACK_GATED_SOURCES = new Set(['user-dsh', 'user-agents'])
@@ -225,7 +223,6 @@ async function previewIntent(ctx, state, packIds, stack) {
     hide: [...before].filter((name) => !after.has(name)).sort(),
     unassigned: skills.filter((skill) => hiddenReason(draft, skill.name, skill.source) === 'unassigned').length,
     catalogChars,
-    budgetChars: BUDGET_CHARS,
   }
 }
 
@@ -2212,7 +2209,7 @@ async function collectState(ctx) {
     scopeDebug,
     failures,
     conflicts,
-    budgetChars: BUDGET_CHARS,
+
     descriptionMaxLength: DESCRIPTION_MAX_LENGTH,
     catalogChars,
     skills,
