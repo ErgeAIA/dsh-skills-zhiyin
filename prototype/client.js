@@ -2610,6 +2610,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         { style: css.cardHead },
                         h('span', { style: css.cardName }, skill.name),
                         h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, sourceShort(skill)),
+                        skill.linkTarget
+                          ? h('span', {
+                              style: { ...css.metaText, flex: '0 0 auto', cursor: 'pointer' },
+                              title: `${say('linkBadgeTitle', '符号链接，实体在')}${skill.linkTarget}`,
+                              onClick: () => revealSkill(skill),
+                            }, say('linkBadge', '软链'))
+                          : null,
                         skill.readOnly
                           ? h('span', { style: { ...css.metaText, flex: '0 0 auto' }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
                           : null,
@@ -2765,10 +2772,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           ? h(
                               'span',
                               {
-                                style: { ...css.metaText, opacity: 0.32 },
+                                style: { ...css.metaText, opacity: 0.7, cursor: 'pointer' },
                                 title: `${say('linkBadgeTitle', '符号链接，实体在')}${skill.linkTarget}`,
+                                onClick: () => revealSkill(skill),
                               },
-                              '⛓',
+                              say('linkBadge', '软链'),
                             )
                           : null,
                         skill.refCount > 1
