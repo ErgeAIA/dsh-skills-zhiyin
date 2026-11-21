@@ -608,19 +608,27 @@ export function apply(ctx) {
   post(ctx, '/zhiyin/uninstall', async (body) => {
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
-    const roots = [installRoot(ctx, 'agents'), installRoot(ctx, 'user'), installRoot(ctx, 'project')].filter(Boolean)
+    // 记下来源目录，恢复时默认回原处。
+    const roots = [
+      { target: 'agents', root: installRoot(ctx, 'agents') },
+      { target: 'user', root: installRoot(ctx, 'user') },
+      { target: 'project', root: installRoot(ctx, 'project') },
+    ].filter((entry) => Boolean(entry.root))
     let from = null
-    for (const root of roots) {
-      const candidate = join(root, name)
+    let originTarget = ''
+    for (const entry of roots) {
+      const candidate = join(entry.root, name)
       if (existsSync(candidate)) {
         from = candidate
+        originTarget = entry.target
         break
       }
     }
     if (!from) return { status: 404, body: { ok: false, error: '该技能不在织音管理的技能目录里（只读来源），无法卸载' } }
     const archiveRoot = join(stateDir(), 'archive')
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const to = join(archiveRoot, stamp + '-' + name)
+    const key = stamp + '-' + name
+    const to = join(archiveRoot, key)
     try {
       mkdirSync(archiveRoot, { recursive: true })
       renameSync(from, to)
@@ -634,7 +642,8 @@ export function apply(ctx) {
     } catch {
       /* 没有链接就跳过 */
     }
-    note('skill-archived', { name, from, to })
+    rememberArchiveOrigin(key, originTarget, from)
+    note('skill-archived', { name, from, to, origin: originTarget })
     invalidateAll()
     return { status: 200, body: { ok: true, name, to } }
   })
@@ -932,6 +941,43 @@ function archiveRootPath() {
   return join(stateDir(), 'archive')
 }
 
+/** 归档来源记录：archive/origins.json —— { [key]: { target, from, archivedAt } }，供恢复时默认回原目录。 */
+function archiveOriginFile() {
+  return join(archiveRootPath(), 'origins.json')
+}
+
+function readArchiveOrigins() {
+  try {
+    const parsed = JSON.parse(readFileSync(archiveOriginFile(), 'utf8'))
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeArchiveOrigins(map) {
+  try {
+    mkdirSync(archiveRootPath(), { recursive: true })
+    writeFileSync(archiveOriginFile(), JSON.stringify(map, null, 2))
+  } catch {
+    /* 记录失败不影响归档本身 */
+  }
+}
+
+function rememberArchiveOrigin(key, target, from) {
+  if (!key || !target) return
+  const map = readArchiveOrigins()
+  map[key] = { target, from, archivedAt: new Date().toISOString() }
+  writeArchiveOrigins(map)
+}
+
+function forgetArchiveOrigin(key) {
+  const map = readArchiveOrigins()
+  if (!Object.prototype.hasOwnProperty.call(map, key)) return
+  delete map[key]
+  writeArchiveOrigins(map)
+}
+
 /** 归档目录名 = ISO 时间戳（冒号/点换成 -）+ '-' + 技能名；技能名本身可能带 -，所以只剥前缀。 */
 function parseArchiveKey(key) {
   const match = String(key).match(/^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(.*)$/)
@@ -946,6 +992,7 @@ function parseArchiveKey(key) {
 
 function listArchive() {
   const root = archiveRootPath()
+  const origins = readArchiveOrigins()
   const entries = []
   if (existsSync(root)) {
     for (const key of readdirSync(root)) {
@@ -959,7 +1006,15 @@ function listArchive() {
       if (!stat.isDirectory()) continue
       const parsed = parseArchiveKey(key)
       const front = skillFrontmatterName(join(full, 'SKILL.md'))
-      entries.push({ key, name: front || parsed.dirName, dirName: parsed.dirName, archivedAt: parsed.archivedAt, path: full })
+      const origin = origins[key]
+      entries.push({
+        key,
+        name: front || parsed.dirName,
+        dirName: parsed.dirName,
+        archivedAt: parsed.archivedAt,
+        path: full,
+        origin: origin && typeof origin.target === 'string' ? origin.target : '',
+      })
     }
   }
   // 时间戳前缀按字典序即时间序，新的在前。
@@ -973,7 +1028,15 @@ function restoreArchive(ctx, body) {
   const parsed = parseArchiveKey(key)
   const src = join(archiveRootPath(), key)
   if (!existsSync(src)) return { status: 404, body: { ok: false, error: '归档里没有这个技能' } }
-  const target = body?.target === 'user' || body?.target === 'project' ? body.target : 'agents'
+  const requested = typeof body?.target === 'string' ? body.target : 'origin'
+  const origin = readArchiveOrigins()[key]
+  const originTarget = origin && typeof origin.target === 'string' ? origin.target : ''
+  const target =
+    requested === 'agents' || requested === 'user' || requested === 'project'
+      ? requested
+      : originTarget === 'user' || originTarget === 'project' || originTarget === 'agents'
+        ? originTarget
+        : 'agents'
   const destRoot = installRoot(ctx, target)
   if (!destRoot) return { status: 400, body: { ok: false, error: '目标目录不可用' } }
   const name = String(skillFrontmatterName(join(src, 'SKILL.md')) || parsed.dirName || '').trim()
@@ -1003,6 +1066,7 @@ function restoreArchive(ctx, body) {
       note('skill-link-failed', { name, error: String(error?.message ?? error) })
     }
   }
+  forgetArchiveOrigin(key)
   note('skill-restored', { name, key, dest, target })
   invalidateAll()
   return { status: 200, body: { ok: true, name, dest, target } }
@@ -1896,7 +1960,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins }
 
 function invalidateAll() {
   for (const entry of registrations) {

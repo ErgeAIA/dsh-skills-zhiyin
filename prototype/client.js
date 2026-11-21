@@ -1346,7 +1346,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [archiveEntries, setArchiveEntries] = React.useState([])
       const [archiveLoading, setArchiveLoading] = React.useState(false)
       const [archiveError, setArchiveError] = React.useState('')
-      const [archiveTarget, setArchiveTarget] = React.useState('agents')
+      const [archiveTarget, setArchiveTarget] = React.useState('origin')
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1759,6 +1759,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         if (skill.source === 'bundled') return say('sourceBundled', '内置')
         if (skill.source === 'custom') return say('sourceCustom', '自定义目录')
         return skill.source
+      }
+      const originLabel = (target) => {
+        if (target === 'agents') return say('originAgents', '技能库 ~/.agents/skills')
+        if (target === 'user') return say('originUser', '用户目录 ~/.dsh/skills')
+        if (target === 'project') return say('originProject', '项目 .dsh/skills')
+        return say('originUnknown', '未知')
       }
       const sourceShort = (skill) => {
         if (skill.source === 'bundled') return say('sourceBundled', '内置')
@@ -2525,6 +2531,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       value: archiveTarget,
                       onChange: (event) => setArchiveTarget(event.target.value),
                     },
+                    h('option', { value: 'origin', style: css.optionStyle }, say('restoreOrigin', '原目录（推荐）')),
                     h('option', { value: 'agents', style: css.optionStyle }, say('installAgents', '技能库 ~/.agents/skills')),
                     h('option', { value: 'user', style: css.optionStyle }, say('installUser', '用户目录 ~/.dsh/skills')),
                     h('option', { value: 'project', style: css.optionStyle }, say('installProject', '项目 .dsh/skills')),
@@ -2566,6 +2573,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                             entry.archivedAt
                               ? h('span', { style: { ...css.hint, flex: '0 0 auto' } }, say('archivedAt', '归档于') + ' ' + entry.archivedAt)
                               : null,
+                            h('span', { style: { ...css.hint, flex: '0 0 auto' } }, say('originAt', '原位置：') + originLabel(entry.origin)),
                           ),
                         ),
                         h(
