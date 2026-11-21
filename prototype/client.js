@@ -1153,6 +1153,17 @@ window.__ModuleLoader__.load({
     ['path', 'M16 20V4'],
     ['path', 'm13 17 3 3 3-3'],
   ],
+  packagePlus: [
+    ['path', 'M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14'],
+    ['path', 'M3.29 7 12 12l8.71-5'],
+    ['path', 'M12 22V12'],
+    ['path', 'M16 16h6'],
+    ['path', 'M19 13v6'],
+  ],
+  search: [
+    ['circle', { cx: 11, cy: 11, r: 7 }],
+    ['path', 'm21 21-4.3-4.3'],
+  ],
 }
 
 function Icon({ name, size = 15 }) {
@@ -1175,6 +1186,13 @@ function Icon({ name, size = 15 }) {
       tag === 'circle' ? h('circle', { key: index, ...spec }) : h('path', { key: index, d: spec }),
     ),
   )
+}
+
+function formatInstalls(value) {
+  const n = Number(value) || 0
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k'
+  return String(n)
 }
 
 function Spinner({ size = 15 }) {
@@ -1285,6 +1303,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [noteViewing, setNoteViewing] = React.useState(null)     // 查看完整备注的技能；null 表示关闭
       const [backups, setBackups] = React.useState(null)               // 配置备份列表
       const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
+      // 技能市场（skills.sh）：热门默认、关键词搜索、一键安装到 SSOT。
+      const [marketQuery, setMarketQuery] = React.useState('')
+      const [marketItems, setMarketItems] = React.useState([])
+      const [marketTrending, setMarketTrending] = React.useState(true)
+      const [marketLoading, setMarketLoading] = React.useState(false)
+      const [marketError, setMarketError] = React.useState('')
+      const [marketBusy, setMarketBusy] = React.useState(null)
+      const [marketLoaded, setMarketLoaded] = React.useState(false)
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1411,6 +1437,57 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .catch((error) => setInstallError(String(error?.message ?? error)))
           .finally(() => setBusy(false))
       }
+
+      // 技能市场：宿主代理由 skills.sh（浏览器跨域拿不到）；空查询 = 热门。
+      const loadMarket = React.useCallback((q) => {
+        setMarketLoaded(true)
+        setMarketLoading(true)
+        setMarketError('')
+        fetch('/zhiyin/market?q=' + encodeURIComponent(q || '') + '&limit=40', { headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error('HTTP ' + response.status)
+            return response.json()
+          })
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '请求失败')
+            setMarketItems(Array.isArray(payload.skills) ? payload.skills : [])
+            setMarketTrending(payload.trending !== false)
+          })
+          .catch((error) => setMarketError(String(error?.message ?? error)))
+          .finally(() => setMarketLoading(false))
+      }, [])
+      const installFromMarket = (item) => {
+        setMarketBusy(item.source)
+        setMarketError('')
+        fetch('/zhiyin/install', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: item.source, target: 'agents' }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result?.ok === true) {
+              load()
+              return
+            }
+            if (result?.error === 'multiple') {
+              setInstallPath(item.source)
+              setInstallTarget('agents')
+              setInstallCandidates(result.candidates ?? [])
+              setInstallSelected((result.candidates ?? []).map((candidate) => candidate.subpath))
+              setInstallProgress('')
+              setInstallError('')
+              setInstalling(true)
+              return
+            }
+            setMarketError(result?.error ?? '安装失败')
+          })
+          .catch((error) => setMarketError(String(error?.message ?? error)))
+          .finally(() => setMarketBusy(null))
+      }
+      React.useEffect(() => {
+        if (tab === 'market' && !marketLoaded) loadMarket('')
+      }, [tab, marketLoaded, loadMarket])
 
       // 导出配置：拉一份 JSON，直接让浏览器下载一份带时间戳的文件。
       const exportConfig = React.useCallback(() => {
@@ -1910,6 +1987,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           ),
         ),
 
+        h('p', { style: { ...css.hint, marginTop: 10 } }, say('next', '技能包开关决定包内技能是否对 agent 可见；单个技能也可以随时停用。')),
+
         // 元信息条：版本 · 观测时间 ｜ 右侧主按钮（全部停用/全部启用）
         data
           ? h(
@@ -2049,6 +2128,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 { style: css.seg },
                 h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, `${say('tabList', '技能')} ${counts.total}`),
                 h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, `${say('tabPacks', '技能包')} ${(data.packs ?? []).length}`),
+                h('button', { type: 'button', style: tab === 'market' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('market') }, say('tabMarket', '技能市场')),
     
               ),
               tab === 'list'
@@ -2070,8 +2150,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
-        // 工具条：分组动作 · 搜索（占满）· 排序 / 安装
-        data
+        // 工具条：分组动作 · 搜索（占满）· 排序 / 安装（技能市场页用自带搜索）
+        data && tab !== 'market'
           ? h(
               'div',
               { style: css.toolbar },
@@ -2111,8 +2191,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     'button',
                     {
                       type: 'button',
-                      style: css.iconBtn,
-                      title: say('install', '安装技能'),
+                      style: { ...css.primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 6 },
+                      title: say('installHintShort', '从 skills.sh / GitHub / 本地安装技能'),
                       'aria-label': say('install', '安装技能'),
                       disabled: busy,
                       onClick: () => {
@@ -2125,7 +2205,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         setInstalling(true)
                       },
                     },
-                    h(Icon, { name: 'install', size: 14 }),
+                    h(Icon, { name: 'packagePlus', size: 15 }),
+                    say('install', '安装技能'),
                   )
                 : null,
             )
@@ -2234,6 +2315,93 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   }),
                 )
               }),
+            )
+          : null,
+
+        !data
+          ? h('p', { style: { ...css.hint, marginTop: 12 } }, say('loading', '正在读取技能列表…'))
+          : null,
+
+        // 技能市场（skills.sh）：热门默认、关键词搜索、一键安装
+        data && tab === 'market'
+          ? h(
+              'div',
+              null,
+              h(
+                'div',
+                { style: css.toolbar },
+                h('input', {
+                  style: css.input,
+                  value: marketQuery,
+                  placeholder: say('marketSearchPlaceholder', '搜索 skills.sh 技能（至少 2 个字符；留空看热门）'),
+                  onChange: (event) => setMarketQuery(event.target.value),
+                  onKeyDown: (event) => { if (event.key === 'Enter') loadMarket(marketQuery) },
+                }),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: { ...css.btn, display: 'inline-flex', alignItems: 'center', gap: 6 },
+                    disabled: marketLoading,
+                    onClick: () => loadMarket(marketQuery),
+                  },
+                  marketLoading ? h(Spinner, { size: 14 }) : h(Icon, { name: 'search', size: 14 }),
+                  say('marketSearch', '搜索'),
+                ),
+              ),
+              h(
+                'div',
+                { style: { ...css.hint, marginTop: 8 } },
+                marketTrending
+                  ? say('marketTrending', '热门技能（按安装量排序）')
+                  : `${say('marketResult', '搜索结果')}：${marketItems.length}`,
+              ),
+              marketError
+                ? h('div', { style: { ...css.hint, marginTop: 8, color: '#d05a4a' } }, marketError)
+                : null,
+              marketLoading && marketItems.length === 0
+                ? h('div', { style: { ...css.hint, marginTop: 10 } }, say('marketLoading', '正在读取技能市场…'))
+                : null,
+              !marketLoading && marketItems.length === 0 && !marketError
+                ? h('div', { style: { ...css.hint, marginTop: 10 } }, say('marketEmpty', '没有找到技能；换个关键词试试'))
+                : null,
+              h(
+                'div',
+                { style: { ...css.list, marginTop: 12 } },
+                marketItems.map((item) => {
+                  const installed = (data.skills ?? []).some((skill) => skill.name === item.name)
+                  return h(
+                    'div',
+                    { key: item.id || item.source + '/' + item.name, style: css.item },
+                    h(
+                      'div',
+                      { style: css.itemMain },
+                      h(
+                        'div',
+                        { style: css.itemHead },
+                        h('span', { style: css.name }, item.name),
+                        h('span', { style: css.badge(true) }, item.source),
+                        installed
+                          ? h('span', { style: { ...css.badge(true), background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
+                          : null,
+                        h('span', { style: { ...css.hint, marginLeft: 'auto', flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
+                      ),
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: css.iconBtn,
+                        title: installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
+                        'aria-label': installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
+                        disabled: marketBusy != null || installed,
+                        onClick: () => installFromMarket(item),
+                      },
+                      marketBusy === item.source ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                    ),
+                  )
+                }),
+              ),
             )
           : null,
 
@@ -2465,7 +2633,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     ),
                   ),
             )
-          : h('p', { style: { ...css.hint, marginTop: 12 } }, say('loading', '正在观测…')),
+          : null,
 
         editing
           ? (function renderEditor() {
@@ -2747,7 +2915,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                             disabled: busy || installSelected.length === 0,
                             onClick: runInstallSelected,
                           },
-                          busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'install', size: 14 }),
+                          busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
                           ` ${busy ? say('installing', '安装中…') : `${say('installSelected', '安装选中')} (${installSelected.length})`}`,
                         ),
                       )
@@ -2759,7 +2927,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           disabled: busy || installPath.trim() === '',
                           onClick: () => runInstall(),
                         },
-                        busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'install', size: 14 }),
+                        busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
                         ` ${busy ? say('installing', '安装中…') : say('install', '安装技能')}`,
                       ),
                 ),
@@ -3002,7 +3170,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
-        h('p', { style: { ...css.hint, marginTop: 18 } }, say('next', '组合可先预览后应用；导入配置与回滚都会留下备份。')),
       )
     }
 
