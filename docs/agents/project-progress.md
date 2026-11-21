@@ -2,7 +2,7 @@
 title: Project Progress
 type: project-progress
 project: dsh-skills-zhiyin
-updated: 2026-11-20
+updated: 2026-11-21
 description: >
   项目开发进度实时记录：阶段、分支、代码状态、最近进展。每次会话更新。
   AI 在本文件新增进展或修改当前状态后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -17,13 +17,23 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（技能市场+UI 优化走 feat/market-and-ui → 提交 211c756 → 合并 3313af7 → 已推送 origin，分支已删）；上一轮备注内联+弹窗X+死代码：5d7ecb7 → 80b1dc2
-- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
+- **当前分支**：main（市场卡片/描述/平铺安装/输入框清除走 feat/market-cards-inputs → 提交 b1af7e1 → 合并 23f9a62 → 已推送 origin，分支已删）；上一轮技能市场+UI：211c756 → 3313af7
+- **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场」三页（市场走 skills.sh）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 15:5x 新增技能市场（skills.sh）+ 安装按钮语义化 + 说明句上移 + 加载态修复（commit 211c756，merge 3313af7）
+- **最后更新**：2026-11-21 17:1x 技能市场体验与安装修正 + 全局输入框清除 X（commit b1af7e1，merge 23f9a62）
+  - 市场卡片：列表改大卡片（cardGrid）；技能名可点击跳转 skills.sh 技能页（/source/skillId）；前 12 张卡按需从详情页 ld+json 取描述（宿主 /zhiyin/market/desc 代理 + 30 分钟缓存）
+  - 热门修正：skills.sh 无 trending API，原 q=skill 只捞到低安装量仓库；改为 find/agent/pdf/writing/design 多词合并去重后按 installs 降序，实测 40 条唯一且百万级（find-skills 4.46M…）
+  - 安装修正：市场点某个技能时传 skill，宿主按 SKILL.md 的 name（或目录名）精确匹配只装该技能，并始终平铺到目标根（不新建仓库目录）；匹配不到才退回弹窗且默认不预选；候选上限 30→200
+  - 其它图标一起转：busy key 从 source 改为唯一 id，只有被点的卡片转圈
+  - 代理根因：Node fetch 不读 HTTP(S)_PROXY（本机 Clash 7890），undici ProxyAgent TLS 被重置；新增 httpGetText：有代理走 curl.exe（-L -x），无代理回落 fetch；市场搜索/描述/SKILL.md 直链统一使用
+  - 全局输入框：新增 ClearField（框内右下角 X 一键清除），应用到技能搜索、市场搜索、成员搜索、新建/改名技能包、安装路径、导入名称/路径/正文、导入配置正文；复选框/单选不动
+  - node --check 双半边 exit 0；带代理实测 marketSearch 200/40 条、marketDescription 200
+  - 待验收：重启 DSH 后 F5 看市场大卡片/点击跳转/描述/热门量、点安装只装该技能且平铺、所有输入框 X
+
+- 上一轮：2026-11-21 15:5x 新增技能市场（skills.sh）+ 安装按钮语义化 + 说明句上移 + 加载态修复（commit 211c756，merge 3313af7）
   - 技能市场：新增第三个页签「技能市场」；宿主新增 GET /zhiyin/market 代理 skills.sh 公开搜索（浏览器跨域拿不到）；空查询=热门（q=skill + installs 降序，skills.sh 无 trending API）；关键词搜索；每行显示名称/来源/安装量/已安装徽标，一键安装到 ~/.agents/skills（多技能仓库返回 multiple 时自动打开安装弹窗勾选）；结果 5 分钟缓存 + 3 次重试（skills.sh 多 IP 个别超时）
   - 参考 AI Vault：SKILLS_SH_SEARCH_API=https://www.skills.sh/api/search?q=&limit=，字段 {name,source,installs}；实测 host 侧 fetch 成功（trending 返回 find-skills 446 万安装）
   - 安装按钮语义修正（/tuyi）：图标由 download 形（易读成下载）改为 package-plus（加一个技能包），并从纯图标改为「图标+安装技能」的品牌色主按钮，一眼可找

@@ -2,7 +2,7 @@
 title: Debug Log
 type: debug-log
 project: dsh-skills-zhiyin
-updated: 2026-11-17
+updated: 2026-11-21
 description: >
   反复调试的 bug 追加记录，优先级与实现事实对齐。只追加，不删除或改写历史。
   AI 在本文件新增或修改任何条目后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -15,6 +15,15 @@ description: >
 > 字段：`- **日期**：` / `- **现象**：` / `- **根因**：` / `- **修复**：` / `- **验证限制**：` / `- **教训**：`
 
 ***
+
+## BUG-005: 技能市场请求频繁失败（Node fetch 不读系统代理）
+
+- **日期**：2026-11-21
+- **现象**：技能市场热门/搜索偶尔 200、频繁 502「连接 skills.sh 失败」；同一台机器 PowerShell 的 Invoke-RestMethod 与 curl.exe 都能正常访问。
+- **根因**：机器通过 HTTP(S)_PROXY=http://127.0.0.1:7890 出网；PowerShell/curl 继承系统代理，Node 内置 fetch（undici）默认不读环境代理，直连 10s 超时。undici 的 ProxyAgent/EnvHttpProxyAgent 在该代理上 TLS 握手被重置（ECONNRESET），同样不可用。
+- **修复**：宿主新增 httpGetText(url)：检测到 HTTPS_PROXY/HTTP_PROXY 时改走 curl.exe -sS -L -x <proxy>，无代理时回落 fetch；市场搜索、技能描述、SKILL.md 直链下载统一走它。
+- **验证**：带代理环境实测 marketSearch('',40) 返回 200、40 条唯一技能（find-skills 4.46M…），marketDescription 返回真实描述；extractLdDescription 对样例 HTML 解析正确。
+- **教训**：在用户机器上请求外网优先复用系统代理链路（curl/PowerShell），不要假设 Node fetch 能直连；跨平台按 process.platform 选 curl.exe/curl。
 
 ## BUG-004: 刷新态文字竖排 + 「全部技能」计数含未开启目录
 
