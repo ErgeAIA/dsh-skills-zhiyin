@@ -17,13 +17,19 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（打开技能目录 + 成本说明重写走 feat/reveal-dir-cost-copy → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮信息弹窗：240e6fe → fed2a46
+- **当前分支**：main（修复打开目录无反应 + 软链标记走 fix/reveal-and-link-badge → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮打开目录+文案：97035e7 → 1153c25
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 20:1x 卡片加「打开技能目录」+ 成本说明按第一性原理重写
+- **最后更新**：2026-11-21 21:0x 修复「打开技能目录无反应」与软链标记不可见
+  - 无反应根因：宿主用 execFile('explorer.exe', [dir], { windowsHide: true }) —— Windows 上 windowsHide 会让 explorer 不弹窗口；且 explorer 成功也返回非 0，回调被忽略后前端看不到任何反馈。改为 spawn(command, [dir], { detached: true, stdio: 'ignore', windowsHide: false }) + unref，只监听启动错误并记 skill-reveal-failed。
+  - 软链标记「没了」根因：卡片视图从来没有软链徽标；列表视图的 ⛓ 在「徽标降噪」提交里降到 opacity 0.32，几乎不可见。现在卡片与列表都显示「软链」文字徽标（opacity 0.7，可点击打开目录），title 给出实体路径。实测 ~/.dsh/skills 下 97 条软链本身完好，仅显示丢失。
+  - node --check 双半边 exit 0；skillDirectory 命中 <root>/<name> 返回技能目录而非根目录。
+  - 待验收：重启后点文件夹图标应弹出资源管理器并定位到该技能目录；卡片与列表都能看到「软链」标记且可点击。
+
+- 上一轮：2026-11-21 20:1x 卡片加「打开技能目录」+ 成本说明按第一性原理重写
   - 打开目录：宿主 POST /zhiyin/reveal → skillDirectory() 先按三个安装根找 <root>/<name>（含 SKILL.md），再用快照真实路径剥掉 SKILL.md 兜底（软链接可解引用）；平台分别用 explorer.exe / open / xdg-open 打开**该技能目录**，不打开技能根；事件 skill-revealed。前端卡片视图每张卡加 folder 图标（title：在文件管理器里打开这个技能的目录）。
   - 成本说明重写：标题改「目录字符数 · 计算方式与建议上限」；四段——计算方式（min(描述,500) 累加 +200、只计描述为下限、停用/未入包不计）／成本构成（路由信号、目录追加历史、超限按 LRU 丢弃）／建议上限（上下文 1%：200K→2,000 token；中文 ≤2,000 字符、英文 ≤8,000 字符、单条 400–1,000、硬上限 1,024）／优化方式（描述只留做什么+何时用、不用的停用、同域合并）／依据（两条官方与社区链接 + 各自结论）。删掉「不能用一个固定字符数当红线」等口语与待核实表述。
   - node --check 双半边 exit 0；skillDirectory 假环境三例（按根命中、按真实路径兜底、缺失返回 null）通过。
