@@ -1877,6 +1877,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         ['内置', counts.bySource.bundled],
         ['自定义', counts.bySource.custom],
       ].filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(' · ')
+      // ~/.dsh/skills 里大量是指向 ~/.agents/skills 的软链：同名技能只算一次，
+      // 所以关掉 .agents 后总数基本不变。这里明确说明，避免「开关一开数字反而变少」的困惑。
+      const linkedCount = scoped.filter(
+        (skill) => skill.source === 'user-dsh' && (data?.skills ?? []).some((other) => other.name === skill.name && other.source === 'user-agents'),
+      ).length
+      const srcNote = linkedCount > 0
+        ? say('srcLinked', '其中 {n} 个用户目录技能是 .agents 的软链，同名只算一次').replace('{n}', String(linkedCount))
+        : ''
 
       const skills = React.useMemo(() => {
         const needle = query.trim().toLowerCase()
@@ -2307,6 +2315,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               null,
               h('div', { style: { ...css.grid, marginTop: 16 } }, statCards(data, counts, say, filter, setFilter)),
               h('div', { style: { ...css.hint, marginTop: 8 } }, `${say('statBySource', '来源')}：${srcLine}`),
+          srcNote ? h('div', { style: { ...css.hint, marginTop: 2, opacity: 0.62 } }, srcNote) : null,
             )
           : null,
 
@@ -2695,12 +2704,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               type: 'button',
                               style: running ? { ...css.primaryBtn, opacity: 0.8, cursor: 'progress' } : css.primaryBtn,
                               title: running ? say('marketInstalling', '正在安装…') : busyElsewhere ? say('marketBusyOther', '另一个技能正在安装，请稍候') : say('install', '安装技能'),
+                              whiteSpace: 'nowrap',
                               'aria-busy': running ? 'true' : 'false',
                               disabled: running || busyElsewhere,
                               onClick: () => installFromMarket(item),
                             },
                             running ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
-                            running ? say('marketInstalling', '正在安装…') : say('install', '安装技能')),
+                            running ? say('marketInstalling', '安装中…') : say('installShort', '安装')),
                     ),
                   )
                 }),
