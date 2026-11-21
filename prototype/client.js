@@ -857,6 +857,7 @@ window.__ModuleLoader__.load({
         color: 'inherit',
         fontSize: fs.body,
         cursor: 'pointer',
+        whiteSpace: 'nowrap',
       },
       list: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 },
       // 批量条：选中若干技能后出现，一次提交只翻一遍目录。
@@ -968,6 +969,13 @@ window.__ModuleLoader__.load({
         fontSize: fs.body,
         fontWeight: 600,
         cursor: 'pointer',
+        // 图标 + 文字必须同一行：窄卡片里之前被挤成上下两行。
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        whiteSpace: 'nowrap',
+        flex: '0 0 auto',
       },
       // 告警区（内容之上、点名具体对象）
       alertWrap: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 },
@@ -2704,7 +2712,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               type: 'button',
                               style: running ? { ...css.primaryBtn, opacity: 0.8, cursor: 'progress' } : css.primaryBtn,
                               title: running ? say('marketInstalling', '正在安装…') : busyElsewhere ? say('marketBusyOther', '另一个技能正在安装，请稍候') : say('install', '安装技能'),
-                              whiteSpace: 'nowrap',
                               'aria-busy': running ? 'true' : 'false',
                               disabled: running || busyElsewhere,
                               onClick: () => installFromMarket(item),
