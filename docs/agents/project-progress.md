@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（修复打开目录无反应 + 软链标记走 fix/reveal-and-link-badge → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮打开目录+文案：97035e7 → 1153c25
+- **当前分支**：main（skills.sh 链接安装 + 市场安装动效走 feat/market-install-progress → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮修复打开目录/软链：0da9b39 → 06c195e
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 21:0x 修复「打开技能目录无反应」与软链标记不可见
+- **最后更新**：2026-11-21 22:1x skills.sh 链接安装 + 市场安装进行中动效
+  - skills.sh 链接安装：installFromText 新增识别 https://www.skills.sh/<owner>/<repo>[/subpath]，剥离后交给既有 GitHub 解析（等价于 owner/repo，含子路径即装该技能）；安装弹窗提示补充「skills.sh 技能页链接」。
+  - 托管来源（uizze.sh、open.feishu.cn 等域名首段）：实测 skills.sh 未提供公开下载通道——/api/v1/* 需 Vercel OIDC token（401），官方 npx skills add 该页面报 SKILLS_DOWNLOAD_NOT_A_SKILL，/SKILL.md、/download、well-known 均返回 HTML。故仍不支持直接安装，但宿主返回明确原因；前端把死按钮改为「在 skills.sh 打开」（搜索图标），不再给人能点的错觉。
+  - 市场安装动效：恢复 marketBusy（按条目 id）与 marketDone；点安装即在卡片内显示 Spinner + cursor:progress + aria-busy，其它条目在安装期间禁用并提示「另一个技能正在安装」；成功显示 ✓ 已安装，失败才回落安装弹窗（multiple）或显示错误。
+  - 实测：resolveGithubSource 对 owner/repo、owner/repo/subpath、GitHub URL、npx skills add 四种形式解析正确；skills.sh URL 分类（域名来源 vs owner/repo）正确。node --check 双半边 exit 0。
+  - 待验收：市场点安装有转圈、成功变 ✓；安装弹窗粘贴 skills.sh 的 owner/repo 链接能装；托管条目点击跳转 skills.sh 页面。
+
+- 上一轮：2026-11-21 21:0x 修复「打开技能目录无反应」与软链标记不可见
   - 无反应根因：宿主用 execFile('explorer.exe', [dir], { windowsHide: true }) —— Windows 上 windowsHide 会让 explorer 不弹窗口；且 explorer 成功也返回非 0，回调被忽略后前端看不到任何反馈。改为 spawn(command, [dir], { detached: true, stdio: 'ignore', windowsHide: false }) + unref，只监听启动错误并记 skill-reveal-failed。
   - 软链标记「没了」根因：卡片视图从来没有软链徽标；列表视图的 ⛓ 在「徽标降噪」提交里降到 opacity 0.32，几乎不可见。现在卡片与列表都显示「软链」文字徽标（opacity 0.7，可点击打开目录），title 给出实体路径。实测 ~/.dsh/skills 下 97 条软链本身完好，仅显示丢失。
   - node --check 双半边 exit 0；skillDirectory 命中 <root>/<name> 返回技能目录而非根目录。

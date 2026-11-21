@@ -1454,6 +1454,27 @@ async function installFromText(ctx, body) {
     return installDirectory(ctx, body, cleanPath(text), '')
   }
   if (/^https?:\/\//i.test(text) && /\.md(\?|$)/i.test(text)) return installRawSkill(ctx, body, text)
+  // skills.sh 技能页（https://www.skills.sh/<owner>/<repo>[/<subpath>]）等价于 owner/repo[/subpath]。
+  const skillsSh = text.match(/^https?:\/\/(?:www\.)?skills\.sh\/(.+)$/i)
+  if (skillsSh) {
+    const rest = skillsSh[1].replace(/[?#].*$/, '').replace(/\/+$/, '')
+    const parts = rest.split('/').filter(Boolean)
+    // 域名来源（如 uizze.sh）没有公开仓库，明确报错而不是含糊失败。
+    if (parts.length >= 2 && /\.[a-z]{2,}$/i.test(parts[0])) {
+      return {
+        status: 400,
+        body: {
+          ok: false,
+          error: '这是 skills.sh 托管的技能（来源 ' + parts[0] + '），没有公开 GitHub 仓库，无法直接安装；请在 skills.sh 页面上按作者的说明安装',
+        },
+      }
+    }
+    const clean = parts.join('/')
+    if (clean) {
+      const source = resolveGithubSource(clean)
+      if (source) return installFromText(ctx, { ...body, text: clean })
+    }
+  }
   const source = resolveGithubSource(text)
   if (!source) {
     return { status: 400, body: { ok: false, error: '看不懂这个来源：支持 owner/repo、GitHub 链接、npx skills add …、SKILL.md 直链或本地文件夹' } }
