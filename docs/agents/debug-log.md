@@ -16,6 +16,16 @@ description: >
 
 ***
 
+## BUG-010: 设置页 400、一直「正在读取技能列表…」（TDZ 变量遮蔽）
+
+- **日期**：2026-11-22
+- **现象**：打开织音面板显示「读取失败：HTTP 400」，技能列表一直停在「正在读取技能列表…」；其余路由（archive / market / probe / backups）全部 200。
+- **根因**：BUG-009 的修复里新增了模块级 let observedSkillNames，但当时命名为 observedNames，而 collectState 内部第 2341 行早已有一个同名局部 const observedNames。同一函数作用域内，第 2282 行的 observedNames = ... 赋值命中的是这个局部变量（TDZ，尚未初始化），抛 ReferenceError；宿主把 resource 异常统一转成 400。
+- **为什么只有 /zhiyin/state 挂**：只有该路由会走 collectState；其它 GET 路由不碰这段代码。
+- **修复**：模块级变量改名为 observedSkillNames，与函数内局部 observedNames 彻底解耦。
+- **验证**：假 ctx 冒烟（mod.apply + 执行全部 effect + 调 state.resource()）通过，23 条路由注册成功，state 返回合法 JSON 不再抛错；node --check 双半边 exit 0。
+- **教训**：给模块加全局状态时先全局搜同名标识符；TDZ 报错在宿主层会被吞成 400，看不到堆栈，必须靠假 ctx 冒烟测试才能暴露。
+
 ## BUG-009: 技能总数随「加载 ~/.agents/skills」开关抖动（111 vs 112）
 
 - **日期**：2026-11-22
