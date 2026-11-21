@@ -1342,6 +1342,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketError, setMarketError] = React.useState('')
       const [marketLoaded, setMarketLoaded] = React.useState(false)
       const [marketDesc, setMarketDesc] = React.useState({})
+      // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录。
+      const [archiveEntries, setArchiveEntries] = React.useState([])
+      const [archiveLoading, setArchiveLoading] = React.useState(false)
+      const [archiveError, setArchiveError] = React.useState('')
+      const [archiveTarget, setArchiveTarget] = React.useState('agents')
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1367,6 +1372,37 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             })),
           )
       }, [])
+
+      const loadArchive = React.useCallback(() => {
+        setArchiveLoading(true)
+        setArchiveError('')
+        fetch('/zhiyin/archive', { headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error('HTTP ' + response.status)
+            return response.json()
+          })
+          .then((payload) => setArchiveEntries(Array.isArray(payload?.entries) ? payload.entries : []))
+          .catch((error) => setArchiveError(String(error?.message ?? error)))
+          .finally(() => setArchiveLoading(false))
+      }, [])
+      React.useEffect(() => { loadArchive() }, [loadArchive])
+      const restoreArchived = (entry) => {
+        setArchiveError('')
+        setBusy(true)
+        fetch('/zhiyin/restore', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ key: entry.key, target: archiveTarget }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? '恢复失败')
+            loadArchive()
+            load()
+          })
+          .catch((error) => setArchiveError(String(error?.message ?? error)))
+          .finally(() => setBusy(false))
+      }
 
       const write = React.useCallback(
         (path, body) => {
@@ -2172,6 +2208,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, `${say('tabList', '技能')} ${counts.total}`),
                 h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, `${say('tabPacks', '技能包')} ${(data.packs ?? []).length}`),
                 h('button', { type: 'button', style: tab === 'market' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('market') }, say('tabMarket', '技能市场')),
+                h('button', { type: 'button', style: tab === 'archive' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('archive') }, `${say('tabArchive', '归档')} ${archiveEntries.length}`),
     
               ),
               tab === 'list'
@@ -2194,7 +2231,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           : null,
 
         // 工具条：分组动作 · 搜索（占满）· 排序 / 安装（技能市场页用自带搜索）
-        data && tab !== 'market'
+        data && tab !== 'market' && tab !== 'archive'
           ? h(
               'div',
               { style: css.toolbar },
@@ -2469,6 +2506,85 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
+        // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录
+        data && tab === 'archive'
+          ? h(
+              'div',
+              null,
+              h(
+                'div',
+                { style: css.toolbar },
+                h(
+                  'label',
+                  { style: css.sortWrap },
+                  say('restoreTarget', '恢复到'),
+                  h(
+                    'select',
+                    {
+                      style: css.sortSelect,
+                      value: archiveTarget,
+                      onChange: (event) => setArchiveTarget(event.target.value),
+                    },
+                    h('option', { value: 'agents', style: css.optionStyle }, say('installAgents', '技能库 ~/.agents/skills')),
+                    h('option', { value: 'user', style: css.optionStyle }, say('installUser', '用户目录 ~/.dsh/skills')),
+                    h('option', { value: 'project', style: css.optionStyle }, say('installProject', '项目 .dsh/skills')),
+                  ),
+                ),
+                h('span', { style: { flex: '1 1 auto' } }),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: css.iconBtn,
+                    title: say('refresh', '重新观测'),
+                    'aria-label': say('refresh', '重新观测'),
+                    disabled: archiveLoading,
+                    onClick: loadArchive,
+                  },
+                  archiveLoading ? h(Spinner, { size: 15 }) : h(Icon, { name: 'refresh', size: 14 }),
+                ),
+              ),
+              archiveError
+                ? h('div', { style: { ...css.hint, marginTop: 8, color: '#d05a4a' } }, say('archiveError', '归档操作失败：') + archiveError)
+                : null,
+              !archiveLoading && archiveEntries.length === 0
+                ? h('div', { style: { ...css.hint, marginTop: 12 } }, say('archiveEmpty', '还没有归档的技能。在技能列表点「卸载」会把技能移到这里，可随时恢复。'))
+                : h(
+                    'div',
+                    { style: { ...css.list, marginTop: 12 } },
+                    archiveEntries.map((entry) =>
+                      h(
+                        'div',
+                        { key: entry.key, style: css.item },
+                        h(
+                          'div',
+                          { style: css.itemMain },
+                          h(
+                            'div',
+                            { style: css.itemHead },
+                            h('span', { style: css.name }, entry.name),
+                            entry.archivedAt
+                              ? h('span', { style: { ...css.hint, flex: '0 0 auto' } }, say('archivedAt', '归档于') + ' ' + entry.archivedAt)
+                              : null,
+                          ),
+                        ),
+                        h(
+                          'button',
+                          {
+                            type: 'button',
+                            style: css.btn,
+                            disabled: busy || archiveLoading,
+                            title: say('restoreHint', '恢复到上方的目标目录'),
+                            onClick: () => restoreArchived(entry),
+                          },
+                          say('restore', '恢复'),
+                        ),
+                      ),
+                    ),
+                  ),
+            )
+          : null,
+
         // 卡片视图
         data && tab === 'list' && view === 'cards'
           ? h(
@@ -2534,7 +2650,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               disabled: busy,
                               onClick: () => {
                                 if (window.confirm(say('uninstallAsk', '卸载并把技能移入归档目录？') + ' ' + skill.name)) {
-                                  write('/zhiyin/uninstall', { name: skill.name })
+                                  write('/zhiyin/uninstall', { name: skill.name }).then(() => loadArchive())
                                 }
                               },
                             }, h(Icon, { name: 'archive', size: 14 }))
@@ -2602,7 +2718,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               disabled: busy,
                               onClick: () => {
                                 if (window.confirm(say('uninstallAsk', '卸载并把技能移入归档目录？') + ' ' + skill.name)) {
-                                  write('/zhiyin/uninstall', { name: skill.name })
+                                  write('/zhiyin/uninstall', { name: skill.name }).then(() => loadArchive())
                                 }
                               },
                             },

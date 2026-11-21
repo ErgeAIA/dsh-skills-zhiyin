@@ -639,6 +639,16 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, name, to } }
   })
 
+  // 归档：列出被「卸载」移入 archive 的技能，供设置页查看与恢复。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/archive',
+      resource: async () => json(listArchive()),
+    }),
+  )
+  post(ctx, '/zhiyin/restore', async (body) => restoreArchive(ctx, body))
+
   // 导出配置：只导出可移植的编排状态（包 / 停用项 / 总开关），
   // 跟「导出配置 / 导入配置」呼应 PRD DR-10（配置丢失是唯一不可恢复事故）。
   ctx.effect(() =>
@@ -916,6 +926,86 @@ function installRoot(ctx, target) {
     }
   }
   return null
+}
+
+function archiveRootPath() {
+  return join(stateDir(), 'archive')
+}
+
+/** 归档目录名 = ISO 时间戳（冒号/点换成 -）+ '-' + 技能名；技能名本身可能带 -，所以只剥前缀。 */
+function parseArchiveKey(key) {
+  const match = String(key).match(/^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)-(.*)$/)
+  return {
+    key: String(key),
+    dirName: match ? match[2] : String(key),
+    archivedAt: match
+      ? match[1].replace(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, '$1 $2:$3:$4')
+      : '',
+  }
+}
+
+function listArchive() {
+  const root = archiveRootPath()
+  const entries = []
+  if (existsSync(root)) {
+    for (const key of readdirSync(root)) {
+      const full = join(root, key)
+      let stat
+      try {
+        stat = statSync(full)
+      } catch {
+        continue
+      }
+      if (!stat.isDirectory()) continue
+      const parsed = parseArchiveKey(key)
+      const front = skillFrontmatterName(join(full, 'SKILL.md'))
+      entries.push({ key, name: front || parsed.dirName, dirName: parsed.dirName, archivedAt: parsed.archivedAt, path: full })
+    }
+  }
+  // 时间戳前缀按字典序即时间序，新的在前。
+  entries.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
+  return { root, entries }
+}
+
+function restoreArchive(ctx, body) {
+  const key = typeof body?.key === 'string' ? body.key.trim() : ''
+  if (!key) return { status: 400, body: { ok: false, error: 'key is required' } }
+  const parsed = parseArchiveKey(key)
+  const src = join(archiveRootPath(), key)
+  if (!existsSync(src)) return { status: 404, body: { ok: false, error: '归档里没有这个技能' } }
+  const target = body?.target === 'user' || body?.target === 'project' ? body.target : 'agents'
+  const destRoot = installRoot(ctx, target)
+  if (!destRoot) return { status: 400, body: { ok: false, error: '目标目录不可用' } }
+  const name = String(skillFrontmatterName(join(src, 'SKILL.md')) || parsed.dirName || '').trim()
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) return { status: 400, body: { ok: false, error: '技能名不合法：' + name } }
+  const dest = join(destRoot, name)
+  if (existsSync(dest)) return { status: 409, body: { ok: false, error: '目标目录已有同名技能：' + dest } }
+  try {
+    mkdirSync(destRoot, { recursive: true })
+    try {
+      renameSync(src, dest)
+    } catch (error) {
+      // 跨盘 rename 会 EXDEV：退回复制再删。
+      if (error?.code !== 'EXDEV') throw error
+      cpSync(src, dest, { recursive: true, errorOnExist: true, force: false })
+      rmSync(src, { recursive: true, force: true })
+    }
+  } catch (error) {
+    return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
+  }
+  // 恢复进技能库（.agents）时，顺手补回 .dsh/skills 的软链接，DSH 才看得到。
+  if (target === 'agents') {
+    try {
+      const link = join(dshSkillsRoot(), name)
+      mkdirSync(dshSkillsRoot(), { recursive: true })
+      if (!existsSync(link)) symlinkSync(dest, link, 'junction')
+    } catch (error) {
+      note('skill-link-failed', { name, error: String(error?.message ?? error) })
+    }
+  }
+  note('skill-restored', { name, key, dest, target })
+  invalidateAll()
+  return { status: 200, body: { ok: true, name, dest, target } }
 }
 
 /** 某个技能在 SSOT 里的真实目录；找不到返回 null。 */
@@ -1806,7 +1896,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey }
 
 function invalidateAll() {
   for (const entry of registrations) {
