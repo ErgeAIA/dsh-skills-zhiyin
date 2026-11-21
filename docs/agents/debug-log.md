@@ -16,6 +16,15 @@ description: >
 
 ***
 
+## BUG-007: 市场安装回填 skills.sh 域名来源导致「看不懂这个来源」
+
+- **日期**：2026-11-21
+- **现象**：技能市场点安装后，安装弹窗自动回填 uizze.sh 之类的值，点安装报「看不懂这个来源：支持 owner/repo、GitHub 链接…」。
+- **根因**：skills.sh 搜索结果里有一类域名来源（如 uizze.sh、open.feishu.cn）是 skills.sh 托管技能，没有公开 GitHub 仓库；宿主只支持 GitHub/本地，resolveGithubSource('uizze.sh') 必然失败。
+- **修复**：宿主 marketSearch 给每条加 installable = source.includes('/') 与正确技能页 URL（域名来源是 /<source>/skills/<skillId>）；前端对 installable === false 的条目显示「托管」徽标、禁用安装并给出说明，不再回填不可安装地址。
+- **验证**：带代理实测 40 条热门中 37 可装、3 托管；ui-taste installable=false / url 正确，find-skills installable=true。
+- **教训**：外部注册表的 source 并不总是 owner/repo，接入前要先枚举来源形态；不可安装的类型要显式禁用并解释，不能让它带着错误坐标进安装流程。
+
 ## BUG-006: 搜索技能后设置页整块空白（模块级组件误用 Page 内的 say）
 
 - **日期**：2026-11-21

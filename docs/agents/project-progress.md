@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（修复设置页空白+市场安装确认走 fix/market-install-blank → 提交 c072c99 → 合并 b39743e → 已推送 origin，分支已删；推送首次 TLS 失败已重试）；上一轮市场卡片/平铺/输入框X：b1af7e1 → 23f9a62
+- **当前分支**：main（托管来源技能不开放安装走 fix/hosted-market-install → 提交 cfefe49 → 合并 4e085e7 → 已推送 origin，分支已删）；上一轮修复空白页+安装确认：c072c99 → b39743e
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场」三页（市场走 skills.sh）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 18:2x 修复搜索后设置页空白 + 市场安装改为确认目录（commit c072c99，merge b39743e）
+- **最后更新**：2026-11-21 18:4x 托管来源技能不开放安装 + 技能页 URL 修正（commit cfefe49，merge 4e085e7）
+  - 问题：市场点安装回填的是 skills.sh 域名来源（如 uizze.sh、open.feishu.cn），这类是 skills.sh 托管技能、没有公开 GitHub 仓库，宿主只支持 GitHub/本地 → 必然报「看不懂这个来源」。
+  - 修复：宿主 marketSearch 为每条加 installable = source.includes('/') 与正确技能页 URL（域名来源为 /<source>/skills/<skillId>）；前端对 installable === false 的条目显示「托管」徽标、禁用安装按钮并给出 tooltip 说明，不再回填不可安装地址。
+  - 实测：带代理 40 条热门里 37 可装、3 托管；ui-taste installable=false、URL 正确；find-skills installable=true。
+  - node --check 双半边 exit 0。
+  - 待验收：F5 后市场里域名来源技能显示「托管」且按钮禁用；GitHub 来源仍可弹窗选目录并安装。
+
+- 上一轮：2026-11-21 18:2x 修复搜索后设置页空白 + 市场安装改为确认目录（commit c072c99，merge b39743e）
   - 空白页根因（BUG-006）：新加的 ClearField 是模块级组件，却调用 Page 内部的 say；输入框为空时不渲染清除 X 所以不触发，一旦有值（搜索/输入）就 ReferenceError，整块织音面板卸载成空白。改为 clearLabel 默认 prop，不再引用 Page 作用域。
   - 市场安装：不再静默直装；点安装打开安装弹窗（与「通过地址安装」一致），预填 source + 技能名，先选安装目录（技能库/用户目录/项目），点「安装技能」后宿主按技能名精确只装这一个并平铺到目标根；未匹配才列候选且默认不勾选。
   - 新增 installSkill 状态；runInstall 携带 skill；普通安装入口重置 installSkill；市场卡片安装按钮不再转圈。
