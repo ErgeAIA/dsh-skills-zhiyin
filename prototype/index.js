@@ -255,6 +255,24 @@ export function apply(ctx) {
     }),
   )
 
+  // 技能市场：代理 skills.sh 公开搜索（浏览器跨域拿不到，必须经宿主）。
+  // 空查询 = 热门：skills.sh 没有 trending API，用通用词 "skill" 拉一批再按 installs 降序。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/market',
+      handler: async (request, response) => {
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const q = String(url.searchParams.get('q') ?? '').trim()
+        const requested = Number(url.searchParams.get('limit') ?? 40)
+        const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 60) : 40
+        const result = await marketSearch(q, limit)
+        response.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' })
+        response.end(JSON.stringify(result.body))
+      },
+    }),
+  )
+
   // 单个技能的开关；传 names 时合并成一次提交（FR-023 批量提交：  
   // 一次写盘 / 一次 invalidate，目录只翻一遍）。
   post(ctx, '/zhiyin/skill', async (body) => {
@@ -993,6 +1011,71 @@ function cloneRepo(source) {
   return { dir }
 }
 
+const marketCache = new Map()
+
+/**
+ * 查询 skills.sh 公开搜索 API。
+ * - 端点：GET https://www.skills.sh/api/search?q={q}&limit={n}
+ * - 返回 skills: [{ id, skillId, name, installs, source }]；q 至少 2 字符。
+ * - 空查询按热门处理：用 q=skill 拉一批，再按 installs 降序（skills.sh 无 trending API）。
+ */
+async function marketSearch(query, limit) {
+  const trimmed = String(query ?? '').trim()
+  const trending = trimmed.length < 2
+  const q = trending ? 'skill' : trimmed
+  const cacheKey = q + '|' + limit
+  const hit = marketCache.get(cacheKey)
+  if (hit && Date.now() - hit.at < 5 * 60 * 1000) return { status: 200, body: hit.body }
+  const apiUrl = 'https://www.skills.sh/api/search?q=' + encodeURIComponent(q) + '&limit=' + limit
+  // skills.sh 解析到多个 IP，个别地址会连接超时；重试几次提高成功率。
+  let payload = null
+  let lastError = ''
+  for (let attempt = 0; attempt < 3 && payload === null; attempt += 1) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 20000)
+      let response
+      try {
+        response = await fetch(apiUrl, {
+          headers: { 'user-agent': 'dsh-zhiyin/0.1', accept: 'application/json' },
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+      if (!response.ok) {
+        lastError = 'HTTP ' + response.status
+        if (response.status < 500) break
+        continue
+      }
+      payload = await response.json()
+    } catch (error) {
+      lastError = String(error?.message ?? error)
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 400))
+    }
+  }
+  if (payload === null) {
+    return { status: 502, body: { ok: false, error: '连接 skills.sh 失败：' + lastError } }
+  }
+  const items = (Array.isArray(payload?.skills) ? payload.skills : [])
+    .map((item) => ({
+      name: String(item?.name ?? ''),
+      source: String(item?.source ?? ''),
+      skillId: String(item?.skillId ?? ''),
+      id: String(item?.id ?? ''),
+      installs: Number(item?.installs ?? 0) || 0,
+    }))
+    .filter((item) => item.name && item.source)
+  items.sort((a, b) => b.installs - a.installs)
+  const body = { ok: true, query: q, trending, count: items.length, skills: items.slice(0, limit) }
+  if (marketCache.size >= 20) {
+    const oldest = [...marketCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]
+    if (oldest) marketCache.delete(oldest[0])
+  }
+  marketCache.set(cacheKey, { at: Date.now(), body })
+  return { status: 200, body }
+}
+
 /** 批量安装：一次 clone，多个子目录逐个装入，返回成功与失败清单。 */
 function installBatch(ctx, body) {
   const text = cleanPath(String(body?.text ?? ''))
@@ -1627,7 +1710,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch }
 
 function invalidateAll() {
   for (const entry of registrations) {
