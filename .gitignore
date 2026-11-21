@@ -59,3 +59,6 @@ temp/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 织音调试产物（宿主 state 快照转储）
+.tmp-state.json

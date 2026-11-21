@@ -562,6 +562,28 @@ window.__ModuleLoader__.load({
       costHead: { fontSize: fs.body, fontWeight: 600, marginTop: 16, color: 'var(--zhiyin-accent, #e0743c)' },
       costBullet: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 8 },
       costLink: { color: 'var(--zhiyin-accent, #e0743c)', textDecoration: 'none' },
+      // 首屏骨架屏：市场要并发拉 5 组 skills.sh 数据，先占位，避免空白让人以为没加载。
+      skeletonCard: {
+        display: 'inline-block',
+        width: '100%',
+        boxSizing: 'border-box',
+        breakInside: 'avoid',
+        marginBottom: 16,
+        verticalAlign: 'top',
+        borderRadius: 14,
+        padding: '14px 16px 12px',
+        background: 'rgba(128,128,128,0.045)',
+        border: '1px solid rgba(128,128,128,0.10)',
+      },
+      skeletonBar: (width, height = 12) => ({
+        width,
+        height,
+        borderRadius: 6,
+        background: 'linear-gradient(90deg, rgba(128,128,128,0.10) 25%, rgba(128,128,128,0.20) 37%, rgba(128,128,128,0.10) 63%)',
+        backgroundSize: '400% 100%',
+        animation: 'zhiyin-shimmer 1.4s ease-in-out infinite',
+        marginTop: 8,
+      }),
       // 技能市场卡片：瀑布流（多列、高度随内容）、hover 抬升；与列表视图明显区分。
       marketGrid: {
         marginTop: 16,
@@ -1014,20 +1036,22 @@ window.__ModuleLoader__.load({
         columnWidth: 320,
         columnGap: 16,
       },
-      skillCard: {
+      // 技能卡：与市场卡片同一套视觉语言（hover 抬升、品牌色边框、阴影）。
+      skillCard: (hover) => ({
         display: 'inline-block',
         width: '100%',
         boxSizing: 'border-box',
         breakInside: 'avoid',
-        marginBottom: 12,
+        marginBottom: 16,
         verticalAlign: 'top',
-        flexDirection: 'column',
-        gap: 10,
         borderRadius: 14,
-        padding: '14px 16px',
-        background: 'rgba(128,128,128,0.045)',
-        border: '1px solid rgba(128,128,128,0.10)',
-      },
+        padding: '14px 16px 12px',
+        background: hover ? 'rgba(128,128,128,0.10)' : 'rgba(128,128,128,0.045)',
+        border: '1px solid ' + (hover ? 'var(--zhiyin-accent, #e0743c)' : 'rgba(128,128,128,0.10)'),
+        boxShadow: hover ? '0 8px 24px rgba(0,0,0,0.28)' : 'none',
+        transform: hover ? 'translateY(-2px)' : 'none',
+        transition: 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease',
+      }),
       cardHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
       cardName: {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -1363,6 +1387,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         },
         [t],
       )
+      // 骨架屏的 shimmer 动画需要 @keyframes，行内样式写不了，挂一次 <style>。
+      React.useEffect(() => {
+        const id = 'zhiyin-keyframes'
+        if (document.getElementById(id)) return undefined
+        const tag = document.createElement('style')
+        tag.id = id
+        tag.textContent =
+          '@keyframes zhiyin-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}' +
+          '@media (prefers-reduced-motion: reduce){.zhiyin-skeleton{animation:none!important}}'
+        document.head.appendChild(tag)
+        return undefined
+      }, [])
       const [state, setState] = React.useState({ loading: true, data: null, error: null, exportError: null })
       // 搜索输入与实际生效的查询分开：输入停 250ms 才过滤，避免每敲一个字就重排 177 张卡。
       const [queryInput, setQueryInput] = React.useState('')
@@ -1415,6 +1451,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketBusy, setMarketBusy] = React.useState(null)   // 正在安装的条目 id
       const [marketDone, setMarketDone] = React.useState({})     // 已装完的条目 id
       const [marketHover, setMarketHover] = React.useState(null) // 鼠标悬停的卡片 id
+      const [skillHover, setSkillHover] = React.useState(null)   // 鼠标悬停的技能卡 name
       const [marketDesc, setMarketDesc] = React.useState({})
       // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录。
       const [archiveEntries, setArchiveEntries] = React.useState([])
@@ -2623,7 +2660,22 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, marketError))
                 : null,
               marketLoading && marketItems.length === 0
-                ? h('div', { style: { ...css.hint, marginTop: 12 } }, say('marketLoading', '正在读取技能市场…'))
+                ? h(
+                    'div',
+                    { style: css.marketGrid },
+                    Array.from({ length: 6 }).map((_, index) =>
+                      h(
+                        'div',
+                        { key: 'sk-' + index, style: css.skeletonCard },
+                        h('div', { style: css.skeletonBar('70%', 16) }),
+                        h('div', { style: css.skeletonBar('45%') }),
+                        h('div', { style: css.skeletonBar('100%') }),
+                        h('div', { style: css.skeletonBar('92%') }),
+                        h('div', { style: css.skeletonBar('60%') }),
+                        h('div', { style: { ...css.skeletonBar('38%', 28), marginTop: 14 } }),
+                      ),
+                    ),
+                  )
                 : null,
               !marketLoading && marketItems.length === 0 && !marketError
                 ? h('div', { style: css.emptyBox },
@@ -2857,18 +2909,21 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h('span', null, say('emptyHint', '换个关键词，或清空搜索框看看全部技能')))
                 : skills.map((skill) => {
                     const on = skill.enabled !== false
+                    const hovered = skillHover === skill.name
                     return h(
                       'div',
                       {
                         key: skill.name,
-                        style: on ? css.skillCard : { ...css.skillCard, ...css.itemOff },
+                        style: { ...css.skillCard(hovered), ...(on ? {} : css.itemOff) },
                         title: skill.linkTarget ?? skill.logicalPath ?? skill.path ?? undefined,
+                        onMouseEnter: () => setSkillHover(skill.name),
+                        onMouseLeave: () => setSkillHover((previous) => (previous === skill.name ? null : previous)),
                       },
                       h(
                         'div',
                         { style: css.cardHead },
                         h('span', { style: css.cardName }, skill.name),
-                        h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, sourceShort(skill)),
+                        h('span', { style: { ...css.badge(on), flex: '0 0 auto' } }, sourceShort(skill)),
                         skill.linkTarget
                           ? h('span', {
                               style: { ...css.metaText, flex: '0 0 auto', cursor: 'pointer' },
@@ -2879,7 +2934,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         skill.readOnly
                           ? h('span', { style: { ...css.metaText, flex: '0 0 auto' }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
                           : null,
-                        h('span', { style: { ...css.hint, flex: '0 0 auto' } }, String(Math.min((skill.description ?? '').length, 500))),
+                      ),
+                      // 信息带：与市场卡片同构（来源已在头部徽标，这里只放成本信息）。
+                      h(
+                        'div',
+                        { style: css.marketCardMeta },
+                        h('span', { title: say('descCharsTitle', 'SKILL.md 描述字符数（计入目录成本）') },
+                          String(Math.min((skill.description ?? '').length, 500)) + ' ' + say('charsUnit', '字符')),
+                        skill.refCount > 1
+                          ? h('span', { style: { opacity: 0.5 } }, '·')
+                          : null,
+                        skill.refCount > 1
+                          ? h('span', { title: `${say('refCountTitle', '引用它的技能包')}：${(skill.refs ?? []).join('、')}` },
+                              say('refCountShort', '引用') + ' ' + skill.refCount)
+                          : null,
                       ),
                       h('div', { style: css.cardDesc }, skill.description ?? ''),
                       skill.note
@@ -2887,9 +2955,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         : null,
                       h(
                         'div',
-                        { style: css.cardFoot },
+                        { style: css.marketCardFoot },
                         h('span', { style: css.dot(on) }),
-                        h('span', { style: { fontSize: fs.meta, opacity: op.meta } },
+                        h('span', { style: { ...css.hint, flex: '0 0 auto' } },
                           on ? say('enabled', '已启用') : (reasonLabel(skill.hiddenReason) || say('disabledBadge', '已停用'))),
                         h('span', { style: { flex: '1 1 auto' } }),
                         h('button', {
@@ -2909,16 +2977,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           onClick: () => openNote(skill),
                         }, h(Icon, { name: 'edit', size: 14 })),
 
-                        skill.refCount > 1
-                          ? h(
-                              'span',
-                              {
-                                style: css.refBadge,
-                                title: `${say('refCountTitle', '引用它的技能包')}：${(skill.refs ?? []).join('、')}${skill.refCount > (skill.refs ?? []).length ? ' …' : ''}`,
-                              },
-                              say('refCountShort', '引用') + ' ' + skill.refCount,
-                            )
-                          : null,
                         skill.uninstallable === true
                           ? h('button', {
                               type: 'button',
