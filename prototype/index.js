@@ -11,7 +11,7 @@
  * 为什么不走 Remote：Typert 的客户端装配是构建期固定清单、生成器不随
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
-import { execFile, execFileSync } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
@@ -965,15 +965,18 @@ function openSkillDirectory(ctx, body) {
   if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
   const dir = skillDirectory(ctx, name, body?.path)
   if (!dir) return { status: 404, body: { ok: false, error: '找不到这个技能目录：' + name } }
+  // Windows 上 explorer 成功打开也会返回非 0；且 windowsHide 会让它不弹窗口。
+  // 所以用 detached + ignore stdio 启动，只关心「能否启动」，不看退出码。
+  const [command, args] =
+    process.platform === 'win32'
+      ? ['explorer.exe', [dir]]
+      : process.platform === 'darwin'
+        ? ['open', [dir]]
+        : ['xdg-open', [dir]]
   try {
-    if (process.platform === 'win32') {
-      // explorer 打开目录成功时也可能返回非 0，故不校验退出码。
-      execFile('explorer.exe', [dir], { windowsHide: true }, () => {})
-    } else if (process.platform === 'darwin') {
-      execFile('open', [dir], () => {})
-    } else {
-      execFile('xdg-open', [dir], () => {})
-    }
+    const child = spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: false })
+    child.on('error', (error) => note('skill-reveal-failed', { name, dir, error: String(error?.message ?? error) }))
+    child.unref()
   } catch (error) {
     return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
   }
