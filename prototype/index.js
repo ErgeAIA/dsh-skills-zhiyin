@@ -359,6 +359,9 @@ export function apply(ctx) {
       const name = (typeof body?.name === 'string' ? body.name.trim() : '') || title || '导入的技能包'
       const newId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
       packs.push({ id: newId, name, enabled: true, members: names, conflictsWith: [], order: packs.length })
+      // 导入包默认启用：与「新建」一致，按互斥规则关掉「全部技能」，否则两个都亮着。
+      const importAllPack = packs.find((candidate) => candidate.id === ALL_PACK_ID)
+      if (importAllPack) importAllPack.enabled = false
       saveState(state)
       invalidateAll()
       return { status: 200, body: { ok: true, id: newId, members: names.length, names } }

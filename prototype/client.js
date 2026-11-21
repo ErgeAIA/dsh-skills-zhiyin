@@ -2643,11 +2643,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         title: say('marketOpen', '在 skills.sh 打开技能页'),
                         style: { ...css.marketCardTitle, color: 'inherit', textDecoration: 'none', cursor: 'pointer', flex: '1 1 auto' },
                       }, item.name),
-                      installed
-                        ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
-                        : item.installable === false
-                          ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.75 }, title: say('marketHostedHint', 'skills.sh 托管技能，没有公开 GitHub 仓库，无法直接安装') }, say('marketHostedBadge', '托管'))
-                          : null,
+                      // 右上角只保留「托管」这类需要警示的状态；「已安装」放底部操作区，避免同一信息出现两次。
+                      item.installable === false && !installed
+                        ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.75 }, title: say('marketHostedHint', 'skills.sh 托管技能，没有公开 GitHub 仓库，无法直接安装') }, say('marketHostedBadge', '托管'))
+                        : null,
                     ),
                     h(
                       'div',
