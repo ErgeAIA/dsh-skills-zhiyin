@@ -2,7 +2,7 @@
 title: Decision Log
 type: decision-log
 project: dsh-skills-zhiyin
-updated: 2026-11-19
+updated: 2026-11-21
 priority: higher-than-prd
 description: >
   开发过程决策日志，优先级高于 PRD；冲突时以本文件最新条目为准（PRD/ADR 由用户自行同步，本技能不代改）。
@@ -15,6 +15,14 @@ description: >
 > **优先级高于 PRD**：冲突时以本文件最新决策为准；PRD/ADR 由用户自行同步，本技能不代改。
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
+
+## DEC-008: 目录预算撤下阈值，只展示成本
+
+- **日期**：2026-11-21
+- **背景**：设置页展示「目录字符数已超出预算 25555 / 8000」的红条。8000 是早期按 PRD §6.8 自定的默认值，并无依据；新用户看到红色告警会以为出了问题。用户要求：只展示成本，阈值必须先调研社区/官方依据，不能凭感觉定。
+- **决策**：撤下 8000 预算与超限告警，界面只展示目录字符数（成本估算公式不变：可见技能描述截断 500 之和 + 200 框架开销）。调研结论（2026-11-21）：① Agent Skills 官方规范：单条 description ≤ 1024 字符（API 拒绝超限）、name ≤ 64 字符；② Claude Code（2026）路由清单把 description + when_to_use 合并截到约 1536 字符（v2.1.105 起），全部已装技能的目录总量参考 ≈ 上下文窗口的 1%，超预算按 LRU 丢弃描述而非截断（v2.1.129+）；③ 单条描述写作目标 400–1000 字符。中文约 1 字符 1 token，「1% 上下文」折算的字符数与英文差异大，因此不做固定字符阈值。待核实：DSH 自身对目录的注入行为与上限。
+  来源：https://platform.claude.com/docs/zh-CN/build-with-claude/skills-guide （请求限制）；https://github.com/josiahsiegel/claude-plugin-marketplace/blob/main/plugins/plugin-master/skills/triggering-reliability/references/severity-and-limits.md （Claude Code 2026 三层上限）。
+- **验证**：client 移除 pct/进度条/告警与 budgetOf/alertBudget 文案及遗留 bar/barFill/budget 样式；host 移除 BUDGET_CHARS 与 budgetChars 字段；node --check 双半边 exit 0；budgetChars/alertBudget/budgetOf 残留引用扫描为 0。
 
 ## DEC-006: 文档收敛到 docs/ 子目录
 

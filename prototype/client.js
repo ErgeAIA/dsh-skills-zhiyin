@@ -28,8 +28,7 @@ window.__ModuleLoader__.load({
         statUser: '仅用户可用',
         statNeither: '仅内部可用',
         budget: '目录字符数',
-        budgetOf: '（预算 8000）',
-        scope: '观测范围',
+              scope: '观测范围',
         scopeOf: '个在跑的会话',
         complete: '观测完整',
         incomplete: '观测不完整（已列出确认到的部分）',
@@ -150,8 +149,7 @@ window.__ModuleLoader__.load({
         packCostUnit: '字符',
         packNotInCombo: '本组合未纳入',
         packHiddenAgents: '被 .agents 开关挡住',
-        alertBudget: '目录字符数已超出预算',
-        alertConflict: '同名技能冲突',
+              alertConflict: '同名技能冲突',
         alertFrom: '个来源',
         alertGhost: '技能包引用了未安装技能',
         close: '关闭',
@@ -282,8 +280,7 @@ window.__ModuleLoader__.load({
         statUser: 'User-only',
         statNeither: 'Internal only',
         budget: 'Catalog characters',
-        budgetOf: '(budget 8000)',
-        scope: 'Observed scopes',
+              scope: 'Observed scopes',
         scopeOf: 'running sessions',
         complete: 'Observation complete',
         incomplete: 'Observation incomplete (confirmed subset listed)',
@@ -404,8 +401,7 @@ window.__ModuleLoader__.load({
         packCostUnit: 'chars',
         packNotInCombo: 'Not in active combo',
         packHiddenAgents: 'hidden by .agents switch',
-        alertBudget: 'Catalog characters exceed the budget',
-        alertConflict: 'Duplicate skill names',
+              alertConflict: 'Duplicate skill names',
         alertFrom: 'sources',
         alertGhost: 'Pack references skills that are not installed',
         close: 'Close',
@@ -709,18 +705,6 @@ window.__ModuleLoader__.load({
       matrixBy: { fontSize: 12, opacity: 0.62, flex: '1 1 auto', minWidth: 0 },
       matrixNum: { fontSize: 12.5, opacity: 0.8, flex: '0 0 auto' },
       refBadge: { fontSize: 11, opacity: 0.72, flex: '0 0 auto' },
-      bar: {
-        height: 6,
-        borderRadius: 999,
-        background: 'rgba(128,128,128,0.22)',
-        overflow: 'hidden',
-        marginTop: 8,
-      },
-      barFill: (pct) => ({
-        height: '100%',
-        width: `${Math.min(100, pct)}%`,
-        background: pct > 100 ? '#d9534f' : pct > 80 ? '#e0a33e' : '#4a9d6a',
-      }),
       budgetRow: {
         display: 'flex',
         alignItems: 'center',
@@ -730,21 +714,6 @@ window.__ModuleLoader__.load({
       },
       budgetLabel: { fontSize: 11.5, opacity: 0.55, flex: '0 0 auto' },
       budgetNum: { fontSize: 12, fontWeight: 600, flex: '0 0 auto' },
-      budgetCap: { fontSize: 11, opacity: 0.45, fontWeight: 400 },
-      budgetTrack: {
-        flex: '1 1 auto',
-        height: 4,
-        borderRadius: 999,
-        background: 'rgba(128,128,128,0.18)',
-        overflow: 'hidden',
-        minWidth: 80,
-      },
-      budgetFill: (pct) => ({
-        display: 'block',
-        height: '100%',
-        width: `${Math.min(100, pct)}%`,
-        background: pct > 100 ? '#d9534f' : pct > 80 ? '#e0a33e' : 'rgba(128,128,128,0.55)',
-      }),
       input: {
         flex: '1 1 220px',
         minWidth: 160,
@@ -1750,7 +1719,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         return sorted
       }, [scoped, query, filter, sortField])
 
-      const pct = data ? Math.round((data.catalogChars / data.budgetChars) * 100) : 0
       const sourceLabel = (skill) => {
         const root = skill.root
           ? skill.root.replace(/^[A-Za-z]:\\Users\\[^\\]+\\/, '~/').replace(/\\/g, '/')
@@ -1934,12 +1902,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .finally(() => setBusy(false))
       }
 
-      // 告警：目录超预算 / 同名冲突 / 包内引用了未安装技能
+      // 告警：同名冲突 / 包内引用了未安装技能（目录成本只展示，不设阈值，避免误导新用户）
       const alerts = React.useMemo(() => {
         const out = []
-        if (data && data.catalogChars > data.budgetChars) {
-          out.push({ key: 'budget', text: `${say('alertBudget', '目录字符数已超出预算')} ${data.catalogChars} / ${data.budgetChars}` })
-        }
         if (data && Array.isArray(data.conflicts)) {
           for (const conflict of data.conflicts) {
             out.push({ key: 'conflict:' + conflict.name, text: `${say('alertConflict', '同名技能冲突')}：${conflict.name}（${conflict.count} ${say('alertFrom', '个来源')}）` })
@@ -2191,13 +2156,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h(
                     'div',
                     { style: css.groupTitle },
-                    say('budget', '目录字符数'),
-                    h('span', { style: { ...css.budgetNum, marginLeft: 8 } }, String(data.catalogChars),
-                      h('span', { style: css.budgetCap }, ` / ${data.budgetChars}`)),
+                    h('span', { title: say('budgetHint', '成本估算：只统计当前模型可见技能的描述（每条截断 500 字符）+ 200 框架开销。没有硬性上限，阈值待调研，仅供参考。') }, say('budget', '目录字符数')),
+                    h('span', { style: { ...css.budgetNum, marginLeft: 8 } }, String(data.catalogChars)),
                   ),
                   h('div', { style: css.groupDesc },
                     data.complete ? say('complete', '观测完整') : say('incomplete', '观测不完整')),
-                  h('span', { style: { ...css.budgetTrack, marginTop: 6 } }, h('span', { style: css.budgetFill(pct) })),
                 ),
               ),
             )
