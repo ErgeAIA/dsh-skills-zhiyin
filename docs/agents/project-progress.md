@@ -17,13 +17,19 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（目录成本撤下阈值走 fix/catalog-cost-no-budget → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮归档原位置：21d4827 → 0f53340
+- **当前分支**：main（目录成本信息弹窗走 feat/catalog-cost-info-modal → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮撤下阈值：214475f → 8f88b52
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 19:4x 目录成本只展示不设阈值（DEC-008，撤下 8000 预算与告警）
+- **最后更新**：2026-11-21 19:5x 目录字符数做成信息弹窗（解释 + 建议 + 出处）
+  - 「目录字符数 / 观测完整」整块可点击（带 info 图标），打开 DEC-008 调研成果的信息弹窗。
+  - 弹窗六段：数字含义（描述截断 500 之和 + 200 估算，不是报错）→ 为什么值得看（路由信号、token、目录追加进会话历史）→ 官方/社区量级（1024 硬上限、~1536 路由清单、~1% 上下文与 LRU 丢弃、400–1000 写作目标、中英 token 差异）→ 我们的建议（关掉不用技能、描述短且触发词前置、别为压数字牺牲可用性）→ 出处（Anthropic 平台文档、Claude Code 2026 上限参考）→ 待核实（DSH 注入行为未实测）。
+  - 仅改 client：新增 info 图标、costSection/costHead/costBullet/costLink 样式、costInfoOpen 状态；node --check client exit 0。
+  - 待验收：F5 后点「目录字符数」卡片弹出说明，链接可打开，右上角 X 与「知道了」可关闭。
+
+- 上一轮：2026-11-21 19:4x 目录成本只展示不设阈值（DEC-008，撤下 8000 预算与告警）
   - 调研结论：① Agent Skills 官方规范：description ≤ 1024 字符（API 拒绝超限）、name ≤ 64；② Claude Code（2026）：路由清单 description+when_to_use 合并截 ~1536（v2.1.105 起），全部已装技能目录总量参考 ≈ 上下文窗口 1%，超预算按 LRU 丢弃描述而非截断（v2.1.129+）；③ 单条描述写作目标 400–1000。中文 ~1 字符 1 token，固定字符阈值不可靠 → 只展示成本。
   - 代码：client 删除 pct/进度条/超预算告警/budgetOf、alertBudget 文案与遗留 bar、barFill、budget 样式；host 删除 BUDGET_CHARS 与 budgetChars 字段；成本数字加 tooltip 说明估算口径。
   - node --check 双半边 exit 0；budgetChars/alertBudget/budgetOf/barFill 残留扫描为 0。
