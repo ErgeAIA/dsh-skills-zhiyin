@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（安装按钮文案 + 统计口径走 fix/install-label-and-count → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮徽标+互斥：26bf60a → 8b9a32c
+- **当前分支**：main（修复 400/TDZ 走 fix/state-tdz → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮安装按钮+统计：2a07df9 → 5d6d269
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:2x 市场安装按钮收窄 + 修复技能总数随 .agents 开关抖动
+- **最后更新**：2026-11-22 00:3x 修复设置页 400 / 一直加载中（TDZ 变量遮蔽）
+  - 现象：织音面板「读取失败：HTTP 400」，技能列表卡在「正在读取技能列表…」；archive/market/probe/backups 均 200，只有 /zhiyin/state 挂。
+  - 根因：上一轮加的模块级 let observedNames 与 collectState 内第 2341 行已有的局部 const observedNames 同名，同一函数作用域内第 2282 行的赋值命中该局部变量（TDZ），抛 ReferenceError；宿主把 resource 异常统一转成 400。
+  - 修复：模块级变量改名 observedSkillNames，与函数内局部彻底解耦。
+  - 验证：假 ctx 冒烟（mod.apply → 执行全部 effect → 调 state.resource()）通过，23 条路由注册成功、state 返回合法 JSON；node --check 双半边 exit 0。
+  - 待验收：重启 DSH 后设置页正常加载技能列表，不再出现 HTTP 400。
+
+- 上一轮：2026-11-22 00:2x 市场安装按钮收窄 + 修复技能总数随 .agents 开关抖动
   - 安装按钮：「安装技能」在窄卡片里换行，改为「图标 + 安装」（安装中显示「安装中…」），并加 whiteSpace: nowrap 禁止折行。
   - 统计口径（BUG-009）：磁盘实测 ~/.dsh/skills 有 96 个目录，其中 92 个是指向 ~/.agents/skills 的软链；两处同名技能在合并时只算一次。但 shadowCandidates 直接遍历 state.known（只增不减的观测历史，实测 179 条）生成影子候选，把已从磁盘删除的陈旧条目也当成技能，导致「全部技能」开关前后总数差 1（111 vs 112）。
   - 修复：新增模块级 observedNames（collectState 每轮写入），shadowCandidates 跳过本轮已观测到的名字，陈旧条目不参与统计。
