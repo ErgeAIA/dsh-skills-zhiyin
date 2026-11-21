@@ -645,6 +645,9 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, name, to } }
   })
 
+  // 打开技能所在目录：只调用系统文件管理器，不写任何文件。
+  post(ctx, '/zhiyin/reveal', async (body) => openSkillDirectory(ctx, body))
+
   // 归档：列出被「卸载」移入 archive 的技能，供设置页查看与恢复。
   ctx.effect(() =>
     ctx.webServer.register({
@@ -936,6 +939,46 @@ function installRoot(ctx, target) {
 
 function archiveRootPath() {
   return join(stateDir(), 'archive')
+}
+
+/**
+ * 找到某个技能的实际目录（不是根目录）。
+ * 顺序：织音管理的三个安装根 → 快照里的真实路径（含软链接实体）。
+ */
+function skillDirectory(ctx, name, realPath) {
+  const roots = [installRoot(ctx, 'agents'), installRoot(ctx, 'user'), installRoot(ctx, 'project')].filter(Boolean)
+  for (const root of roots) {
+    const candidate = join(root, name)
+    if (existsSync(join(candidate, 'SKILL.md'))) return candidate
+  }
+  if (typeof realPath === 'string' && realPath.length > 0) {
+    // realPath 是 SKILL.md 的真实路径（软链接已解引用），取它所在目录。
+    const dir = realPath.replace(/[\\/]SKILL\.md$/i, '')
+    if (existsSync(dir)) return dir
+  }
+  return null
+}
+
+/** 在系统文件管理器里打开这个技能目录（只读操作，不写任何文件）。 */
+function openSkillDirectory(ctx, body) {
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+  const dir = skillDirectory(ctx, name, body?.path)
+  if (!dir) return { status: 404, body: { ok: false, error: '找不到这个技能目录：' + name } }
+  try {
+    if (process.platform === 'win32') {
+      // explorer 打开目录成功时也可能返回非 0，故不校验退出码。
+      execFile('explorer.exe', [dir], { windowsHide: true }, () => {})
+    } else if (process.platform === 'darwin') {
+      execFile('open', [dir], () => {})
+    } else {
+      execFile('xdg-open', [dir], () => {})
+    }
+  } catch (error) {
+    return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
+  }
+  note('skill-revealed', { name, dir })
+  return { status: 200, body: { ok: true, name, dir } }
 }
 
 /** 归档来源记录：archive/origins.json —— { [key]: { target, from, archivedAt } }，供恢复时默认回原目录。 */
@@ -1957,7 +2000,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory }
 
 function invalidateAll() {
   for (const entry of registrations) {
