@@ -553,6 +553,10 @@ window.__ModuleLoader__.load({
         minHeight: 120,
       },
       modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
+      costSection: { fontSize: 12.5, lineHeight: 1.6, opacity: 0.86, marginTop: 6 },
+      costHead: { fontSize: 12, fontWeight: 600, marginTop: 12, color: 'var(--zhiyin-accent, #e0743c)' },
+      costBullet: { fontSize: 12.5, lineHeight: 1.6, opacity: 0.86, marginTop: 4 },
+      costLink: { color: 'var(--zhiyin-accent, #e0743c)', textDecoration: 'none' },
       seg: {
         display: 'inline-flex',
         borderRadius: 10,
@@ -1139,6 +1143,11 @@ window.__ModuleLoader__.load({
     ['circle', { cx: 11, cy: 11, r: 7 }],
     ['path', 'm21 21-4.3-4.3'],
   ],
+  info: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', 'M12 11v6'],
+    ['circle', { cx: 12, cy: 7.6, r: 0.6, fill: 'currentColor', stroke: 'none' }],
+  ],
 }
 
 function Icon({ name, size = 15 }) {
@@ -1316,6 +1325,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [archiveLoading, setArchiveLoading] = React.useState(false)
       const [archiveError, setArchiveError] = React.useState('')
       const [archiveTarget, setArchiveTarget] = React.useState('origin')
+      const [costInfoOpen, setCostInfoOpen] = React.useState(false)
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -2149,14 +2159,21 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               ),
               h(
                 'div',
-                { style: css.groupRowLast },
+                {
+                  style: { ...css.groupRowLast, cursor: 'pointer' },
+                  onClick: () => setCostInfoOpen(true),
+                  title: say('costInfoTip', '点开看这个数字的含义、建议与出处'),
+                },
                 h(
                   'div',
                   { style: css.groupMain },
                   h(
                     'div',
                     { style: css.groupTitle },
-                    h('span', { title: say('budgetHint', '成本估算：只统计当前模型可见技能的描述（每条截断 500 字符）+ 200 框架开销。没有硬性上限，阈值待调研，仅供参考。') }, say('budget', '目录字符数')),
+                    h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
+                      say('budget', '目录字符数'),
+                      h(Icon, { name: 'info', size: 12 }),
+                    ),
                     h('span', { style: { ...css.budgetNum, marginLeft: 8 } }, String(data.catalogChars)),
                   ),
                   h('div', { style: css.groupDesc },
@@ -2867,6 +2884,58 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ),
               )
             })()
+          : null,
+
+        costInfoOpen
+          ? h(
+              'div',
+              { style: css.overlay, onClick: () => setCostInfoOpen(false) },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalMd }, onClick: (event) => event.stopPropagation() },
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('costInfoTitle', '目录字符数是什么？')),
+                  h('button', {
+                    type: 'button',
+                    style: css.iconBtn,
+                    title: say('close', '关闭'),
+                    'aria-label': say('close', '关闭'),
+                    onClick: () => setCostInfoOpen(false),
+                  }, h(Icon, { name: 'close', size: 13 })),
+                ),
+                h(
+                  'div',
+                  { style: css.modalBody },
+                  h('div', { style: css.costSection }, say('costInfoWhat', '这是当前可见技能描述的成本估算：每条描述最多算 500 字符，累加后再加 200 框架开销。它是相对成本尺子，不是 DSH 实际注入的精确字符数（不含技能名和正文），也不是报错。')),
+                  h('div', { style: css.costHead }, say('costInfoWhyHead', '为什么值得看')),
+                  h('div', { style: css.costSection }, say('costInfoWhy', '技能描述是模型判断「何时调用这个技能」的路由信号。目录越长，每次请求付出的 token 越多；每次变更还会把新目录追加进会话历史。')),
+                  h('div', { style: css.costHead }, say('costInfoRulesHead', '官方与社区给出的量级')),
+                  h('div', { style: css.costBullet }, '• ' + say('costRule1', '单条描述 ≤ 1024 字符是官方硬上限（API 会拒绝）；写作目标 400–1000，触发词前置。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costRule2', 'Claude Code 路由清单把 description + when_to_use 合并截到约 1536 字符（v2.1.105 起）。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costRule3', '目录总量参考 ≈ 上下文窗口的 1%；超限后新版按「最近最少使用」丢弃描述而非截断——你以为可用的技能可能悄悄不参与路由。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costRule4', '中文约 1 字符 1 token、英文约 4 字符 1 token，所以不能用一个固定字符数当红线。')),
+                  h('div', { style: css.costHead }, say('costAdviceHead', '我们的建议')),
+                  h('div', { style: css.costBullet }, '• ' + say('costAdvice1', '长期不用的技能就关掉或移出启用包，比盯着数字更重要。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costAdvice2', '描述只写「做什么 + 何时用」，触发词前置，别堆废话。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costAdvice3', '这个数字只是成本尺子，不要为了压低它牺牲可用性。')),
+                  h('div', { style: css.costHead }, say('costSourceHead', '出处与待核实')),
+                  h('div', { style: css.costBullet },
+                    h('a', { href: 'https://platform.claude.com/docs/zh-CN/build-with-claude/skills-guide', target: '_blank', rel: 'noreferrer', style: css.costLink }, 'Anthropic 平台文档 · 请求限制'),
+                  ),
+                  h('div', { style: css.costBullet },
+                    h('a', { href: 'https://github.com/josiahsiegel/claude-plugin-marketplace/blob/main/plugins/plugin-master/skills/triggering-reliability/references/severity-and-limits.md', target: '_blank', rel: 'noreferrer', style: css.costLink }, 'Claude Code 描述长度上限与分层（2026）'),
+                  ),
+                  h('div', { style: css.costSection }, say('costInfoPending', '待核实：DSH 自身如何注入目录（截断/丢弃/压缩）尚未实测；我们会抓取真实会话目录来校准口径。')),
+                ),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  h('button', { type: 'button', style: css.primaryBtn, onClick: () => setCostInfoOpen(false) }, say('gotIt', '知道了')),
+                ),
+              ),
+            )
           : null,
 
         creating
