@@ -1322,6 +1322,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketLoading, setMarketLoading] = React.useState(false)
       const [marketError, setMarketError] = React.useState('')
       const [marketLoaded, setMarketLoaded] = React.useState(false)
+      const [marketBusy, setMarketBusy] = React.useState(null)   // 正在安装的条目 id
+      const [marketDone, setMarketDone] = React.useState({})     // 已装完的条目 id
       const [marketDesc, setMarketDesc] = React.useState({})
       // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录。
       const [archiveEntries, setArchiveEntries] = React.useState([])
@@ -1522,17 +1524,40 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .catch((error) => setMarketError(String(error?.message ?? error)))
           .finally(() => setMarketLoading(false))
       }, [])
-      // 市场点安装：打开安装弹窗，先选安装目录（与「通过地址安装」一致），再装这一个技能。
+      // 市场点安装：直接在卡片上安装（进行中转圈 + 完成标记），失败才回落到安装弹窗。
       const installFromMarket = (item) => {
         if (!item?.source || item.installable === false) return
-        setInstallPath(item.source)
-        setInstallSkill(item.skillId || item.name)
-        setInstallTarget('agents')
-        setInstallError('')
-        setInstallCandidates([])
-        setInstallSelected([])
-        setInstallProgress('')
-        setInstalling(true)
+        const key = item.id || item.source + '/' + item.name
+        setMarketBusy(key)
+        setMarketError('')
+        fetch('/zhiyin/install', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: item.source, target: 'agents', skill: item.skillId || item.name }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result?.ok === true) {
+              setMarketDone((previous) => ({ ...previous, [key]: true }))
+              load()
+              return
+            }
+            if (result?.error === 'multiple') {
+              // 同名匹配不到：交给弹窗让人选。
+              setInstallPath(item.source)
+              setInstallSkill(item.skillId || item.name)
+              setInstallTarget('agents')
+              setInstallCandidates(Array.isArray(result.candidates) ? result.candidates : [])
+              setInstallSelected([])
+              setInstallProgress('')
+              setInstallError('')
+              setInstalling(true)
+              return
+            }
+            setMarketError((result?.error ?? '安装失败') + ' · ' + item.name)
+          })
+          .catch((error) => setMarketError(String(error?.message ?? error)))
+          .finally(() => setMarketBusy(null))
       }
       React.useEffect(() => {
         if (tab === 'market' && !marketLoaded) loadMarket('')
@@ -2474,7 +2499,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       installed
                         ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
                         : item.installable === false
-                          ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.7 }, title: say('marketHostedHint', 'skills.sh 托管技能（非 GitHub 仓库），暂不支持直接安装') }, say('marketHostedBadge', '托管'))
+                          ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.7 }, title: say('marketHostedHint', 'skills.sh 托管技能，没有公开 GitHub 仓库，无法直接安装') }, say('marketHostedBadge', '托管'))
                           : null,
                     ),
                     desc
@@ -2485,22 +2510,39 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       { style: css.cardFoot },
                       h('span', { style: { ...css.hint, flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
                       h('span', { style: { flex: '1 1 auto' } }),
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          style: css.iconBtn,
-                          title: installed
-                            ? say('marketInstalled', '已安装')
-                            : item.installable === false
-                              ? say('marketHostedHint', 'skills.sh 托管技能（非 GitHub 仓库），暂不支持直接安装')
-                              : say('install', '安装技能'),
-                          'aria-label': installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
-                          disabled: installed || item.installable === false,
-                          onClick: () => installFromMarket(item),
-                        },
-                        h(Icon, { name: 'packagePlus', size: 14 }),
-                      ),
+                      (function renderInstall() {
+                        const key = item.id || item.source + '/' + item.name
+                        const running = marketBusy === key
+                        const done = marketDone[key] === true
+                        const busyElsewhere = marketBusy != null && !running
+                        if (done || installed) {
+                          return h('span', { style: { ...css.metaText, flex: '0 0 auto', color: '#4a9d6a' }, title: say('marketInstalled', '已安装') },
+                            h(Icon, { name: 'check', size: 13 }), ' ' + say('marketInstalled', '已安装'))
+                        }
+                        if (item.installable === false) {
+                          // 托管技能没有公开仓库：给出「在 skills.sh 打开」而不是一个装不了的按钮。
+                          return h('button', {
+                            type: 'button',
+                            style: css.iconBtn,
+                            title: say('marketHostedHint2', 'skills.sh 托管技能，没有公开仓库；点此在 skills.sh 打开安装说明'),
+                            'aria-label': say('marketOpen', '在 skills.sh 打开技能页'),
+                            onClick: () => window.open(item.url, '_blank', 'noreferrer'),
+                          }, h(Icon, { name: 'search', size: 14 }))
+                        }
+                        return h(
+                          'button',
+                          {
+                            type: 'button',
+                            style: running ? { ...css.iconBtn, cursor: 'progress' } : css.iconBtn,
+                            title: running ? say('marketInstalling', '正在安装…') : busyElsewhere ? say('marketBusyOther', '另一个技能正在安装，请稍候') : say('install', '安装技能'),
+                            'aria-label': running ? say('marketInstalling', '正在安装…') : say('install', '安装技能'),
+                            'aria-busy': running ? 'true' : 'false',
+                            disabled: running || busyElsewhere,
+                            onClick: () => installFromMarket(item),
+                          },
+                          running ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                        )
+                      })(),
                     ),
                   )
                 }),
@@ -3089,7 +3131,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     onClick: () => setInstalling(false),
                   }, h(Icon, { name: 'close', size: 13 })),
                 ),
-                h('p', { style: css.hint }, say('installHint', '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能。无论仓库里有多少技能，都按 SKILL.md 的 name 平级装到所选目录，不会多套一层仓库目录')),
+                h('p', { style: css.hint }, say('installHint', '粘贴 GitHub 仓库、skills.sh 技能页链接、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能。无论仓库里有多少技能，都按 SKILL.md 的 name 平级装到所选目录，不会多套一层仓库目录')),
                 h(ClearField, {
                   wrapperStyle: { width: '100%' },
                   style: css.field,
