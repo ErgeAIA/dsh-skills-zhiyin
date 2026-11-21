@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（按钮折行修复走 fix/button-nowrap → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 400/TDZ：5b472e8 → 15422ee
+- **当前分支**：main（UI 收尾：市场骨架屏 + 技能卡统一走 style/final-polish → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮按钮折行：58aa616 → c731358
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:3x 修复市场「安装」按钮图标与文字上下折行
+- **最后更新**：2026-11-22 00:5x UI 收尾：市场首屏骨架屏 + 技能列表卡片统一
+  - 市场骨架屏：首屏要并发拉 5 组 skills.sh 数据，原来只显示一行「正在读取技能市场…」。现改为 6 张骨架卡（瀑布流同构：标题/来源/三行描述/底部按钮占位），带 shimmer 渐变动画；@keyframes 通过 useEffect 挂一次 <style> 注入，并加 prefers-reduced-motion 关闭动画。
+  - 技能列表卡片统一：css.skillCard 由静态对象改为 (hover) => ({...})，与市场卡片同一套视觉语言——hover 上浮 2px、品牌橙边框、0 8px 24px 阴影、140ms 过渡；新增 skillHover 状态与 onMouseEnter/onMouseLeave。
+  - 卡片结构重排：头部（名称 + 来源徽标 + 软链/只读）→ 信息带（描述字符数 · 引用数，复用 css.marketCardMeta）→ 描述 → 备注 → 底部分隔线 + 圆点状态 + 操作区（打开目录/备注/卸载/开关）。去掉原来在头部和底部重复出现的状态文案与 refBadge。
+  - node --check 双半边 exit 0；假 ctx 冒烟：23 条路由注册、5 条 GET resource 全部成功。
+  - 待验收：F5 后市场首屏出现骨架卡再替换为真实卡片；技能列表卡片悬停有抬升高亮，与市场卡片视觉一致。
+
+- 上一轮：2026-11-22 00:3x 修复市场「安装」按钮图标与文字上下折行
   - 现象：上一轮已把文案从「安装技能」缩成「安装」，按钮仍显示为图标在上、文字在下的两行。
   - 根因：不是文案太长，而是 css.primaryBtn 缺少 display:inline-flex —— button 默认 display:inline-block 且内部是 SVG + 文本节点，没有 flex 容器约束时会按块级换行；上一轮把 whiteSpace 误写成了 title 旁边的 props（React 会当成未知 DOM 属性丢弃），所以完全没生效。
   - 修复：primaryBtn 补 display:inline-flex + alignItems/justifyContent center + gap:6 + whiteSpace:nowrap + flex:0 0 auto；css.btn 也补 whiteSpace:nowrap 防止其它窄容器按钮折行；删掉误放在 props 上的 whiteSpace。
