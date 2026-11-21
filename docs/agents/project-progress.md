@@ -17,13 +17,22 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（备注内联操作+弹窗统一X+死代码清理走 fix/note-inline-and-deadcode → 提交 5d7ecb7 → 合并 80b1dc2 → 已推送 origin，分支已删）；上一轮安装按钮状态机+图标：f8cda87 → 62949f7
+- **当前分支**：main（技能市场+UI 优化走 feat/market-and-ui → 提交 211c756 → 合并 3313af7 → 已推送 origin，分支已删）；上一轮备注内联+弹窗X+死代码：5d7ecb7 → 80b1dc2
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面只留「技能 / 技能包」两页；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 01:0x 备注编辑改为编辑框内联操作 + 全部弹窗统一右上角 X + 死代码清理（commit 5d7ecb7，merge 80b1dc2）
+- **最后更新**：2026-11-21 15:5x 新增技能市场（skills.sh）+ 安装按钮语义化 + 说明句上移 + 加载态修复（commit 211c756，merge 3313af7）
+  - 技能市场：新增第三个页签「技能市场」；宿主新增 GET /zhiyin/market 代理 skills.sh 公开搜索（浏览器跨域拿不到）；空查询=热门（q=skill + installs 降序，skills.sh 无 trending API）；关键词搜索；每行显示名称/来源/安装量/已安装徽标，一键安装到 ~/.agents/skills（多技能仓库返回 multiple 时自动打开安装弹窗勾选）；结果 5 分钟缓存 + 3 次重试（skills.sh 多 IP 个别超时）
+  - 参考 AI Vault：SKILLS_SH_SEARCH_API=https://www.skills.sh/api/search?q=&limit=，字段 {name,source,installs}；实测 host 侧 fetch 成功（trending 返回 find-skills 446 万安装）
+  - 安装按钮语义修正（/tuyi）：图标由 download 形（易读成下载）改为 package-plus（加一个技能包），并从纯图标改为「图标+安装技能」的品牌色主按钮，一眼可找
+  - 说明句上移：把「技能包开关决定包内技能是否对 agent 可见；单个技能也可以随时停用」移到标题下方最上方，删除页尾同一句
+  - 加载态修复：「正在读取技能列表…」原是列表视图三元表达式的 else，切到技能包/卡片视图时会常驻；改为仅 !data 时显示，列表 else 返回 null
+  - node --check 双半边 exit 0；marketSearch 真实网络实测 200（重试后）
+  - 待验收：完整重启 DSH 加载宿主 /zhiyin/market 后，F5 看「技能市场」页默认热门、搜索、一键安装
+
+- 上一轮：2026-11-21 01:0x 备注编辑改为编辑框内联操作 + 全部弹窗统一右上角 X + 死代码清理（commit 5d7ecb7，merge 80b1dc2）
   - 备注编辑弹窗：去掉底部「取消/保存」，改为编辑框内右下角并排两个图标——X=清空已输入、✓=保存（保存中显示 spinner）；仅编辑态出现；右上角 X 仍为关闭
   - 弹窗统一 X：新建技能包 / 改名 / 导入技能包 / 导入配置 / 备份 / 备注，全部在标题右侧加关闭 X，并移除底部「取消/关闭」文字按钮；有主操作的只留主操作
   - 死代码清理（-472 行）：移除组合/合奏页（tab、状态、comboRequest/openComboPreview/runCombo、4 个组合弹窗、渲染块）、包冲突声明弹窗、排除/常驻 setIntentFlag 等已从 UI 移除的残留（后端路由按 DEC 保留）；仅剩未使用的 combo 文案键（纯数据，不影响运行）
