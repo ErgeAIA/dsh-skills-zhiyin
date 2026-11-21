@@ -789,6 +789,12 @@ window.__ModuleLoader__.load({
         background: 'rgba(128,128,128,0.16)', color: 'inherit', opacity: 0.85,
       },
       noteActSave: { background: 'rgba(224,116,60,0.18)', color: 'var(--zhiyin-accent, #e0743c)' },
+      clearBtn: {
+        position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+        width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: 999, border: 'none', cursor: 'pointer',
+        background: 'rgba(128,128,128,0.22)', color: 'inherit', opacity: 0.7, padding: 0,
+      },
       btn: {
         padding: '6px 14px',
         borderRadius: 10,
@@ -1188,6 +1194,29 @@ function Icon({ name, size = 15 }) {
   )
 }
 
+function ClearField({ value, onChange, style, wrapperStyle, multiline = false, ...rest }) {
+  // 输入框内联「清除」X：所有文本输入共用，避免外围再加一排按钮。
+  const clear = value
+    ? h('button', {
+        type: 'button',
+        tabIndex: -1,
+        title: say('clearInput', '清除'),
+        'aria-label': say('clearInput', '清除'),
+        onMouseDown: (event) => event.preventDefault(),
+        onClick: () => onChange({ target: { value: '' } }),
+        style: multiline ? { ...css.clearBtn, top: 8, transform: 'none' } : css.clearBtn,
+      }, h(Icon, { name: 'close', size: 12 }))
+    : null
+  return h(
+    'span',
+    { style: { position: 'relative', display: 'block', ...wrapperStyle } },
+    multiline
+      ? h('textarea', { ...rest, value, onChange, style: { ...style, width: '100%', boxSizing: 'border-box', paddingRight: 30 } })
+      : h('input', { ...rest, value, onChange, style: { ...style, width: '100%', boxSizing: 'border-box', paddingRight: 30 } }),
+    clear,
+  )
+}
+
 function formatInstalls(value) {
   const n = Number(value) || 0
   if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
@@ -1311,6 +1340,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketError, setMarketError] = React.useState('')
       const [marketBusy, setMarketBusy] = React.useState(null)
       const [marketLoaded, setMarketLoaded] = React.useState(false)
+      const [marketDesc, setMarketDesc] = React.useState({})
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1451,36 +1481,53 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .then((payload) => {
             if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '请求失败')
             setMarketItems(Array.isArray(payload.skills) ? payload.skills : [])
+            setMarketDesc({})
             setMarketTrending(payload.trending !== false)
           })
           .catch((error) => setMarketError(String(error?.message ?? error)))
           .finally(() => setMarketLoading(false))
       }, [])
       const installFromMarket = (item) => {
-        setMarketBusy(item.source)
+        if (!item?.source) return
+        setMarketBusy(item.id || item.source)
         setMarketError('')
-        fetch('/zhiyin/install', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ text: item.source, target: 'agents' }),
-        })
-          .then((response) => response.json())
+        const post = (body) =>
+          fetch('/zhiyin/install', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          }).then((response) => response.json())
+        // 先按「这个技能名」精确安装（宿主只装该技能并平铺到目标根）；装不到再退回弹窗勾选。
+        post({ text: item.source, target: 'agents', skill: item.skillId || item.name })
           .then((result) => {
             if (result?.ok === true) {
               load()
-              return
+              return null
             }
             if (result?.error === 'multiple') {
+              const candidates = Array.isArray(result.candidates) ? result.candidates : []
+              const wanted = String(item.name || item.skillId || '').toLowerCase()
+              const matched =
+                candidates.find((candidate) => String(candidate.name ?? '').toLowerCase() === wanted) ||
+                candidates.find((candidate) => String(candidate.subpath ?? '').split('/').pop().toLowerCase() === wanted)
+              if (matched) {
+                return post({ text: item.source, target: 'agents', subpath: matched.subpath }).then((second) => {
+                  if (second?.ok === true) load()
+                  else setMarketError(second?.error ?? '安装失败')
+                  return null
+                })
+              }
               setInstallPath(item.source)
               setInstallTarget('agents')
-              setInstallCandidates(result.candidates ?? [])
-              setInstallSelected((result.candidates ?? []).map((candidate) => candidate.subpath))
+              setInstallCandidates(candidates)
+              setInstallSelected([])
               setInstallProgress('')
               setInstallError('')
               setInstalling(true)
-              return
+              return null
             }
             setMarketError(result?.error ?? '安装失败')
+            return null
           })
           .catch((error) => setMarketError(String(error?.message ?? error)))
           .finally(() => setMarketBusy(null))
@@ -1488,6 +1535,31 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       React.useEffect(() => {
         if (tab === 'market' && !marketLoaded) loadMarket('')
       }, [tab, marketLoaded, loadMarket])
+      // 技能描述：搜索 API 不含描述，前 12 张卡片按需从详情页取（宿主代理 + 缓存）。
+      React.useEffect(() => {
+        if (!marketItems.length) return undefined
+        const missing = marketItems
+          .slice(0, 12)
+          .filter((item) => item.id && !Object.prototype.hasOwnProperty.call(marketDesc, item.id))
+        if (missing.length === 0) return undefined
+        let cancelled = false
+        Promise.all(
+          missing.map((item) =>
+            fetch('/zhiyin/market/desc?source=' + encodeURIComponent(item.source) + '&skill=' + encodeURIComponent(item.skillId), { headers: { accept: 'application/json' } })
+              .then((response) => response.json())
+              .then((payload) => [item.id, typeof payload?.description === 'string' ? payload.description : ''])
+              .catch(() => [item.id, '']),
+          ),
+        ).then((pairs) => {
+          if (cancelled) return
+          setMarketDesc((previous) => {
+            const next = { ...previous }
+            for (const [id, text] of pairs) next[id] = text
+            return next
+          })
+        })
+        return () => { cancelled = true }
+      }, [marketItems, marketDesc])
 
       // 导出配置：拉一份 JSON，直接让浏览器下载一份带时间戳的文件。
       const exportConfig = React.useCallback(() => {
@@ -2161,7 +2233,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h('button', { type: 'button', style: css.iconBtn, title: say('packImport', '导入 txt 技能包'), 'aria-label': say('packImport', '导入 txt 技能包'), onClick: () => { setImportText(''); setImportPath(''); setImportName(''); setImporting(true) }, disabled: busy }, h(Icon, { name: 'import', size: 14 })),
                   )
                 : null,
-              h('input', {
+              h(ClearField, {
+                wrapperStyle: { flex: '1 1 220px', minWidth: 0 },
                 style: css.input,
                 value: queryInput,
                 placeholder:
@@ -2330,7 +2403,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: css.toolbar },
-                h('input', {
+                h(ClearField, {
+                  wrapperStyle: { flex: '1 1 220px', minWidth: 0 },
                   style: css.input,
                   value: marketQuery,
                   placeholder: say('marketSearchPlaceholder', '搜索 skills.sh 技能（至少 2 个字符；留空看热门）'),
@@ -2367,37 +2441,49 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 : null,
               h(
                 'div',
-                { style: { ...css.list, marginTop: 12 } },
+                { style: { ...css.cardGrid, marginTop: 12 } },
                 marketItems.map((item) => {
                   const installed = (data.skills ?? []).some((skill) => skill.name === item.name)
+                  const desc = marketDesc[item.id]
+                  const descKnown = Object.prototype.hasOwnProperty.call(marketDesc, item.id)
                   return h(
                     'div',
-                    { key: item.id || item.source + '/' + item.name, style: css.item },
+                    { key: item.id || item.source + '/' + item.name, style: css.skillCard },
                     h(
                       'div',
-                      { style: css.itemMain },
-                      h(
-                        'div',
-                        { style: css.itemHead },
-                        h('span', { style: css.name }, item.name),
-                        h('span', { style: css.badge(true) }, item.source),
-                        installed
-                          ? h('span', { style: { ...css.badge(true), background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
-                          : null,
-                        h('span', { style: { ...css.hint, marginLeft: 'auto', flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
-                      ),
+                      { style: css.cardHead },
+                      h('a', {
+                        href: item.url || ('https://www.skills.sh/' + item.source + '/' + item.skillId),
+                        target: '_blank',
+                        rel: 'noreferrer',
+                        title: say('marketOpen', '在 skills.sh 打开技能页'),
+                        style: { ...css.cardName, color: 'inherit', textDecoration: 'none', cursor: 'pointer', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                      }, item.name),
+                      h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, item.source),
+                      installed
+                        ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
+                        : null,
                     ),
+                    desc
+                      ? h('div', { style: css.cardDesc }, desc)
+                      : h('div', { style: { ...css.cardDesc, opacity: 0.45 } }, descKnown ? say('marketNoDesc', '暂无描述') : '…'),
                     h(
-                      'button',
-                      {
-                        type: 'button',
-                        style: css.iconBtn,
-                        title: installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
-                        'aria-label': installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
-                        disabled: marketBusy != null || installed,
-                        onClick: () => installFromMarket(item),
-                      },
-                      marketBusy === item.source ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                      'div',
+                      { style: css.cardFoot },
+                      h('span', { style: { ...css.hint, flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
+                      h('span', { style: { flex: '1 1 auto' } }),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          style: css.iconBtn,
+                          title: installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
+                          'aria-label': installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
+                          disabled: installed || marketBusy != null,
+                          onClick: () => installFromMarket(item),
+                        },
+                        marketBusy === item.id ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                      ),
                     ),
                   )
                 }),
@@ -2664,7 +2750,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h('span', { style: css.modalTitle }, pack.name + ' · ' + say('packMembersTitle', '选择成员')),
                     h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setEditing(null) }, h(Icon, { name: 'close', size: 13 }),),
                   ),
-                  h('input', {
+                  h(ClearField, {
+                    wrapperStyle: { flex: '1 1 220px', minWidth: 0 },
                     style: css.input,
                     value: memberQuery,
                     placeholder: say('search', '按名称搜索'),
@@ -2730,7 +2817,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h('span', { style: css.modalTitle }, say('packNew', '新建技能包')),
                   h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setCreating(false) }, h(Icon, { name: 'close', size: 13 })),
                 ),
-                h('input', {
+                h(ClearField, {
+                  wrapperStyle: { width: '100%' },
                   style: css.field,
                   maxLength: 40,
                   value: draftName,
@@ -2778,7 +2866,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h('span', { style: css.modalTitle }, say('packRename', '改名')),
                   h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setRenaming(null) }, h(Icon, { name: 'close', size: 13 })),
                 ),
-                h('input', {
+                h(ClearField, {
+                  wrapperStyle: { width: '100%' },
                   style: css.field,
                   maxLength: 40,
                   value: renaming.name,
@@ -2827,8 +2916,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     onClick: () => setInstalling(false),
                   }, h(Icon, { name: 'close', size: 13 })),
                 ),
-                h('p', { style: css.hint }, say('installHint', '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能')),
-                h('input', {
+                h('p', { style: css.hint }, say('installHint', '粘贴 GitHub 仓库、技能目录、npx skills add 命令、SKILL.md 直链，或本地文件夹路径；只新建目录，不改已有技能。无论仓库里有多少技能，都按 SKILL.md 的 name 平级装到所选目录，不会多套一层仓库目录')),
+                h(ClearField, {
+                  wrapperStyle: { width: '100%' },
                   style: css.field,
                   value: installPath,
                   placeholder: say('installPath', 'owner/repo、https://github.com/owner/repo 或 D:\\skills\\my-skill'),
@@ -2866,7 +2956,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   ? h(
                       'div',
                       { style: { marginTop: 10 } },
-                      h('div', { style: css.hint }, say('installMultiple', '这个仓库里有多个技能，勾选后一起安装：')),
+                      h('div', { style: css.hint }, say('installMultiple', '这个仓库里有多个技能，勾选后一起安装（都平级装到所选目录）：')),
                       h('div', { style: { ...css.hint, marginTop: 2 } }, say('installSelectedCount', '已选 {n} / {m}').replace('{n}', String(installSelected.length)).replace('{m}', String(installCandidates.length))),
                       h(
                         'div',
@@ -2949,19 +3039,23 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setImporting(false) }, h(Icon, { name: 'close', size: 13 })),
                 ),
                 h('div', { style: css.hint }, say('importHint', '支持 AI Vault 导出的技能包 txt：每行「目录名 | 来源 | owner/repo | 分支 | 子目录」，# 开头的行会被忽略。')),
-                h('input', {
+                h(ClearField, {
+                  wrapperStyle: { width: '100%' },
                   style: css.field,
                   value: importName,
                   placeholder: say('packNamePlaceholder', '技能包名称（留空用文件里的名字）'),
                   onChange: (event) => setImportName(event.target.value),
                 }),
-                h('input', {
+                h(ClearField, {
+                  wrapperStyle: { width: '100%' },
                   style: css.field,
                   value: importPath,
                   placeholder: say('importPathPlaceholder', 'txt 文件绝对路径，例如 D:\\packs\\mattpocock.txt'),
                   onChange: (event) => setImportPath(event.target.value),
                 }),
-                h('textarea', {
+                h(ClearField, {
+                  multiline: true,
+                  wrapperStyle: { display: 'block' },
                   style: css.textarea,
                   value: importText,
                   placeholder: say('importTextPlaceholder', '或者直接把 txt 内容粘到这里'),
@@ -3008,7 +3102,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setImportingConfig(false) }, h(Icon, { name: 'close', size: 13 })),
                 ),
                 h('p', { style: css.hint }, say('importConfigHint2', '粘贴此前「导出配置」得到的 JSON。导入会覆盖当前的技能包与停用项；旧配置会先自动备份到插件状态目录。')),
-                h('textarea', {
+                h(ClearField, {
+                  multiline: true,
+                  wrapperStyle: { display: 'block' },
                   style: css.textarea,
                   value: importConfigText,
                   placeholder: say('importConfigPlaceholder', '{\n  "schemaVersion": 1,\n  "packs": []\n}'),

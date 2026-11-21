@@ -11,7 +11,7 @@
  * 为什么不走 Remote：Typert 的客户端装配是构建期固定清单、生成器不随
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
@@ -267,6 +267,20 @@ export function apply(ctx) {
         const requested = Number(url.searchParams.get('limit') ?? 40)
         const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 60) : 40
         const result = await marketSearch(q, limit)
+        response.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' })
+        response.end(JSON.stringify(result.body))
+      },
+    }),
+  )
+
+  // 技能描述：搜索 API 不含描述，按需从技能详情页 ld+json 取（缓存 30 分钟）。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/market/desc',
+      handler: async (request, response) => {
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await marketDescription(url.searchParams.get('source') ?? '', url.searchParams.get('skill') ?? '')
         response.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' })
         response.end(JSON.stringify(result.body))
       },
@@ -1011,52 +1025,48 @@ function cloneRepo(source) {
   return { dir }
 }
 
-const marketCache = new Map()
-
 /**
- * 查询 skills.sh 公开搜索 API。
- * - 端点：GET https://www.skills.sh/api/search?q={q}&limit={n}
- * - 返回 skills: [{ id, skillId, name, installs, source }]；q 至少 2 字符。
- * - 空查询按热门处理：用 q=skill 拉一批，再按 installs 降序（skills.sh 无 trending API）。
+ * 取一段远程文本。用户机器上常见 HTTP(S)_PROXY（如 Clash 7890），
+ * Node 的内置 fetch 不读代理直连会被拒；有代理时改走 curl（继承系统代理），否则用 fetch。
  */
-async function marketSearch(query, limit) {
-  const trimmed = String(query ?? '').trim()
-  const trending = trimmed.length < 2
-  const q = trending ? 'skill' : trimmed
-  const cacheKey = q + '|' + limit
-  const hit = marketCache.get(cacheKey)
-  if (hit && Date.now() - hit.at < 5 * 60 * 1000) return { status: 200, body: hit.body }
+function httpGetText(url, timeoutMs = 20000) {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy
+  if (proxy) {
+    const curl = process.platform === 'win32' ? 'curl.exe' : 'curl'
+    const args = ['-sS', '-L', '-m', String(Math.max(1, Math.ceil(timeoutMs / 1000))), '-A', 'dsh-zhiyin/0.1', '-x', proxy, url]
+    return new Promise((resolve, reject) => {
+      execFile(curl, args, { maxBuffer: 16 * 1024 * 1024, windowsHide: true, timeout: timeoutMs + 3000 }, (error, stdout, stderr) => {
+        if (error) reject(new Error(String(stderr || error.message).slice(0, 300)))
+        else resolve(stdout)
+      })
+    })
+  }
+  return fetch(url, { headers: { 'user-agent': 'dsh-zhiyin/0.1' }, signal: AbortSignal.timeout(timeoutMs) }).then((response) => {
+    if (!response.ok) throw new Error('HTTP ' + response.status)
+    return response.text()
+  })
+}
+
+const marketCache = new Map()
+const marketDescCache = new Map()
+
+/** 热门近似：skills.sh 无 trending API；用几个覆盖面广的词各拉一批，合并后按 installs 降序。 */
+const TRENDING_QUERIES = ['find', 'agent', 'pdf', 'writing', 'design']
+
+/** 单次 skills.sh 搜索；失败重试（其解析到多个 IP，个别会超时）。 */
+async function fetchSearchRaw(q, limit) {
   const apiUrl = 'https://www.skills.sh/api/search?q=' + encodeURIComponent(q) + '&limit=' + limit
-  // skills.sh 解析到多个 IP，个别地址会连接超时；重试几次提高成功率。
   let payload = null
   let lastError = ''
   for (let attempt = 0; attempt < 3 && payload === null; attempt += 1) {
     try {
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 20000)
-      let response
-      try {
-        response = await fetch(apiUrl, {
-          headers: { 'user-agent': 'dsh-zhiyin/0.1', accept: 'application/json' },
-          signal: controller.signal,
-        })
-      } finally {
-        clearTimeout(timer)
-      }
-      if (!response.ok) {
-        lastError = 'HTTP ' + response.status
-        if (response.status < 500) break
-        continue
-      }
-      payload = await response.json()
+      payload = JSON.parse(await httpGetText(apiUrl, 20000))
     } catch (error) {
       lastError = String(error?.message ?? error)
       if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 400))
     }
   }
-  if (payload === null) {
-    return { status: 502, body: { ok: false, error: '连接 skills.sh 失败：' + lastError } }
-  }
+  if (payload === null) return { error: lastError }
   const items = (Array.isArray(payload?.skills) ? payload.skills : [])
     .map((item) => ({
       name: String(item?.name ?? ''),
@@ -1066,14 +1076,86 @@ async function marketSearch(query, limit) {
       installs: Number(item?.installs ?? 0) || 0,
     }))
     .filter((item) => item.name && item.source)
-  items.sort((a, b) => b.installs - a.installs)
-  const body = { ok: true, query: q, trending, count: items.length, skills: items.slice(0, limit) }
+  return { items }
+}
+
+/**
+ * 查询技能市场。
+ * - 关键词 >= 2 字符：单次搜索，按 installs 降序。
+ * - 空查询 = 热门：多个通用词合并去重后按 installs 降序（skills.sh 无 trending API）。
+ * - 每条附带 url（skills.sh 技能页），供前端点击跳转。
+ */
+async function marketSearch(query, limit) {
+  const trimmed = String(query ?? '').trim()
+  const trending = trimmed.length < 2
+  const cacheKey = (trending ? '__trending__' : trimmed) + '|' + limit
+  const hit = marketCache.get(cacheKey)
+  if (hit && Date.now() - hit.at < 5 * 60 * 1000) return { status: 200, body: hit.body }
+  let items
+  if (!trending) {
+    const one = await fetchSearchRaw(trimmed, limit)
+    if (one.error) return { status: 502, body: { ok: false, error: '连接 skills.sh 失败：' + one.error } }
+    items = one.items.sort((a, b) => b.installs - a.installs)
+  } else {
+    const settled = await Promise.all(TRENDING_QUERIES.map((q) => fetchSearchRaw(q, 20)))
+    const byId = new Map()
+    for (const result of settled) for (const item of result.items ?? []) if (!byId.has(item.id)) byId.set(item.id, item)
+    if (byId.size === 0) return { status: 502, body: { ok: false, error: '连接 skills.sh 失败' } }
+    items = [...byId.values()].sort((a, b) => b.installs - a.installs)
+  }
+  const out = items.slice(0, limit).map((item) => ({
+    ...item,
+    url: 'https://www.skills.sh/' + item.source + '/' + item.skillId,
+  }))
+  const body = { ok: true, query: trending ? '' : trimmed, trending, count: out.length, skills: out }
   if (marketCache.size >= 20) {
     const oldest = [...marketCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]
     if (oldest) marketCache.delete(oldest[0])
   }
   marketCache.set(cacheKey, { at: Date.now(), body })
   return { status: 200, body }
+}
+
+/** 从技能详情页的 ld+json 取描述（skills.sh 搜索 API 不返回描述）。 */
+function extractLdDescription(html) {
+  const re = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g
+  let match
+  while ((match = re.exec(html))) {
+    try {
+      const parsed = JSON.parse(match[1])
+      const list = Array.isArray(parsed) ? parsed : [parsed]
+      for (const entry of list) {
+        if (entry && (entry['@type'] === 'SoftwareApplication' || entry['@type'] === 'Product') && typeof entry.description === 'string') {
+          return entry.description.trim()
+        }
+      }
+    } catch {
+      /* 单个块解析失败继续找下一个 */
+    }
+  }
+  return ''
+}
+
+/** 技能描述：按 source/skillId 取详情页，缓存 30 分钟。 */
+async function marketDescription(source, skillId) {
+  const src = String(source ?? '').trim()
+  const skill = String(skillId ?? '').trim()
+  if (!src || !skill) return { status: 400, body: { ok: false, error: 'source 与 skill 必填' } }
+  const key = src + '/' + skill
+  const hit = marketDescCache.get(key)
+  if (hit && Date.now() - hit.at < 30 * 60 * 1000) return { status: 200, body: { ok: true, description: hit.value } }
+  const url = 'https://www.skills.sh/' + src + '/' + skill
+  let lastError = ''
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const description = extractLdDescription(await httpGetText(url, 15000))
+      marketDescCache.set(key, { at: Date.now(), value: description })
+      return { status: 200, body: { ok: true, description } }
+    } catch (error) {
+      lastError = String(error?.message ?? error)
+    }
+  }
+  return { status: 502, body: { ok: false, error: lastError || '获取描述失败' } }
 }
 
 /** 批量安装：一次 clone，多个子目录逐个装入，返回成功与失败清单。 */
@@ -1148,9 +1230,7 @@ function installDirectory(ctx, body, source, fallbackName) {
 async function installRawSkill(ctx, body, url) {
   let text = ''
   try {
-    const response = await fetch(url, { redirect: 'follow' })
-    if (!response.ok) return { status: 400, body: { ok: false, error: '下载 SKILL.md 失败：HTTP ' + response.status } }
-    text = await response.text()
+    text = await httpGetText(url, 20000)
   } catch (error) {
     return { status: 400, body: { ok: false, error: '下载 SKILL.md 失败：' + String(error?.message ?? error) } }
   }
@@ -1193,8 +1273,19 @@ async function installFromText(ctx, body) {
     if (rels.length === 0 && existsSync(join(tmp, 'SKILL.md'))) rels.push('')
   }
   if (rels.length === 0) return { status: 400, body: { ok: false, error: '仓库里没有找到 SKILL.md' } }
+  // 市场点某个技能时传 skill：按 SKILL.md 的 name（或目录名）精确匹配，只装这一个并平铺到目标根。
+  const wantedSkill = typeof body?.skill === 'string' ? body.skill.trim().toLowerCase() : ''
+  if (wantedSkill) {
+    const matched = rels.find((rel) => {
+      const resolved = skillFrontmatterName(join(tmp, rel, 'SKILL.md')) || basename(rel) || source.repo
+      return String(resolved).toLowerCase() === wantedSkill
+    }) ?? rels.find((rel) => String(basename(rel)).toLowerCase() === wantedSkill)
+    if (matched !== undefined) {
+      return installDirectory(ctx, { ...body, skill: undefined }, join(tmp, matched), basename(matched) || source.repo)
+    }
+  }
   if (rels.length > 1) {
-    const candidates = rels.slice(0, 30).map((rel) => ({
+    const candidates = rels.slice(0, 200).map((rel) => ({
       subpath: rel,
       name: skillFrontmatterName(join(tmp, rel, 'SKILL.md')) || basename(rel) || source.repo,
     }))
@@ -1710,7 +1801,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription }
 
 function invalidateAll() {
   for (const entry of registrations) {
