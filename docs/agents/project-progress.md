@@ -17,13 +17,22 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（UI 第二批：间距网格 + 空态/错误态走 style/spacing-and-states → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮字号 token：77346e2 → 5add86e
+- **当前分支**：main（UI 第三批：市场瀑布流卡片走 style/market-waterfall-cards → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮间距+空态：a8922cf → 1a2bb0d
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:0x UI 第二批：间距统一 8pt 网格 + 空态/错误态规范化
+- **最后更新**：2026-11-22 00:4x UI 第三批：技能市场卡片瀑布流化 + hover
+  - 卡片重做：原来沿用技能卡样式（加宽版列表），现改为独立卡片语言——标题两行截断（monospace 15px）+ 状态徽标（已安装/托管）、来源仓库 · 安装量信息带、描述四行截断、CLI 命令块（等宽+浅底）、底部分隔线 + 「可安装/托管」标签 + 主按钮（安装/已安装+重装/查看）。
+  - 瀑布流：新增 css.marketGrid（columnWidth 280、columnGap 16、marginBottom 16、breakInside avoid），高度随内容，多列错落。
+  - hover：新增 marketHover 状态 + css.marketCard(hovered) —— 上浮 2px、边框转品牌橙、阴影 0 8px 24px、底色加深，140ms 过渡。
+  - 安装态保留：进行中 Spinner + 文案、其它卡片禁用、成功 ✓。
+  - 顺带把文件行尾统一为 CRLF（此前混入 93 处裸 LF）。
+  - node --check client exit 0。
+  - 待验收：F5 后市场为多列瀑布流、悬停有抬升高亮、卡片信息层次（标题/来源/描述/命令/操作）清晰。
+
+- 上一轮：2026-11-22 00:0x UI 第二批：间距统一 8pt 网格 + 空态/错误态规范化
   - 间距：marginTop 收敛到 {2,4,8,12,16,24}（块级 8/12/16/24，元素内 2/4），原 1/6/10/14/18/22 共 23 处全部归位；cardGrid columnGap 12→16、row columnGap 10→12、alertWrap gap 6→8、页面标签行 22→24。
   - 空态：新增 css.emptyBox（虚线框 + 居中 + 标题/说明两级），替换技能列表/卡片、技能包、市场、归档、备份共 6 处裸 hint 文案；每处补「下一步该做什么」的副文案。
   - 错误态：新增 css.errorBox（红边框 + 淡红底 + info 图标），统一观测失败、导出失败、市场错误、归档错误、安装失败、备份错误 6 处，替换原来只用 color:#d05a4a 的一行文字。
