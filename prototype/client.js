@@ -518,6 +518,11 @@ window.__ModuleLoader__.load({
       },
     }
 
+    // 字号与透明度 token：原先散落 52 处硬编码，正文只有 12.5px、说明 12px + opacity 0.6，
+    // 100% 缩放下中文阅读吃力。这里收敛成一套可读尺度，其余样式一律引用。
+    const fs = { body: 14, hint: 13, meta: 12, badge: 11.5, cardName: 15, title: 22, section: 13.5 }
+    const op = { hint: 0.78, meta: 0.65, dim: 0.72, faint: 0.55 }
+
     const css = {
       page: { maxWidth: 780, padding: '2px 0 48px', color: 'inherit' },
       overlay: {
@@ -543,7 +548,7 @@ window.__ModuleLoader__.load({
         gap: 10,
       },
       modalHead: { display: 'flex', alignItems: 'center', gap: 8 },
-      modalTitle: { fontSize: 13, fontWeight: 600, flex: '1 1 auto', minWidth: 0 },
+      modalTitle: { fontSize: fs.body, fontWeight: 600, flex: '1 1 auto', minWidth: 0 },
       modalBody: {
         flex: '1 1 auto',
         overflowY: 'auto',
@@ -553,9 +558,9 @@ window.__ModuleLoader__.load({
         minHeight: 120,
       },
       modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
-      costSection: { fontSize: 12.5, lineHeight: 1.6, opacity: 0.86, marginTop: 6 },
-      costHead: { fontSize: 12, fontWeight: 600, marginTop: 12, color: 'var(--zhiyin-accent, #e0743c)' },
-      costBullet: { fontSize: 12.5, lineHeight: 1.6, opacity: 0.86, marginTop: 4 },
+      costSection: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 6 },
+      costHead: { fontSize: fs.body, fontWeight: 600, marginTop: 16, color: 'var(--zhiyin-accent, #e0743c)' },
+      costBullet: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 6 },
       costLink: { color: 'var(--zhiyin-accent, #e0743c)', textDecoration: 'none' },
       seg: {
         display: 'inline-flex',
@@ -569,8 +574,8 @@ window.__ModuleLoader__.load({
         border: 'none',
         background: 'transparent',
         color: 'inherit',
-        fontSize: 12.5,
-        padding: '6px 14px',
+        fontSize: fs.body,
+        padding: '7px 15px',
         cursor: 'pointer',
         opacity: 0.62,
       },
@@ -588,15 +593,15 @@ window.__ModuleLoader__.load({
         gap: 8,
         flexWrap: 'wrap',
       },
-      title: { fontSize: 22, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' },
-      subtitle: { opacity: 0.6, fontSize: 13 },
+      title: { fontSize: fs.title, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' },
+      subtitle: { opacity: op.hint, fontSize: fs.body },
       row: { display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginTop: 18 },
       switchRow: {
         display: 'flex',
         alignItems: 'center',
         gap: 8,
         cursor: 'pointer',
-        fontSize: 12.5,
+        fontSize: fs.body,
         flex: '0 0 auto',
         userSelect: 'none',
       },
@@ -627,7 +632,7 @@ window.__ModuleLoader__.load({
         height: 15,
         borderRadius: '50%',
         background: 'rgba(128,128,128,0.18)',
-        fontSize: 10,
+        fontSize: fs.meta,
         lineHeight: '13px',
         textAlign: 'center',
         opacity: 0.55,
@@ -636,7 +641,7 @@ window.__ModuleLoader__.load({
         userSelect: 'none',
       },
       pill: (on) => ({
-        fontSize: 11.5,
+        fontSize: fs.meta,
         padding: '2px 10px',
         borderRadius: 999,
         border: 'none',
@@ -645,7 +650,7 @@ window.__ModuleLoader__.load({
         opacity: on ? 1 : 0.6,
         flex: '0 0 auto',
       }),
-      hint: { fontSize: 12, opacity: 0.6 },
+      hint: { fontSize: fs.hint, opacity: op.hint, lineHeight: 1.55 },
       grid: {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
@@ -663,8 +668,8 @@ window.__ModuleLoader__.load({
         background: 'rgba(128,128,128,0.16)',
         borderColor: 'var(--zhiyin-accent, #e0743c)',
       },
-      statLabel: { fontSize: 11.5, opacity: 0.62 },
-      statValue: { fontSize: 19, fontWeight: 600, marginTop: 3, lineHeight: 1.2 },
+      statLabel: { fontSize: fs.meta, opacity: op.meta },
+      statValue: { fontSize: 20, fontWeight: 600, marginTop: 4, lineHeight: 1.2 },
 
       group: {
         marginTop: 18,
@@ -687,8 +692,8 @@ window.__ModuleLoader__.load({
         padding: '12px 14px',
       },
       groupMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
-      groupTitle: { fontSize: 13, fontWeight: 500 },
-      groupDesc: { fontSize: 12, opacity: 0.58, lineHeight: 1.45 },
+      groupTitle: { fontSize: fs.body, fontWeight: 600 },
+      groupDesc: { fontSize: fs.hint, opacity: op.hint, lineHeight: 1.55 },
       // 生效面矩阵（FR-020）：四行，每行一个生效面 + 谁控制它 + 当前数量。
       matrixRow: {
         display: 'flex',
@@ -705,10 +710,10 @@ window.__ModuleLoader__.load({
         minWidth: 0,
         padding: '9px 14px',
       },
-      matrixName: { fontSize: 12.5, fontWeight: 600, flex: '0 0 auto', minWidth: 88 },
-      matrixBy: { fontSize: 12, opacity: 0.62, flex: '1 1 auto', minWidth: 0 },
-      matrixNum: { fontSize: 12.5, opacity: 0.8, flex: '0 0 auto' },
-      refBadge: { fontSize: 11, opacity: 0.72, flex: '0 0 auto' },
+      matrixName: { fontSize: fs.body, fontWeight: 600, flex: '0 0 auto', minWidth: 96 },
+      matrixBy: { fontSize: fs.hint, opacity: op.hint, flex: '1 1 auto', minWidth: 0 },
+      matrixNum: { fontSize: fs.body, opacity: 0.85, flex: '0 0 auto' },
+      refBadge: { fontSize: fs.meta, opacity: 0.8, flex: '0 0 auto' },
       budgetRow: {
         display: 'flex',
         alignItems: 'center',
@@ -716,8 +721,8 @@ window.__ModuleLoader__.load({
         marginTop: 12,
         padding: '0 2px',
       },
-      budgetLabel: { fontSize: 11.5, opacity: 0.55, flex: '0 0 auto' },
-      budgetNum: { fontSize: 12, fontWeight: 600, flex: '0 0 auto' },
+      budgetLabel: { fontSize: fs.meta, opacity: op.meta, flex: '0 0 auto' },
+      budgetNum: { fontSize: fs.body, fontWeight: 600, flex: '0 0 auto' },
       input: {
         flex: '1 1 220px',
         minWidth: 160,
@@ -726,7 +731,7 @@ window.__ModuleLoader__.load({
         border: '1px solid rgba(128,128,128,0.14)',
         background: 'rgba(128,128,128,0.05)',
         color: 'inherit',
-        fontSize: 13,
+        fontSize: fs.body,
       },
       field: {
         flex: '0 0 auto',
@@ -737,7 +742,7 @@ window.__ModuleLoader__.load({
         border: '1px solid rgba(128,128,128,0.14)',
         background: 'rgba(128,128,128,0.05)',
         color: 'inherit',
-        fontSize: 13,
+        fontSize: fs.body,
       },
       modalSm: { width: 420 },
       modalMd: { width: 520 },
@@ -750,7 +755,7 @@ window.__ModuleLoader__.load({
         background: 'rgba(128,128,128,0.12)',
         color: 'inherit',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 12,
+        fontSize: fs.hint,
         resize: 'vertical',
       },
       // 备注编辑：清除/保存在编辑框内右下角并排，不弹外围按钮。
@@ -774,7 +779,7 @@ window.__ModuleLoader__.load({
         border: '1px solid rgba(128,128,128,0.16)',
         background: 'transparent',
         color: 'inherit',
-        fontSize: 12.5,
+        fontSize: fs.body,
         cursor: 'pointer',
       },
       list: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 },
@@ -811,14 +816,14 @@ window.__ModuleLoader__.load({
         background: 'rgba(128,128,128,0.10)',
         color: 'inherit',
         cursor: 'pointer',
-        fontSize: 13,
+        fontSize: fs.body,
         opacity: 0.7,
       },
       itemMain: { flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
       itemHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
       name: {
         fontFamily: 'inherit',
-        fontSize: 13.5,
+        fontSize: fs.body,
         fontWeight: 600,
         flex: '0 1 auto',
         minWidth: 0,
@@ -827,7 +832,7 @@ window.__ModuleLoader__.load({
         textOverflow: 'ellipsis',
       },
       badge: (on) => ({
-        fontSize: 10.5,
+        fontSize: fs.badge,
         padding: '0 6px',
         borderRadius: 999,
         border: 'none',
@@ -837,7 +842,7 @@ window.__ModuleLoader__.load({
         flex: '0 0 auto',
       }),
       badgeWarn: {
-        fontSize: 10.5,
+        fontSize: fs.badge,
         padding: '0 6px',
         borderRadius: 999,
         border: 'none',
@@ -845,10 +850,11 @@ window.__ModuleLoader__.load({
         lineHeight: '17px',
         flex: '0 0 auto',
       },
-      metaText: { fontSize: 10.5, opacity: 0.5, flex: '0 0 auto', letterSpacing: '0.02em' },
+      metaText: { fontSize: fs.meta, opacity: op.meta, flex: '0 0 auto', letterSpacing: '0.01em' },
       desc: {
-        fontSize: 12.5,
-        opacity: 0.62,
+        fontSize: fs.hint,
+        opacity: op.hint,
+        lineHeight: 1.55,
         lineHeight: 1.45,
         display: '-webkit-box',
         WebkitLineClamp: 2,
@@ -856,7 +862,7 @@ window.__ModuleLoader__.load({
         overflow: 'hidden',
       },
       meta: {
-        fontSize: 11,
+        fontSize: fs.meta,
         opacity: 0.45,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
@@ -871,11 +877,11 @@ window.__ModuleLoader__.load({
         alignItems: 'center',
         gap: 8,
         marginTop: 8,
-        fontSize: 11.5,
+        fontSize: fs.meta,
         opacity: 0.62,
         flexWrap: 'wrap',
       },
-      metaDot: { opacity: 0.5 },
+      metaDot: { opacity: 0.6 },
       primaryBtn: {
         marginLeft: 'auto',
         padding: '5px 14px',
@@ -883,7 +889,7 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--zhiyin-accent, #e0743c)',
         background: 'rgba(224,116,60,0.16)',
         color: 'var(--zhiyin-accent, #e0743c)',
-        fontSize: 12.5,
+        fontSize: fs.body,
         fontWeight: 600,
         cursor: 'pointer',
       },
@@ -897,20 +903,20 @@ window.__ModuleLoader__.load({
         borderRadius: 10,
         border: '1px solid rgba(224,163,62,0.35)',
         background: 'rgba(224,163,62,0.10)',
-        fontSize: 12.5,
+        fontSize: fs.body,
         lineHeight: 1.45,
       },
       alertIcon: { flex: '0 0 auto', opacity: 0.8, marginTop: 1 },
       // 工具条（卡片/列表 分段 · 搜索 · 排序）
       toolbar: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, flexWrap: 'wrap' },
-      sortWrap: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto', fontSize: 12, opacity: 0.8 },
+      sortWrap: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto', fontSize: fs.hint, opacity: 0.85 },
       sortSelect: {
         padding: '6px 10px',
         borderRadius: 8,
         border: '1px solid rgba(128,128,128,0.14)',
         background: 'rgba(128,128,128,0.05)',
         color: 'inherit',
-        fontSize: 12.5,
+        fontSize: fs.body,
       },
       // 原生 <option> 弹层不继承 select 样式，深色主题会白底浅字看不见——显式给深底浅字。
       optionStyle: {
@@ -941,7 +947,7 @@ window.__ModuleLoader__.load({
       cardHead: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
       cardName: {
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: 14,
+        fontSize: fs.cardName,
         fontWeight: 600,
         flex: '0 1 auto',
         minWidth: 0,
@@ -950,8 +956,8 @@ window.__ModuleLoader__.load({
         textOverflow: 'ellipsis',
       },
       cardDesc: {
-        fontSize: 12.5,
-        opacity: 0.64,
+        fontSize: fs.hint,
+        opacity: op.hint,
         lineHeight: 1.5,
         display: '-webkit-box',
         WebkitLineClamp: 4,
@@ -960,7 +966,7 @@ window.__ModuleLoader__.load({
         minHeight: 20,
       },
       cardNote: {
-        fontSize: 12,
+        fontSize: fs.hint,
         lineHeight: 1.5,
         padding: '6px 9px',
         borderRadius: 8,
@@ -972,7 +978,7 @@ window.__ModuleLoader__.load({
         overflow: 'hidden',
       },
       noteLine: {
-        fontSize: 11.8,
+        fontSize: fs.hint,
         lineHeight: 1.45,
         marginTop: 4,
         paddingLeft: 8,
@@ -994,14 +1000,14 @@ window.__ModuleLoader__.load({
         flex: '0 0 auto',
       }),
       // 技能包行尾 … 菜单
-      sectionLabel: { fontSize: 11.5, opacity: 0.55, marginTop: 2 },
+      sectionLabel: { fontSize: fs.meta, opacity: op.meta, marginTop: 4 },
       previewList: {
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
         maxHeight: 168,
         overflowY: 'auto',
-        fontSize: 12.5,
+        fontSize: fs.hint,
         lineHeight: 1.45,
       },
       cbRow: {
@@ -1011,9 +1017,9 @@ window.__ModuleLoader__.load({
         padding: '5px 6px',
         borderRadius: 7,
         cursor: 'pointer',
-        fontSize: 12.5,
+        fontSize: fs.hint,
       },
-      mono: { fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: 12.5 },
+      mono: { fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: fs.hint },
       menuWrap: { position: 'relative', flex: '0 0 auto' },
       menu: {
         position: 'absolute',
@@ -1036,7 +1042,7 @@ window.__ModuleLoader__.load({
         textAlign: 'left',
         padding: '7px 10px',
         borderRadius: 7,
-        fontSize: 12.5,
+        fontSize: fs.hint,
         cursor: 'pointer',
       },
     }
@@ -2169,7 +2175,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     'button',
                     {
                       type: 'button',
-                      style: { ...css.btn, padding: '2px 9px', fontSize: 11.5 },
+                      style: { ...css.btn, padding: '3px 10px', fontSize: fs.meta },
                       disabled: busy,
                       title: say('repairHint', '清理指向已消失技能的引用，让观测与投影重新一致'),
                       onClick: repairDrift,
@@ -2553,14 +2559,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     ),
                     desc
                       ? h('div', { style: css.cardDesc }, desc)
-                      : h('div', { style: { ...css.cardDesc, opacity: 0.45 } }, descKnown ? say('marketNoDesc', '暂无描述') : '…'),
+                      : h('div', { style: { ...css.cardDesc, opacity: 0.6 } }, descKnown ? say('marketNoDesc', '暂无描述') : '…'),
                     h(
                       'div',
                       { style: css.cardFoot },
                       h('span', { style: { ...css.hint, flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
                       item.installCommand
                         ? h('code', {
-                            style: { ...css.hint, fontFamily: 'ui-monospace, monospace', opacity: 0.55, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                            style: { ...css.hint, fontFamily: 'ui-monospace, monospace', opacity: 0.7, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
                             title: say('marketCmdHint', '对应的 skills CLI 命令') + '：' + item.installCommand,
                           }, item.installCommand)
                         : null,
@@ -2776,7 +2782,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         'div',
                         { style: css.cardFoot },
                         h('span', { style: css.dot(on) }),
-                        h('span', { style: { fontSize: 11.5, opacity: 0.6 } },
+                        h('span', { style: { fontSize: fs.meta, opacity: op.meta } },
                           on ? say('enabled', '已启用') : (reasonLabel(skill.hiddenReason) || say('disabledBadge', '已停用'))),
                         h('span', { style: { flex: '1 1 auto' } }),
                         h('button', {
@@ -2842,7 +2848,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           ? h(
               'div',
               { style: css.batchBar },
-              h('span', { style: { fontSize: 12, opacity: 0.72 } }, say('batchSelected', '已选') + ' ' + selectedNames.length),
+              h('span', { style: { fontSize: fs.hint, opacity: 0.85 } }, say('batchSelected', '已选') + ' ' + selectedNames.length),
               h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => runBatch(true) }, say('batchEnable', '批量启用')),
               h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => runBatch(false) }, say('batchDisable', '批量停用')),
               h('button', { type: 'button', style: { ...css.btn, marginLeft: 'auto' }, onClick: () => setSelectedNames([]) }, say('batchClear', '清除选择')),
@@ -2898,7 +2904,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           { style: css.itemHead },
                           h('span', { style: css.name }, skill.name),
                         skill.readOnly
-                          ? h('span', { style: { ...css.metaText, opacity: 0.5 }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
+                          ? h('span', { style: { ...css.metaText, opacity: op.meta }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
                           : null,
                         skill.enabled === false
                           ? h('span', { style: css.badgeWarn }, say('disabledBadge', '已停用'))
@@ -3024,7 +3030,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     rows.map((row) =>
                       h(
                         'label',
-                        { key: row.name, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '2px 0', opacity: row.ghost ? 0.72 : 1 } },
+                        { key: row.name, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: fs.hint, padding: '3px 0', opacity: row.ghost ? 0.72 : 1 } },
                         h('input', {
                           type: 'checkbox',
                           checked: draftMembers.includes(row.name),
@@ -3248,7 +3254,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   : null,
                 h(
                   'div',
-                  { style: { display: 'flex', gap: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' } },
+                  { style: { display: 'flex', gap: 14, fontSize: fs.hint, alignItems: 'center', flexWrap: 'wrap' } },
                   h('label', { style: { display: 'flex', gap: 5, alignItems: 'center' } },
                     h('input', {
                       type: 'radio',
@@ -3535,7 +3541,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ),
                 h(
                   'div',
-                  { style: { ...css.previewList, maxHeight: '60vh', whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.65 } },
+                  { style: { ...css.previewList, maxHeight: '60vh', whiteSpace: 'pre-wrap', fontSize: fs.hint, lineHeight: 1.65 } },
                   noteViewing.note,
                 ),
                 h(
