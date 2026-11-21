@@ -1194,14 +1194,15 @@ function Icon({ name, size = 15 }) {
   )
 }
 
-function ClearField({ value, onChange, style, wrapperStyle, multiline = false, ...rest }) {
+function ClearField({ value, onChange, style, wrapperStyle, multiline = false, clearLabel = '清除', ...rest }) {
   // 输入框内联「清除」X：所有文本输入共用，避免外围再加一排按钮。
+  // 注意：这里是模块级组件，不能调用 Page 内部的 say（会在有值渲染 X 时抛 ReferenceError）。
   const clear = value
     ? h('button', {
         type: 'button',
         tabIndex: -1,
-        title: say('clearInput', '清除'),
-        'aria-label': say('clearInput', '清除'),
+        title: clearLabel,
+        'aria-label': clearLabel,
         onMouseDown: (event) => event.preventDefault(),
         onClick: () => onChange({ target: { value: '' } }),
         style: multiline ? { ...css.clearBtn, top: 8, transform: 'none' } : css.clearBtn,
@@ -1308,6 +1309,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
   const [importName, setImportName] = React.useState('')
       const [installing, setInstalling] = React.useState(false)
       const [installPath, setInstallPath] = React.useState('')
+      const [installSkill, setInstallSkill] = React.useState('')
       const [installTarget, setInstallTarget] = React.useState('agents')
       const [installError, setInstallError] = React.useState('')
       const [installCandidates, setInstallCandidates] = React.useState([])
@@ -1338,7 +1340,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketTrending, setMarketTrending] = React.useState(true)
       const [marketLoading, setMarketLoading] = React.useState(false)
       const [marketError, setMarketError] = React.useState('')
-      const [marketBusy, setMarketBusy] = React.useState(null)
       const [marketLoaded, setMarketLoaded] = React.useState(false)
       const [marketDesc, setMarketDesc] = React.useState({})
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
@@ -1400,6 +1401,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setInstallError('')
         setInstalling(false)
         setInstallPath('')
+        setInstallSkill('')
       }
 
       const runInstall = (subpath) => {
@@ -1414,6 +1416,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             text,
             target: installTarget,
             ...(subpath === undefined ? {} : { subpath }),
+            ...(installSkill ? { skill: installSkill } : {}),
           }),
         })
           .then((response) => response.json())
@@ -1426,7 +1429,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             if (result?.error === 'multiple') {
               const candidates = result.candidates ?? []
               setInstallCandidates(candidates)
-              setInstallSelected(candidates.map((candidate) => candidate.subpath))
+              // 市场点选的技能没匹配到时，不要把整仓库默认勾上。
+              setInstallSelected(installSkill ? [] : candidates.map((candidate) => candidate.subpath))
               return
             }
             setInstallError(result?.error ?? '安装失败')
@@ -1487,50 +1491,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .catch((error) => setMarketError(String(error?.message ?? error)))
           .finally(() => setMarketLoading(false))
       }, [])
+      // 市场点安装：打开安装弹窗，先选安装目录（与「通过地址安装」一致），再装这一个技能。
       const installFromMarket = (item) => {
         if (!item?.source) return
-        setMarketBusy(item.id || item.source)
-        setMarketError('')
-        const post = (body) =>
-          fetch('/zhiyin/install', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-          }).then((response) => response.json())
-        // 先按「这个技能名」精确安装（宿主只装该技能并平铺到目标根）；装不到再退回弹窗勾选。
-        post({ text: item.source, target: 'agents', skill: item.skillId || item.name })
-          .then((result) => {
-            if (result?.ok === true) {
-              load()
-              return null
-            }
-            if (result?.error === 'multiple') {
-              const candidates = Array.isArray(result.candidates) ? result.candidates : []
-              const wanted = String(item.name || item.skillId || '').toLowerCase()
-              const matched =
-                candidates.find((candidate) => String(candidate.name ?? '').toLowerCase() === wanted) ||
-                candidates.find((candidate) => String(candidate.subpath ?? '').split('/').pop().toLowerCase() === wanted)
-              if (matched) {
-                return post({ text: item.source, target: 'agents', subpath: matched.subpath }).then((second) => {
-                  if (second?.ok === true) load()
-                  else setMarketError(second?.error ?? '安装失败')
-                  return null
-                })
-              }
-              setInstallPath(item.source)
-              setInstallTarget('agents')
-              setInstallCandidates(candidates)
-              setInstallSelected([])
-              setInstallProgress('')
-              setInstallError('')
-              setInstalling(true)
-              return null
-            }
-            setMarketError(result?.error ?? '安装失败')
-            return null
-          })
-          .catch((error) => setMarketError(String(error?.message ?? error)))
-          .finally(() => setMarketBusy(null))
+        setInstallPath(item.source)
+        setInstallSkill(item.skillId || item.name)
+        setInstallTarget('agents')
+        setInstallError('')
+        setInstallCandidates([])
+        setInstallSelected([])
+        setInstallProgress('')
+        setInstalling(true)
       }
       React.useEffect(() => {
         if (tab === 'market' && !marketLoaded) loadMarket('')
@@ -2270,6 +2241,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       disabled: busy,
                       onClick: () => {
                         setInstallPath('')
+                        setInstallSkill('')
                         setInstallTarget('agents')
                         setInstallError('')
                         setInstallCandidates([])
@@ -2479,10 +2451,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           style: css.iconBtn,
                           title: installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
                           'aria-label': installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
-                          disabled: installed || marketBusy != null,
+                          disabled: installed,
                           onClick: () => installFromMarket(item),
                         },
-                        marketBusy === item.id ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                        h(Icon, { name: 'packagePlus', size: 14 }),
                       ),
                     ),
                   )
@@ -2924,6 +2896,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   placeholder: say('installPath', 'owner/repo、https://github.com/owner/repo 或 D:\\skills\\my-skill'),
                   onChange: (event) => setInstallPath(event.target.value),
                 }),
+                installSkill
+                  ? h('div', { style: css.hint }, say('installSkillHint', '将安装这个技能：') + installSkill)
+                  : null,
                 h(
                   'div',
                   { style: { display: 'flex', gap: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' } },
