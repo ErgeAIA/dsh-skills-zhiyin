@@ -1331,6 +1331,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [archiveError, setArchiveError] = React.useState('')
       const [archiveTarget, setArchiveTarget] = React.useState('origin')
       const [costInfoOpen, setCostInfoOpen] = React.useState(false)
+      const [archivePicked, setArchivePicked] = React.useState([])   // 勾选的归档 key，用于批量删除
+      const [installJobId, setInstallJobId] = React.useState('')     // 本次安装任务 id，用于中止
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.sort', sortField) } catch {} }, [sortField])
 
@@ -1382,6 +1384,31 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             if (!result || result.ok !== true) throw new Error(result?.error ?? '打开失败')
           })
           .catch((error) => setState((previous) => ({ ...previous, error: say('revealFailed', '打开技能目录失败：') + String(error?.message ?? error) })))
+      }
+      // 删除归档：单条或批量，真删目录，需二次确认。
+      const deleteArchived = (keys) => {
+        const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean)
+        if (list.length === 0) return
+        const ask = list.length === 1
+          ? say('archiveDeleteAsk', '彻底删除这份归档？技能目录会被永久移除，无法恢复。')
+          : say('archiveDeleteAskMany', '彻底删除选中的 {n} 份归档？技能目录会被永久移除，无法恢复。').replace('{n}', String(list.length))
+        if (!window.confirm(ask)) return
+        setArchiveError('')
+        setBusy(true)
+        fetch('/zhiyin/archive/delete', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ keys: list }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            const failed = Array.isArray(result?.failed) ? result.failed : []
+            if (failed.length > 0) setArchiveError(failed.map((item) => item.error).join('；'))
+            setArchivePicked((previous) => previous.filter((key) => !list.includes(key)))
+            loadArchive()
+          })
+          .catch((error) => setArchiveError(String(error?.message ?? error)))
+          .finally(() => setBusy(false))
       }
       const restoreArchived = (entry) => {
         setArchiveError('')
@@ -1437,9 +1464,28 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setInstallSkill('')
       }
 
+      // 中止安装：杀掉宿主正在跑的 git 克隆，立刻解除安装中状态。
+      const abortInstall = () => {
+        const jobId = installJobId
+        setInstallProgress(say('installAborting', '正在中止…'))
+        fetch('/zhiyin/install/abort', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ jobId }),
+        })
+          .catch(() => null)
+          .finally(() => {
+            setInstallJobId('')
+            setBusy(false)
+            setInstallProgress('')
+            setInstallError(say('installAborted', '已中止安装'))
+          })
+      }
       const runInstall = (subpath) => {
         const text = installPath.trim()
         if (!text) return
+        const jobId = 'job-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7)
+        setInstallJobId(jobId)
         setBusy(true)
         setInstallError('')
         fetch('/zhiyin/install', {
@@ -1448,6 +1494,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           body: JSON.stringify({
             text,
             target: installTarget,
+            jobId,
             ...(subpath === undefined ? {} : { subpath }),
             ...(installSkill ? { skill: installSkill } : {}),
           }),
@@ -1476,13 +1523,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const runInstallSelected = () => {
         const text = installPath.trim()
         if (!text || installSelected.length === 0) return
+        const jobId = 'job-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7)
+        setInstallJobId(jobId)
         setBusy(true)
         setInstallError('')
         setInstallProgress(say('installProgress', '正在安装 {i}/{n}…').replace('{i}', '1').replace('{n}', String(installSelected.length)))
         fetch('/zhiyin/install/batch', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ text, subpaths: installSelected, target: installTarget }),
+          body: JSON.stringify({ text, subpaths: installSelected, target: installTarget, jobId }),
         })
           .then((response) => response.json())
           .then((result) => {
@@ -1525,7 +1574,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .finally(() => setMarketLoading(false))
       }, [])
       // 市场点安装：直接在卡片上安装（进行中转圈 + 完成标记），失败才回落到安装弹窗。
-      const installFromMarket = (item) => {
+      const installFromMarket = (item, reinstall = false) => {
         if (!item?.source || item.installable === false) return
         const key = item.id || item.source + '/' + item.name
         setMarketBusy(key)
@@ -1533,7 +1582,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         fetch('/zhiyin/install', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ text: item.source, target: 'agents', skill: item.skillId || item.name }),
+          body: JSON.stringify({ text: item.source, target: 'agents', skill: item.skillId || item.name, overwrite: reinstall === true }),
         })
           .then((response) => response.json())
           .then((result) => {
@@ -2509,6 +2558,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       'div',
                       { style: css.cardFoot },
                       h('span', { style: { ...css.hint, flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
+                      item.installCommand
+                        ? h('code', {
+                            style: { ...css.hint, fontFamily: 'ui-monospace, monospace', opacity: 0.55, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                            title: say('marketCmdHint', '对应的 skills CLI 命令') + '：' + item.installCommand,
+                          }, item.installCommand)
+                        : null,
                       h('span', { style: { flex: '1 1 auto' } }),
                       (function renderInstall() {
                         const key = item.id || item.source + '/' + item.name
@@ -2516,8 +2571,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         const done = marketDone[key] === true
                         const busyElsewhere = marketBusy != null && !running
                         if (done || installed) {
-                          return h('span', { style: { ...css.metaText, flex: '0 0 auto', color: '#4a9d6a' }, title: say('marketInstalled', '已安装') },
-                            h(Icon, { name: 'check', size: 13 }), ' ' + say('marketInstalled', '已安装'))
+                          // 已安装也要能重装：技能更新后可以覆盖式重装。
+                          return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto' } },
+                            h('span', { style: { ...css.metaText, color: '#4a9d6a' }, title: say('marketInstalled', '已安装') },
+                              h(Icon, { name: 'check', size: 13 }), ' ' + say('marketInstalled', '已安装')),
+                            h('button', {
+                              type: 'button',
+                              style: css.iconBtn,
+                              title: say('marketReinstallHint', '重新安装（覆盖到所选目录，用于更新）'),
+                              'aria-label': say('marketReinstall', '重新安装'),
+                              disabled: busyElsewhere,
+                              onClick: () => installFromMarket(item, true),
+                            }, h(Icon, { name: 'refresh', size: 13 })),
+                          )
                         }
                         if (item.installable === false) {
                           // 托管技能没有公开仓库：给出「在 skills.sh 打开」而不是一个装不了的按钮。
@@ -2576,6 +2642,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   ),
                 ),
                 h('span', { style: { flex: '1 1 auto' } }),
+                archivePicked.length > 0
+                  ? h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: css.btn,
+                        disabled: busy || archiveLoading,
+                        onClick: () => deleteArchived(archivePicked),
+                      },
+                      say('archiveDeletePicked', '删除选中') + ` (${archivePicked.length})`,
+                    )
+                  : null,
                 h(
                   'button',
                   {
@@ -2601,6 +2679,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       h(
                         'div',
                         { key: entry.key, style: css.item },
+                        h('input', {
+                          type: 'checkbox',
+                          checked: archivePicked.includes(entry.key),
+                          disabled: busy,
+                          title: say('archivePick', '选中以便批量删除'),
+                          'aria-label': say('archivePick', '选中以便批量删除'),
+                          style: css.pick,
+                          onChange: () =>
+                            setArchivePicked((previous) =>
+                              previous.includes(entry.key)
+                                ? previous.filter((key) => key !== entry.key)
+                                : [...previous, entry.key],
+                            ),
+                        }),
                         h(
                           'div',
                           { style: css.itemMain },
@@ -2624,6 +2716,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                             onClick: () => restoreArchived(entry),
                           },
                           say('restore', '恢复'),
+                        ),
+                        h(
+                          'button',
+                          {
+                            type: 'button',
+                            style: css.iconBtn,
+                            title: say('archiveDeleteHint', '彻底删除这份归档（不可恢复）'),
+                            'aria-label': say('archiveDelete', '删除归档'),
+                            disabled: busy || archiveLoading,
+                            onClick: () => deleteArchived(entry.key),
+                          },
+                          h(Icon, { name: 'trash', size: 14 }),
                         ),
                       ),
                     ),
@@ -3209,35 +3313,50 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalFoot },
-                  installCandidates.length > 0
+                  // 安装进行中：把主按钮换成「中止」，避免用户以为卡住而反复点击。
+                  busy && installJobId
                     ? h(
                         'div',
-                        { style: { display: 'flex', gap: 8, marginLeft: 'auto' } },
-                        h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => setInstallSelected(installCandidates.map((candidate) => candidate.subpath)) }, say('installAll', '全选')),
-                        h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => setInstallSelected([]) }, say('installNone', '全不选')),
-                        h(
+                        { style: { display: 'flex', gap: 8, marginLeft: 'auto', alignItems: 'center' } },
+                        h('span', { style: { ...css.hint, display: 'inline-flex', alignItems: 'center', gap: 6 } },
+                          h(Spinner, { size: 13 }),
+                          say('installing', '安装中…')),
+                        h('button', {
+                          type: 'button',
+                          style: css.btn,
+                          title: say('installAbortHint', '中止这次安装（正在克隆的仓库会被终止）'),
+                          onClick: abortInstall,
+                        }, say('installAbort', '中止')),
+                      )
+                    : installCandidates.length > 0
+                      ? h(
+                          'div',
+                          { style: { display: 'flex', gap: 8, marginLeft: 'auto' } },
+                          h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => setInstallSelected(installCandidates.map((candidate) => candidate.subpath)) }, say('installAll', '全选')),
+                          h('button', { type: 'button', style: css.btn, disabled: busy, onClick: () => setInstallSelected([]) }, say('installNone', '全不选')),
+                          h(
+                            'button',
+                            {
+                              type: 'button',
+                              style: { ...css.primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 6 },
+                              disabled: busy || installSelected.length === 0,
+                              onClick: runInstallSelected,
+                            },
+                            h(Icon, { name: 'packagePlus', size: 14 }),
+                            ` ${say('installSelected', '安装选中')} (${installSelected.length})`,
+                          ),
+                        )
+                      : h(
                           'button',
                           {
                             type: 'button',
                             style: { ...css.primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 6 },
-                            disabled: busy || installSelected.length === 0,
-                            onClick: runInstallSelected,
+                            disabled: busy || installPath.trim() === '',
+                            onClick: () => runInstall(),
                           },
-                          busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
-                          ` ${busy ? say('installing', '安装中…') : `${say('installSelected', '安装选中')} (${installSelected.length})`}`,
+                          h(Icon, { name: 'packagePlus', size: 14 }),
+                          ` ${say('install', '安装技能')}`,
                         ),
-                      )
-                    : h(
-                        'button',
-                        {
-                          type: 'button',
-                          style: { ...css.primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 6 },
-                          disabled: busy || installPath.trim() === '',
-                          onClick: () => runInstall(),
-                        },
-                        busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
-                        ` ${busy ? say('installing', '安装中…') : say('install', '安装技能')}`,
-                      ),
                 ),
               ),
             )
