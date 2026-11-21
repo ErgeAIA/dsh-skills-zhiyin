@@ -1103,10 +1103,15 @@ async function marketSearch(query, limit) {
     if (byId.size === 0) return { status: 502, body: { ok: false, error: '连接 skills.sh 失败' } }
     items = [...byId.values()].sort((a, b) => b.installs - a.installs)
   }
-  const out = items.slice(0, limit).map((item) => ({
-    ...item,
-    url: 'https://www.skills.sh/' + item.source + '/' + item.skillId,
-  }))
+  const out = items.slice(0, limit).map((item) => {
+    // 域名来源（如 uizze.sh / open.feishu.cn）是 skills.sh 托管技能，没有公开 GitHub 仓库；
+    // 织音目前只支持 GitHub/本地安装，这类不开放安装，只提供跳转。
+    const installable = String(item.source || '').includes('/')
+    const url = installable
+      ? 'https://www.skills.sh/' + item.source + '/' + item.skillId
+      : 'https://www.skills.sh/' + item.source + '/skills/' + item.skillId
+    return { ...item, installable, url }
+  })
   const body = { ok: true, query: trending ? '' : trimmed, trending, count: out.length, skills: out }
   if (marketCache.size >= 20) {
     const oldest = [...marketCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]

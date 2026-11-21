@@ -1493,7 +1493,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       }, [])
       // 市场点安装：打开安装弹窗，先选安装目录（与「通过地址安装」一致），再装这一个技能。
       const installFromMarket = (item) => {
-        if (!item?.source) return
+        if (!item?.source || item.installable === false) return
         setInstallPath(item.source)
         setInstallSkill(item.skillId || item.name)
         setInstallTarget('agents')
@@ -2434,7 +2434,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, item.source),
                       installed
                         ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
-                        : null,
+                        : item.installable === false
+                          ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.7 }, title: say('marketHostedHint', 'skills.sh 托管技能（非 GitHub 仓库），暂不支持直接安装') }, say('marketHostedBadge', '托管'))
+                          : null,
                     ),
                     desc
                       ? h('div', { style: css.cardDesc }, desc)
@@ -2449,9 +2451,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         {
                           type: 'button',
                           style: css.iconBtn,
-                          title: installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
+                          title: installed
+                            ? say('marketInstalled', '已安装')
+                            : item.installable === false
+                              ? say('marketHostedHint', 'skills.sh 托管技能（非 GitHub 仓库），暂不支持直接安装')
+                              : say('install', '安装技能'),
                           'aria-label': installed ? say('marketInstalled', '已安装') : say('install', '安装技能'),
-                          disabled: installed,
+                          disabled: installed || item.installable === false,
                           onClick: () => installFromMarket(item),
                         },
                         h(Icon, { name: 'packagePlus', size: 14 }),
