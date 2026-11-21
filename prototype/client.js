@@ -558,10 +558,26 @@ window.__ModuleLoader__.load({
         minHeight: 120,
       },
       modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
-      costSection: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 6 },
+      costSection: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 8 },
       costHead: { fontSize: fs.body, fontWeight: 600, marginTop: 16, color: 'var(--zhiyin-accent, #e0743c)' },
-      costBullet: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 6 },
+      costBullet: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 8 },
       costLink: { color: 'var(--zhiyin-accent, #e0743c)', textDecoration: 'none' },
+      // 空态与错误态：之前都是一行裸 hint，分不清「没事」和「出错」。
+      emptyBox: {
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 6, padding: '28px 20px', marginTop: 16, textAlign: 'center',
+        borderRadius: 12, border: '1px dashed rgba(128,128,128,0.22)',
+        background: 'rgba(128,128,128,0.03)',
+        fontSize: fs.hint, opacity: op.hint, lineHeight: 1.6,
+      },
+      emptyTitle: { fontSize: fs.body, fontWeight: 600, opacity: 0.9 },
+      errorBox: {
+        display: 'flex', alignItems: 'flex-start', gap: 8,
+        padding: '10px 12px', marginTop: 12,
+        borderRadius: 10, border: '1px solid rgba(208,90,74,0.35)',
+        background: 'rgba(208,90,74,0.10)', color: '#e08a7e',
+        fontSize: fs.hint, lineHeight: 1.55,
+      },
       seg: {
         display: 'inline-flex',
         borderRadius: 10,
@@ -595,7 +611,7 @@ window.__ModuleLoader__.load({
       },
       title: { fontSize: fs.title, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' },
       subtitle: { opacity: op.hint, fontSize: fs.body },
-      row: { display: 'flex', alignItems: 'center', columnGap: 10, rowGap: 8, flexWrap: 'wrap', marginTop: 18 },
+      row: { display: 'flex', alignItems: 'center', columnGap: 12, rowGap: 8, flexWrap: 'wrap', marginTop: 18 },
       switchRow: {
         display: 'flex',
         alignItems: 'center',
@@ -655,7 +671,7 @@ window.__ModuleLoader__.load({
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
         gap: 8,
-        marginTop: 18,
+        marginTop: 16,
       },
       card: {
         borderRadius: 12,
@@ -672,7 +688,7 @@ window.__ModuleLoader__.load({
       statValue: { fontSize: 20, fontWeight: 600, marginTop: 4, lineHeight: 1.2 },
 
       group: {
-        marginTop: 18,
+        marginTop: 16,
         borderRadius: 12,
         border: '1px solid rgba(128,128,128,0.12)',
         background: 'rgba(128,128,128,0.035)',
@@ -894,7 +910,7 @@ window.__ModuleLoader__.load({
         cursor: 'pointer',
       },
       // 告警区（内容之上、点名具体对象）
-      alertWrap: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 },
+      alertWrap: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 },
       alertItem: {
         display: 'flex',
         alignItems: 'flex-start',
@@ -926,9 +942,9 @@ window.__ModuleLoader__.load({
       // 技能卡网格
       // 瀑布流：按列宽自动分栏，卡片高度随内容变化，不再被同一行拉齐。
       cardGrid: {
-        marginTop: 14,
+        marginTop: 16,
         columnWidth: 320,
-        columnGap: 12,
+        columnGap: 16,
       },
       skillCard: {
         display: 'inline-block',
@@ -2143,7 +2159,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           ),
         ),
 
-        h('p', { style: { ...css.hint, marginTop: 10 } }, say('next', '技能包开关决定包内技能是否对 agent 可见；单个技能也可以随时停用。')),
+        h('p', { style: { ...css.hint, marginTop: 12 } }, say('next', '技能包开关决定包内技能是否对 agent 可见；单个技能也可以随时停用。')),
 
         // 元信息条：版本 · 观测时间 ｜ 右侧主按钮（全部停用/全部启用）
         data
@@ -2201,11 +2217,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           : null,
 
         state.error
-          ? h('p', { style: { ...css.hint, marginTop: 12 } }, `${say('failed', '观测失败：')}${state.error}`)
+          ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, `${say('failed', '观测失败：')}${state.error}`))
           : null,
 
         state.exportError
-          ? h('p', { style: { ...css.hint, marginTop: 12 } }, `${say('exportConfigFailed', '导出失败：')}${state.exportError}`)
+          ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, `${say('exportConfigFailed', '导出失败：')}${state.exportError}`))
           : null,
 
         // 告警区：内容之上，点名具体对象
@@ -2228,7 +2244,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           ? h(
               'div',
               null,
-              h('div', { style: { ...css.grid, marginTop: 18 } }, statCards(data, counts, say, filter, setFilter)),
+              h('div', { style: { ...css.grid, marginTop: 16 } }, statCards(data, counts, say, filter, setFilter)),
               h('div', { style: { ...css.hint, marginTop: 8 } }, `${say('statBySource', '来源')}：${srcLine}`),
             )
           : null,
@@ -2283,7 +2299,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         data
           ? h(
               'div',
-              { style: { ...css.row, marginTop: 22 } },
+              { style: { ...css.row, marginTop: 24 } },
               h(
                 'div',
                 { style: css.seg },
@@ -2381,10 +2397,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               'div',
               { style: css.list },
               (data.packs ?? []).length === 0
-                ? h('div', { style: css.hint }, say('packEmptyHint', '还没有技能包；点右上角新建，再把技能勾进来'))
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('packEmptyTitle', '还没有技能包')),
+                    h('span', null, say('packEmptyHint', '点右上角新建，再把技能勾进来')))
                 : null,
               visiblePacks.length === 0 && (data.packs ?? []).length > 0
-                ? h('div', { style: css.hint }, say('packNoMatch', '没有匹配技能包'))
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('packNoMatch', '没有匹配技能包')),
+                    h('span', null, say('emptyHint', '换个关键词，或清空搜索框看看全部技能')))
                 : null,
               visiblePacks.map((pack) => {
                 const status = packStatus(pack)
@@ -2522,13 +2542,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   : `${say('marketResult', '搜索结果')}：${marketItems.length}`,
               ),
               marketError
-                ? h('div', { style: { ...css.hint, marginTop: 8, color: '#d05a4a' } }, marketError)
+                ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, marketError))
                 : null,
               marketLoading && marketItems.length === 0
-                ? h('div', { style: { ...css.hint, marginTop: 10 } }, say('marketLoading', '正在读取技能市场…'))
+                ? h('div', { style: { ...css.hint, marginTop: 12 } }, say('marketLoading', '正在读取技能市场…'))
                 : null,
               !marketLoading && marketItems.length === 0 && !marketError
-                ? h('div', { style: { ...css.hint, marginTop: 10 } }, say('marketEmpty', '没有找到技能；换个关键词试试'))
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('marketEmpty', '没有找到技能')),
+                    h('span', null, say('marketEmptyHint', '换个关键词试试；至少 2 个字符，留空看热门')))
                 : null,
               h(
                 'div',
@@ -2674,10 +2696,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ),
               ),
               archiveError
-                ? h('div', { style: { ...css.hint, marginTop: 8, color: '#d05a4a' } }, say('archiveError', '归档操作失败：') + archiveError)
+                ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, say('archiveError', '归档操作失败：') + archiveError))
                 : null,
               !archiveLoading && archiveEntries.length === 0
-                ? h('div', { style: { ...css.hint, marginTop: 12 } }, say('archiveEmpty', '还没有归档的技能。在技能列表点「卸载」会把技能移到这里，可随时恢复。'))
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('archiveEmptyTitle', '还没有归档的技能')),
+                    h('span', null, say('archiveEmpty', '在技能列表点「卸载」会把技能移到这里，可随时恢复。')))
                 : h(
                     'div',
                     { style: { ...css.list, marginTop: 12 } },
@@ -2747,7 +2771,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               'div',
               { style: css.cardGrid },
               skills.length === 0
-                ? h('div', { style: css.hint }, say('empty', '没有匹配的技能'))
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('empty', '没有匹配的技能')),
+                    h('span', null, say('emptyHint', '换个关键词，或清空搜索框看看全部技能')))
                 : skills.map((skill) => {
                     const on = skill.enabled !== false
                     return h(
@@ -2860,7 +2886,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               'div',
               { style: css.list },
               skills.length === 0
-                ? h('div', { style: css.hint }, say('empty', '没有匹配的技能'))
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('empty', '没有匹配的技能')),
+                    h('span', null, say('emptyHint', '换个关键词，或清空搜索框看看全部技能')))
                 : skills.map((skill) =>
                     h(
                       'div',
@@ -3023,7 +3051,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     placeholder: say('search', '按名称搜索'),
                     onChange: (event) => setMemberQuery(event.target.value),
                   }),
-                  h('div', { style: { ...css.hint, marginTop: 6 } }, say('packSelectedCount', '已选 {n} / {m}').replace('{n}', String(draftMembers.length)).replace('{m}', String(poolSize))),
+                  h('div', { style: { ...css.hint, marginTop: 8 } }, say('packSelectedCount', '已选 {n} / {m}').replace('{n}', String(draftMembers.length)).replace('{m}', String(poolSize))),
                   h(
                     'div',
                     { style: css.modalBody },
@@ -3283,12 +3311,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 installCandidates.length > 0
                   ? h(
                       'div',
-                      { style: { marginTop: 10 } },
+                      { style: { marginTop: 12 } },
                       h('div', { style: css.hint }, say('installMultiple', '这个仓库里有多个技能，勾选后一起安装（都平级装到所选目录）：')),
                       h('div', { style: { ...css.hint, marginTop: 2 } }, say('installSelectedCount', '已选 {n} / {m}').replace('{n}', String(installSelected.length)).replace('{m}', String(installCandidates.length))),
                       h(
                         'div',
-                        { style: { ...css.previewList, marginTop: 6 } },
+                        { style: { ...css.previewList, marginTop: 8 } },
                         installCandidates.map((candidate) =>
                           h(
                             'label',
@@ -3314,7 +3342,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   ? h('p', { style: css.hint }, installProgress)
                   : null,
                 installError
-                  ? h('p', { style: { ...css.hint, color: '#d05a4a' } }, say('installFailed', '安装失败：') + installError)
+                  ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, say('installFailed', '安装失败：') + installError))
                   : null,
                 h(
                   'div',
@@ -3497,7 +3525,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 backups
                   ? Array.isArray(backups)
                     ? backups.length === 0
-                      ? h('p', { style: css.hint }, say('backupsEmpty', '还没有备份'))
+                      ? h('div', { style: css.emptyBox }, h('span', { style: css.emptyTitle }, say('backupsEmpty', '还没有备份')), h('span', null, say('backupsEmptyHint', '导入配置或回滚时会自动留一份，最多 20 份')))
                       : h(
                           'div',
                           { style: css.previewList },
@@ -3520,7 +3548,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                             ),
                           )
                         )
-                    : h('p', { style: css.hint }, String(backups.error ?? ''))
+                    : h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, String(backups.error ?? '')))
                   : null,
               ),
             )
@@ -3604,7 +3632,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     }, busy ? h(Spinner, { size: 14 }) : h(Icon, { name: 'check', size: 14 })),
                   ),
                 ),
-                h('div', { style: { ...css.hint, marginTop: 6 } }, `${noteDraft.length} / 500`),
+                h('div', { style: { ...css.hint, marginTop: 8 } }, `${noteDraft.length} / 500`),
               ),
             )
           : null,
