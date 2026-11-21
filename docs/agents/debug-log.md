@@ -16,6 +16,15 @@ description: >
 
 ***
 
+## BUG-006: 搜索技能后设置页整块空白（模块级组件误用 Page 内的 say）
+
+- **日期**：2026-11-21
+- **现象**：技能市场搜索后，设置面板右侧（织音整块）变空白；热门页正常，只有输入框有内容后触发。
+- **根因**：新加的 ClearField 是模块级组件，其中 say('clearInput', ...) 却引用了 Page 组件内部的 const say = React.useCallback(...)。输入为空时不渲染清除 X、不调用 say；一旦有值渲染 X → ReferenceError: say is not defined → 无错误边界，整块设置面板卸载成空白。
+- **修复**：ClearField 改用 clearLabel = '清除' 默认 prop，不再引用 Page 作用域；注释标明模块级组件禁用 say。
+- **验证**：node --check client exit 0；模块级 say( 引用扫描为 0（首个 say 出现在 Page 内部）。
+- **教训**：模块级组件/工具函数只能用模块级作用域的东西；Page 内的 say 不能跨层用，否则只在特定状态（有值/有数据）才炸，最难排查。
+
 ## BUG-005: 技能市场请求频繁失败（Node fetch 不读系统代理）
 
 - **日期**：2026-11-21

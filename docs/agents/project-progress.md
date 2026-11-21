@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（市场卡片/描述/平铺安装/输入框清除走 feat/market-cards-inputs → 提交 b1af7e1 → 合并 23f9a62 → 已推送 origin，分支已删）；上一轮技能市场+UI：211c756 → 3313af7
+- **当前分支**：main（修复设置页空白+市场安装确认走 fix/market-install-blank → 提交 c072c99 → 合并 b39743e → 已推送 origin，分支已删；推送首次 TLS 失败已重试）；上一轮市场卡片/平铺/输入框X：b1af7e1 → 23f9a62
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场」三页（市场走 skills.sh）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 17:1x 技能市场体验与安装修正 + 全局输入框清除 X（commit b1af7e1，merge 23f9a62）
+- **最后更新**：2026-11-21 18:2x 修复搜索后设置页空白 + 市场安装改为确认目录（commit c072c99，merge b39743e）
+  - 空白页根因（BUG-006）：新加的 ClearField 是模块级组件，却调用 Page 内部的 say；输入框为空时不渲染清除 X 所以不触发，一旦有值（搜索/输入）就 ReferenceError，整块织音面板卸载成空白。改为 clearLabel 默认 prop，不再引用 Page 作用域。
+  - 市场安装：不再静默直装；点安装打开安装弹窗（与「通过地址安装」一致），预填 source + 技能名，先选安装目录（技能库/用户目录/项目），点「安装技能」后宿主按技能名精确只装这一个并平铺到目标根；未匹配才列候选且默认不勾选。
+  - 新增 installSkill 状态；runInstall 携带 skill；普通安装入口重置 installSkill；市场卡片安装按钮不再转圈。
+  - 实测：克隆 vercel-labs/skills 后 findSkillDirs 命中 find-skills（与 skills.sh skillId 对得上）；events.ndjson 显示 design-mobile-apps 已平铺装到 ~/.agents/skills。
+  - node --check 双半边 exit 0；模块级 say 引用扫描为 0。
+  - 待验收：重启 DSH + F5 后，市场搜索不再空白；点安装先出目录选择弹窗再装这一个技能。
+
+- 上一轮：2026-11-21 17:1x 技能市场体验与安装修正 + 全局输入框清除 X（commit b1af7e1，merge 23f9a62）
   - 市场卡片：列表改大卡片（cardGrid）；技能名可点击跳转 skills.sh 技能页（/source/skillId）；前 12 张卡按需从详情页 ld+json 取描述（宿主 /zhiyin/market/desc 代理 + 30 分钟缓存）
   - 热门修正：skills.sh 无 trending API，原 q=skill 只捞到低安装量仓库；改为 find/agent/pdf/writing/design 多词合并去重后按 installs 降序，实测 40 条唯一且百万级（find-skills 4.46M…）
   - 安装修正：市场点某个技能时传 skill，宿主按 SKILL.md 的 name（或目录名）精确匹配只装该技能，并始终平铺到目标根（不新建仓库目录）；匹配不到才退回弹窗且默认不预选；候选上限 30→200
