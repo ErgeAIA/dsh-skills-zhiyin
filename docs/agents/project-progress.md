@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（归档删除/安装中止/重装/性能走 feat/archive-delete-install-abort → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 skills.sh 链接安装+动效：e54a9c9 → c152ff1
+- **当前分支**：main（UI 可读性收尾走 style/typography-scale → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮归档删除/中止/重装：aa8ab54 → a140106
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 23:0x 归档删除、安装中止、已安装可重装、克隆不再阻塞宿主
+- **最后更新**：2026-11-21 23:5x UI 可读性收尾：字号/透明度 token 化（huashu-design 评审落地）
+  - 评审（Phase 7）量化结论：52 处字号声明中 44 处 ≤13px（最小 10px），叠加 21 处低透明度；正文主力 12.5px、说明 12px + opacity 0.6，层级对比仅 1.76 倍。总体 6.2/10。
+  - 建 token：fs = { body 14, hint 13, meta 12, badge 11.5, cardName 15, title 22, section 13.5 }；op = { hint 0.78, meta 0.65, dim 0.72, faint 0.55 }。
+  - 替换：51 处 fontSize 全部改用 fs.*（仅 statValue 20px 保留为数值层级）；12 处 opacity 改用 op.*；hint/groupDesc/cardDesc/desc 提到 13px + 0.78，metaText 10.5→12 + 0.65，badge 10.5→11.5，cardName 14→15，name 13.5→14，modalTitle/groupTitle/segBtn 12.5/13→14，statLabel 11.5→12，refBadge 11→12。
+  - 间距：costHead 12→16、memberRow 2→3、targetRow 12→14 等随字号同步放大；行高 hint/desc 1.45→1.55、costBullet 1.6→1.65。
+  - node --check client exit 0；hardcoded fontSize 残留 1 处（statValue，有意保留）。
+  - 待验收：F5 后正文与说明文字明显变清晰；卡片名、徽标、元信息不再需要凑近看；层级仍清晰。
+
+- 上一轮：2026-11-21 23:0x 归档删除、安装中止、已安装可重装、克隆不再阻塞宿主
   - 性能根因（BUG-008）：cloneRepo 用 execFileSync('git'...) 同步克隆（timeout 120s），克隆期间整个宿主事件循环冻结，设置页所有请求排队 → 表现为「进入插件管理页非常慢」。改为异步 execFile + Promise（runGit），并保留 repoCache。
   - 安装中止：新增 installJobs（jobId → AbortController）与 POST /zhiyin/install/abort；runGit 支持 abort（kill 子进程 → ABORTED）；install/install/batch 接受 jobId；被中止返回 499 + aborted。前端 runInstall/runInstallSelected 生成 jobId，安装中把主按钮换成「安装中… + 中止」。
   - 归档删除：新增 deleteArchive（单条 key / 批量 keys，校验只允许 archive 直接子目录、拦 ../，删后清 origins 记录）与 POST /zhiyin/archive/delete；归档页每行加删除图标（二次确认），顶部出现「删除选中 (n)」批量按钮，行首加勾选框。
