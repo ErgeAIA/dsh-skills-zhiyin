@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（归档管理走 feat/archive-management → 提交 ef47cba → 合并 369fb5d → 已推送 origin，分支已删）；上一轮托管来源不开放安装：cfefe49 → 4e085e7
+- **当前分支**：main（归档原位置走 feat/archive-origin → 提交 21d4827 → 合并 0f53340 → 已推送 origin，分支已删）；上一轮归档管理：ef47cba → 369fb5d
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 19:1x 归档管理（归档列表 + 恢复到指定目录）（commit ef47cba，merge 369fb5d）
+- **最后更新**：2026-11-21 19:2x 归档记住原位置，恢复默认回原目录（commit 21d4827，merge 0f53340）
+  - 卸载时记录来源（agents/user/project）到 archive/origins.json（键为归档目录名，含 from 路径与时间）；事件 skill-archived 带 origin。
+  - 列表接口返回 entry.origin；归档页「恢复到」默认「原目录（推荐）」，每行显示「原位置：技能库/用户目录/项目」。老条目无 origin 记录 → 回落技能库。
+  - 恢复时 target=origin 由宿主按 origins.json 解析；成功后删除该条 origin 记录。
+  - 实测：假环境 project 技能卸载→记 origin=project→恢复默认回到 project，origins 清空；node --check 双半边 exit 0。
+  - 待验收：重启 DSH 后新卸载一个技能，归档页显示原位置；选「原目录」恢复应回到原目录。
+
+- 上一轮：2026-11-21 19:1x 归档管理（归档列表 + 恢复到指定目录）（commit ef47cba，merge 369fb5d）
   - 背景：卸载只把技能挪进 zhiyin-proto/archive/<时间戳>-<技能名>，前端没有查看/恢复入口。
   - 宿主：新增 GET /zhiyin/archive（解析时间戳前缀 + 读 SKILL.md 的 name）与 POST /zhiyin/restore（按 key 恢复到 agents/user/project；同名冲突 409；EXDEV 退回复制；恢复到 agents 时补 .dsh 软链接）；事件 skill-restored。
   - 前端：新增「归档 N」页签；页签内可选「恢复到 技能库/用户目录/项目」，列表显示技能名与归档时间，逐条「恢复」；卸载成功后自动刷新归档计数。
