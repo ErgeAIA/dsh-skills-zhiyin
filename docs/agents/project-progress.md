@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（UI 第三批：市场瀑布流卡片走 style/market-waterfall-cards → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮间距+空态：a8922cf → 1a2bb0d
+- **当前分支**：main（去重徽标 + 导入包互斥走 fix/badge-and-import-exclusive → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮瀑布流卡片：c44c3d6 → 1bb7b38
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:4x UI 第三批：技能市场卡片瀑布流化 + hover
+- **最后更新**：2026-11-22 00:5x 去掉重复「已安装」徽标 + 修复导入技能包与「全部技能」同时启用
+  - 重复徽标：市场卡片右上角原本也渲染「已安装」，与底部操作区重复。现右上角只保留「托管」这类需警示状态，「已安装」只出现在底部操作区（含重装按钮）。
+  - 互斥漏洞：POST /zhiyin/pack action=import 新建包后直接 enabled: true，漏了关闭「全部技能」这一步（action=create 有），导致导入后两个包同时亮着、与互斥规则冲突。已在 import 分支补 importAllPack.enabled = false，与新建行为一致。
+  - 静态校验：import 与 create 两个分支均包含关闭全部技能；enabled: true 仅出现在这两个入口与默认状态初始化。
+  - node --check 双半边 exit 0。
+  - 待验收：重启后导入 txt 技能包，「全部技能」自动关闭、仅新包启用；市场已安装卡片只在底部出现一次「已安装」。
+
+- 上一轮：2026-11-22 00:4x UI 第三批：技能市场卡片瀑布流化 + hover
   - 卡片重做：原来沿用技能卡样式（加宽版列表），现改为独立卡片语言——标题两行截断（monospace 15px）+ 状态徽标（已安装/托管）、来源仓库 · 安装量信息带、描述四行截断、CLI 命令块（等宽+浅底）、底部分隔线 + 「可安装/托管」标签 + 主按钮（安装/已安装+重装/查看）。
   - 瀑布流：新增 css.marketGrid（columnWidth 280、columnGap 16、marginBottom 16、breakInside avoid），高度随内容，多列错落。
   - hover：新增 marketHover 状态 + css.marketCard(hovered) —— 上浮 2px、边框转品牌橙、阴影 0 8px 24px、底色加深，140ms 过渡。
