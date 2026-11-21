@@ -562,6 +562,66 @@ window.__ModuleLoader__.load({
       costHead: { fontSize: fs.body, fontWeight: 600, marginTop: 16, color: 'var(--zhiyin-accent, #e0743c)' },
       costBullet: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 8 },
       costLink: { color: 'var(--zhiyin-accent, #e0743c)', textDecoration: 'none' },
+      // 技能市场卡片：瀑布流（多列、高度随内容）、hover 抬升；与列表视图明显区分。
+      marketGrid: {
+        marginTop: 16,
+        columnWidth: 280,
+        columnGap: 16,
+      },
+      marketCard: (hover) => ({
+        display: 'inline-block',
+        width: '100%',
+        boxSizing: 'border-box',
+        breakInside: 'avoid',
+        marginBottom: 16,
+        verticalAlign: 'top',
+        borderRadius: 14,
+        padding: '14px 16px 12px',
+        background: hover ? 'rgba(128,128,128,0.10)' : 'rgba(128,128,128,0.045)',
+        border: '1px solid ' + (hover ? 'var(--zhiyin-accent, #e0743c)' : 'rgba(128,128,128,0.10)'),
+        boxShadow: hover ? '0 8px 24px rgba(0,0,0,0.28)' : 'none',
+        transform: hover ? 'translateY(-2px)' : 'none',
+        transition: 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease',
+      }),
+      marketCardTop: { display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 },
+      marketCardTitle: {
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: fs.cardName,
+        fontWeight: 600,
+        lineHeight: 1.3,
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        wordBreak: 'break-word',
+      },
+      marketCardMeta: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, fontSize: fs.meta, opacity: op.meta },
+      marketCardDesc: {
+        fontSize: fs.hint,
+        lineHeight: 1.6,
+        opacity: op.hint,
+        marginTop: 10,
+        display: '-webkit-box',
+        WebkitLineClamp: 4,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        wordBreak: 'break-word',
+      },
+      marketCardCmd: {
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontSize: fs.meta,
+        opacity: 0.62,
+        marginTop: 10,
+        padding: '6px 8px',
+        borderRadius: 8,
+        background: 'rgba(128,128,128,0.10)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+      },
+      marketCardFoot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(128,128,128,0.12)' },
       // 空态与错误态：之前都是一行裸 hint，分不清「没事」和「出错」。
       emptyBox: {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -1346,6 +1406,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketLoaded, setMarketLoaded] = React.useState(false)
       const [marketBusy, setMarketBusy] = React.useState(null)   // 正在安装的条目 id
       const [marketDone, setMarketDone] = React.useState({})     // 已装完的条目 id
+      const [marketHover, setMarketHover] = React.useState(null) // 鼠标悬停的卡片 id
       const [marketDesc, setMarketDesc] = React.useState({})
       // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录。
       const [archiveEntries, setArchiveEntries] = React.useState([])
@@ -2554,53 +2615,65 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 : null,
               h(
                 'div',
-                { style: { ...css.cardGrid, marginTop: 12 } },
+                { style: css.marketGrid },
                 marketItems.map((item) => {
+                  const key = item.id || item.source + '/' + item.name
                   const installed = (data.skills ?? []).some((skill) => skill.name === item.name)
                   const desc = marketDesc[item.id]
                   const descKnown = Object.prototype.hasOwnProperty.call(marketDesc, item.id)
+                  const hovered = marketHover === key
+                  const running = marketBusy === key
+                  const done = marketDone[key] === true
+                  const busyElsewhere = marketBusy != null && !running
                   return h(
                     'div',
-                    { key: item.id || item.source + '/' + item.name, style: css.skillCard },
+                    {
+                      key,
+                      style: css.marketCard(hovered),
+                      onMouseEnter: () => setMarketHover(key),
+                      onMouseLeave: () => setMarketHover((previous) => (previous === key ? null : previous)),
+                    },
                     h(
                       'div',
-                      { style: css.cardHead },
+                      { style: css.marketCardTop },
                       h('a', {
                         href: item.url || ('https://www.skills.sh/' + item.source + '/' + item.skillId),
                         target: '_blank',
                         rel: 'noreferrer',
                         title: say('marketOpen', '在 skills.sh 打开技能页'),
-                        style: { ...css.cardName, color: 'inherit', textDecoration: 'none', cursor: 'pointer', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                        style: { ...css.marketCardTitle, color: 'inherit', textDecoration: 'none', cursor: 'pointer', flex: '1 1 auto' },
                       }, item.name),
-                      h('span', { style: { ...css.badge(true), flex: '0 0 auto' } }, item.source),
                       installed
                         ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', background: 'rgba(74,157,106,0.18)' } }, say('marketInstalled', '已安装'))
                         : item.installable === false
-                          ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.7 }, title: say('marketHostedHint', 'skills.sh 托管技能，没有公开 GitHub 仓库，无法直接安装') }, say('marketHostedBadge', '托管'))
+                          ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.75 }, title: say('marketHostedHint', 'skills.sh 托管技能，没有公开 GitHub 仓库，无法直接安装') }, say('marketHostedBadge', '托管'))
                           : null,
                     ),
-                    desc
-                      ? h('div', { style: css.cardDesc }, desc)
-                      : h('div', { style: { ...css.cardDesc, opacity: 0.6 } }, descKnown ? say('marketNoDesc', '暂无描述') : '…'),
                     h(
                       'div',
-                      { style: css.cardFoot },
-                      h('span', { style: { ...css.hint, flex: '0 0 auto' } }, `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
-                      item.installCommand
-                        ? h('code', {
-                            style: { ...css.hint, fontFamily: 'ui-monospace, monospace', opacity: 0.7, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-                            title: say('marketCmdHint', '对应的 skills CLI 命令') + '：' + item.installCommand,
-                          }, item.installCommand)
-                        : null,
+                      { style: css.marketCardMeta },
+                      h('span', { title: say('marketSourceTitle', '来源仓库') }, String(item.source || '')),
+                      h('span', { style: { opacity: 0.5 } }, '·'),
+                      h('span', { title: say('marketInstallsTitle', 'skills.sh 记录的安装次数') },
+                        `${formatInstalls(item.installs)} ${say('marketInstalls', '次安装')}`),
+                    ),
+                    desc
+                      ? h('div', { style: css.marketCardDesc }, desc)
+                      : h('div', { style: { ...css.marketCardDesc, opacity: 0.55 } }, descKnown ? say('marketNoDesc', '暂无描述') : '…'),
+                    item.installCommand
+                      ? h('code', {
+                          style: css.marketCardCmd,
+                          title: say('marketCmdHint', '对应的 skills CLI 命令') + '：' + item.installCommand,
+                        }, item.installCommand)
+                      : null,
+                    h(
+                      'div',
+                      { style: css.marketCardFoot },
+                      h('span', { style: { ...css.hint, flex: '0 0 auto' } },
+                        item.installable === false ? say('marketHostedBadge', '托管') : say('marketInstallable', '可安装')),
                       h('span', { style: { flex: '1 1 auto' } }),
-                      (function renderInstall() {
-                        const key = item.id || item.source + '/' + item.name
-                        const running = marketBusy === key
-                        const done = marketDone[key] === true
-                        const busyElsewhere = marketBusy != null && !running
-                        if (done || installed) {
-                          // 已安装也要能重装：技能更新后可以覆盖式重装。
-                          return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto' } },
+                      done || installed
+                        ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto' } },
                             h('span', { style: { ...css.metaText, color: '#4a9d6a' }, title: say('marketInstalled', '已安装') },
                               h(Icon, { name: 'check', size: 13 }), ' ' + say('marketInstalled', '已安装')),
                             h('button', {
@@ -2612,31 +2685,23 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               onClick: () => installFromMarket(item, true),
                             }, h(Icon, { name: 'refresh', size: 13 })),
                           )
-                        }
-                        if (item.installable === false) {
-                          // 托管技能没有公开仓库：给出「在 skills.sh 打开」而不是一个装不了的按钮。
-                          return h('button', {
-                            type: 'button',
-                            style: css.iconBtn,
-                            title: say('marketHostedHint2', 'skills.sh 托管技能，没有公开仓库；点此在 skills.sh 打开安装说明'),
-                            'aria-label': say('marketOpen', '在 skills.sh 打开技能页'),
-                            onClick: () => window.open(item.url, '_blank', 'noreferrer'),
-                          }, h(Icon, { name: 'search', size: 14 }))
-                        }
-                        return h(
-                          'button',
-                          {
-                            type: 'button',
-                            style: running ? { ...css.iconBtn, cursor: 'progress' } : css.iconBtn,
-                            title: running ? say('marketInstalling', '正在安装…') : busyElsewhere ? say('marketBusyOther', '另一个技能正在安装，请稍候') : say('install', '安装技能'),
-                            'aria-label': running ? say('marketInstalling', '正在安装…') : say('install', '安装技能'),
-                            'aria-busy': running ? 'true' : 'false',
-                            disabled: running || busyElsewhere,
-                            onClick: () => installFromMarket(item),
-                          },
-                          running ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
-                        )
-                      })(),
+                        : item.installable === false
+                          ? h('button', {
+                              type: 'button',
+                              style: css.btn,
+                              title: say('marketHostedHint2', 'skills.sh 托管技能，没有公开仓库；点此在 skills.sh 打开安装说明'),
+                              onClick: () => window.open(item.url, '_blank', 'noreferrer'),
+                            }, say('marketOpenShort', '查看'))
+                          : h('button', {
+                              type: 'button',
+                              style: running ? { ...css.primaryBtn, opacity: 0.8, cursor: 'progress' } : css.primaryBtn,
+                              title: running ? say('marketInstalling', '正在安装…') : busyElsewhere ? say('marketBusyOther', '另一个技能正在安装，请稍候') : say('install', '安装技能'),
+                              'aria-busy': running ? 'true' : 'false',
+                              disabled: running || busyElsewhere,
+                              onClick: () => installFromMarket(item),
+                            },
+                            running ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                            running ? say('marketInstalling', '正在安装…') : say('install', '安装技能')),
                     ),
                   )
                 }),
