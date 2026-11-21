@@ -17,13 +17,19 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（目录成本信息弹窗走 feat/catalog-cost-info-modal → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮撤下阈值：214475f → 8f88b52
+- **当前分支**：main（打开技能目录 + 成本说明重写走 feat/reveal-dir-cost-copy → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮信息弹窗：240e6fe → fed2a46
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-21 19:5x 目录字符数做成信息弹窗（解释 + 建议 + 出处）
+- **最后更新**：2026-11-21 20:1x 卡片加「打开技能目录」+ 成本说明按第一性原理重写
+  - 打开目录：宿主 POST /zhiyin/reveal → skillDirectory() 先按三个安装根找 <root>/<name>（含 SKILL.md），再用快照真实路径剥掉 SKILL.md 兜底（软链接可解引用）；平台分别用 explorer.exe / open / xdg-open 打开**该技能目录**，不打开技能根；事件 skill-revealed。前端卡片视图每张卡加 folder 图标（title：在文件管理器里打开这个技能的目录）。
+  - 成本说明重写：标题改「目录字符数 · 计算方式与建议上限」；四段——计算方式（min(描述,500) 累加 +200、只计描述为下限、停用/未入包不计）／成本构成（路由信号、目录追加历史、超限按 LRU 丢弃）／建议上限（上下文 1%：200K→2,000 token；中文 ≤2,000 字符、英文 ≤8,000 字符、单条 400–1,000、硬上限 1,024）／优化方式（描述只留做什么+何时用、不用的停用、同域合并）／依据（两条官方与社区链接 + 各自结论）。删掉「不能用一个固定字符数当红线」等口语与待核实表述。
+  - node --check 双半边 exit 0；skillDirectory 假环境三例（按根命中、按真实路径兜底、缺失返回 null）通过。
+  - 待验收：重启后卡片有文件夹图标、点击打开对应技能目录（非根目录）；点目录字符数看新文案。
+
+- 上一轮：2026-11-21 19:5x 目录字符数做成信息弹窗（解释 + 建议 + 出处）
   - 「目录字符数 / 观测完整」整块可点击（带 info 图标），打开 DEC-008 调研成果的信息弹窗。
   - 弹窗六段：数字含义（描述截断 500 之和 + 200 估算，不是报错）→ 为什么值得看（路由信号、token、目录追加进会话历史）→ 官方/社区量级（1024 硬上限、~1536 路由清单、~1% 上下文与 LRU 丢弃、400–1000 写作目标、中英 token 差异）→ 我们的建议（关掉不用技能、描述短且触发词前置、别为压数字牺牲可用性）→ 出处（Anthropic 平台文档、Claude Code 2026 上限参考）→ 待核实（DSH 注入行为未实测）。
   - 仅改 client：新增 info 图标、costSection/costHead/costBullet/costLink 样式、costInfoOpen 状态；node --check client exit 0。

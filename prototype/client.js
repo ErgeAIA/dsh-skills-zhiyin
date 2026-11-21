@@ -1148,6 +1148,9 @@ window.__ModuleLoader__.load({
     ['path', 'M12 11v6'],
     ['circle', { cx: 12, cy: 7.6, r: 0.6, fill: 'currentColor', stroke: 'none' }],
   ],
+  folder: [
+    ['path', 'M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .22 1.33.6l1.1 1.2c.33.38.83.6 1.33.6h4.04A2.5 2.5 0 0 1 19 9.9v6.6A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5z'],
+  ],
 }
 
 function Icon({ name, size = 15 }) {
@@ -1365,6 +1368,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .finally(() => setArchiveLoading(false))
       }, [])
       React.useEffect(() => { loadArchive() }, [loadArchive])
+      // 打开技能所在目录：宿主用系统文件管理器打开「这个技能的目录」，不是技能根。
+      const revealSkill = (skill) => {
+        fetch('/zhiyin/reveal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: skill.name, path: skill.linkTarget ?? skill.path ?? undefined }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? '打开失败')
+          })
+          .catch((error) => setState((previous) => ({ ...previous, error: say('revealFailed', '打开技能目录失败：') + String(error?.message ?? error) })))
+      }
       const restoreArchived = (entry) => {
         setArchiveError('')
         setBusy(true)
@@ -2612,6 +2628,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         h('span', { style: { flex: '1 1 auto' } }),
                         h('button', {
                           type: 'button',
+                          title: say('revealHint', '在文件管理器里打开这个技能的目录'),
+                          'aria-label': say('reveal', '打开目录'),
+                          style: css.iconBtn,
+                          disabled: busy,
+                          onClick: () => revealSkill(skill),
+                        }, h(Icon, { name: 'folder', size: 14 })),
+                        h('button', {
+                          type: 'button',
                           title: say('noteEdit', '编辑备注'),
                           'aria-label': say('noteEdit', '编辑备注'),
                           style: css.iconBtn,
@@ -2896,7 +2920,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalHead },
-                  h('span', { style: css.modalTitle }, say('costInfoTitle', '目录字符数是什么？')),
+                  h('span', { style: css.modalTitle }, say('costInfoTitle', '目录字符数 · 计算方式与建议上限')),
                   h('button', {
                     type: 'button',
                     style: css.iconBtn,
@@ -2908,26 +2932,33 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h(
                   'div',
                   { style: css.modalBody },
-                  h('div', { style: css.costSection }, say('costInfoWhat', '这是当前可见技能描述的成本估算：每条描述最多算 500 字符，累加后再加 200 框架开销。它是相对成本尺子，不是 DSH 实际注入的精确字符数（不含技能名和正文），也不是报错。')),
-                  h('div', { style: css.costHead }, say('costInfoWhyHead', '为什么值得看')),
-                  h('div', { style: css.costSection }, say('costInfoWhy', '技能描述是模型判断「何时调用这个技能」的路由信号。目录越长，每次请求付出的 token 越多；每次变更还会把新目录追加进会话历史。')),
-                  h('div', { style: css.costHead }, say('costInfoRulesHead', '官方与社区给出的量级')),
-                  h('div', { style: css.costBullet }, '• ' + say('costRule1', '单条描述 ≤ 1024 字符是官方硬上限（API 会拒绝）；写作目标 400–1000，触发词前置。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costRule2', 'Claude Code 路由清单把 description + when_to_use 合并截到约 1536 字符（v2.1.105 起）。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costRule3', '目录总量参考 ≈ 上下文窗口的 1%；超限后新版按「最近最少使用」丢弃描述而非截断——你以为可用的技能可能悄悄不参与路由。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costRule4', '中文约 1 字符 1 token、英文约 4 字符 1 token，所以不能用一个固定字符数当红线。')),
-                  h('div', { style: css.costHead }, say('costAdviceHead', '我们的建议')),
-                  h('div', { style: css.costBullet }, '• ' + say('costAdvice1', '长期不用的技能就关掉或移出启用包，比盯着数字更重要。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costAdvice2', '描述只写「做什么 + 何时用」，触发词前置，别堆废话。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costAdvice3', '这个数字只是成本尺子，不要为了压低它牺牲可用性。')),
-                  h('div', { style: css.costHead }, say('costSourceHead', '出处与待核实')),
+                  h('div', { style: css.costHead }, say('costWhatHead', '计算方式')),
+                  h('div', { style: css.costBullet }, '• ' + say('costWhat1', '每个可见技能取 min(描述长度, 500) 字符，全部相加后再加 200 字符框架开销。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costWhat2', '只计描述，不含技能名与 SKILL.md 正文，因此是本目录的成本下限。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costWhat3', '停用、未加入启用包、被上层开关挡住的技能不计入。')),
+                  h('div', { style: css.costHead }, say('costWhyHead', '成本构成')),
+                  h('div', { style: css.costBullet }, '• ' + say('costWhy1', '描述是模型判断「何时调用该技能」的路由信号，随每次请求注入。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costWhy2', '目录变化会作为新条目追加进会话历史，一次请求承载多份目录。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costWhy3', '总量超过模型承受范围时，实现会按最近最少使用丢弃描述，被丢弃的技能不再参与路由。')),
+                  h('div', { style: css.costHead }, say('costLimitHead', '建议上限')),
+                  h('div', { style: css.costBullet }, '• ' + say('costLimit1', '目录总量：上下文窗口的 1%。200K 窗口折算为 2,000 token。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costLimit2', '按 token 折算字符：中文 1 字符 ≈ 1 token → 建议 ≤ 2,000 字符；英文 4 字符 ≈ 1 token → 建议 ≤ 8,000 字符。中英混排按实际比例折算。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costLimit3', '单条描述：目标 400–1,000 字符，硬上限 1,024 字符（API 拒绝超限）。')),
+                  h('div', { style: css.costHead }, say('costDoHead', '优化方式')),
+                  h('div', { style: css.costBullet }, '• ' + say('costDo1', '描述只保留「做什么 + 何时用」，触发词放在开头，删去背景与套话。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costDo2', '长期不用的技能移出启用包或停用，成本直接归零。')),
+                  h('div', { style: css.costBullet }, '• ' + say('costDo3', '同领域技能合并，减少重复的路由信号。')),
+                  h('div', { style: css.costHead }, say('costSourceHead', '依据')),
                   h('div', { style: css.costBullet },
-                    h('a', { href: 'https://platform.claude.com/docs/zh-CN/build-with-claude/skills-guide', target: '_blank', rel: 'noreferrer', style: css.costLink }, 'Anthropic 平台文档 · 请求限制'),
+                    '• ',
+                    h('a', { href: 'https://platform.claude.com/docs/zh-CN/build-with-claude/skills-guide', target: '_blank', rel: 'noreferrer', style: css.costLink }, say('costSrc1', 'Anthropic 平台文档 · Agent Skills 请求限制')),
+                    say('costSrc1Note', '：description 上限 1,024 字符，name 上限 64 字符。'),
                   ),
                   h('div', { style: css.costBullet },
-                    h('a', { href: 'https://github.com/josiahsiegel/claude-plugin-marketplace/blob/main/plugins/plugin-master/skills/triggering-reliability/references/severity-and-limits.md', target: '_blank', rel: 'noreferrer', style: css.costLink }, 'Claude Code 描述长度上限与分层（2026）'),
+                    '• ',
+                    h('a', { href: 'https://github.com/josiahsiegel/claude-plugin-marketplace/blob/main/plugins/plugin-master/skills/triggering-reliability/references/severity-and-limits.md', target: '_blank', rel: 'noreferrer', style: css.costLink }, say('costSrc2', 'Claude Code 描述长度分层（2026）')),
+                    say('costSrc2Note', '：路由清单合并截断 1,536 字符；目录总量预算为上下文窗口的 1%，超限按 LRU 丢弃描述。'),
                   ),
-                  h('div', { style: css.costSection }, say('costInfoPending', '待核实：DSH 自身如何注入目录（截断/丢弃/压缩）尚未实测；我们会抓取真实会话目录来校准口径。')),
                 ),
                 h(
                   'div',
