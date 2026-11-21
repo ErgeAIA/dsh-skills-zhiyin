@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（修复 400/TDZ 走 fix/state-tdz → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮安装按钮+统计：2a07df9 → 5d6d269
+- **当前分支**：main（按钮折行修复走 fix/button-nowrap → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 400/TDZ：5b472e8 → 15422ee
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:3x 修复设置页 400 / 一直加载中（TDZ 变量遮蔽）
+- **最后更新**：2026-11-22 00:3x 修复市场「安装」按钮图标与文字上下折行
+  - 现象：上一轮已把文案从「安装技能」缩成「安装」，按钮仍显示为图标在上、文字在下的两行。
+  - 根因：不是文案太长，而是 css.primaryBtn 缺少 display:inline-flex —— button 默认 display:inline-block 且内部是 SVG + 文本节点，没有 flex 容器约束时会按块级换行；上一轮把 whiteSpace 误写成了 title 旁边的 props（React 会当成未知 DOM 属性丢弃），所以完全没生效。
+  - 修复：primaryBtn 补 display:inline-flex + alignItems/justifyContent center + gap:6 + whiteSpace:nowrap + flex:0 0 auto；css.btn 也补 whiteSpace:nowrap 防止其它窄容器按钮折行；删掉误放在 props 上的 whiteSpace。
+  - 尺寸核算：列宽 280、卡片内边距 32 + 边框 2 → 内容宽 246px；footer 内「可安装」39px + gap 8 + 按钮约 78px = 125px，余量 121px，不会挤压。
+  - node --check client exit 0；确认已无 whiteSpace 误写在 props 上。
+  - 待验收：F5 后市场卡片按钮显示为「图标 + 安装」单行。
+
+- 上一轮：2026-11-22 00:3x 修复设置页 400 / 一直加载中（TDZ 变量遮蔽）
   - 现象：织音面板「读取失败：HTTP 400」，技能列表卡在「正在读取技能列表…」；archive/market/probe/backups 均 200，只有 /zhiyin/state 挂。
   - 根因：上一轮加的模块级 let observedNames 与 collectState 内第 2341 行已有的局部 const observedNames 同名，同一函数作用域内第 2282 行的赋值命中该局部变量（TDZ），抛 ReferenceError；宿主把 resource 异常统一转成 400。
   - 修复：模块级变量改名 observedSkillNames，与函数内局部彻底解耦。
