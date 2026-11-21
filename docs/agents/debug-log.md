@@ -16,6 +16,15 @@ description: >
 
 ***
 
+## BUG-008: 进入插件管理页非常慢（同步 git clone 冻结宿主事件循环）
+
+- **日期**：2026-11-21
+- **现象**：每次打开设置页的织音面板都很慢，安装技能期间更明显。
+- **根因**：cloneRepo 用 execFileSync('git', ['clone','--depth','1',...], { timeout: 120000 }) 同步执行；克隆/网络慢时整个宿主事件循环被阻塞，/zhiyin/state 等所有请求排队（空载实测 23ms，克隆期间会拖到秒级以上）。
+- **修复**：改为异步 runGit(args, signal)（execFile + Promise，可 abort），cloneRepo 变 async，installBatch/installFromText 均 await；同时接入 installJobs 与 /zhiyin/install/abort 支持中止。
+- **验证**：node --check 双半边 exit 0；/zhiyin/state 空载 23–237ms；中止链路 kill 子进程 → ABORTED → 499。
+- **教训**：宿主路由里任何可能秒级以上的子进程都必须异步；execFileSync 会冻结整个服务，表现为「页面慢」而不是「安装慢」。
+
 ## BUG-007: 市场安装回填 skills.sh 域名来源导致「看不懂这个来源」
 
 - **日期**：2026-11-21

@@ -645,6 +645,18 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, name, to } }
   })
 
+  // 中止安装：杀掉正在跑的 git 克隆，前端据此立刻解除“安装中”状态。
+  post(ctx, '/zhiyin/install/abort', async (body) => {
+    const id = typeof body?.jobId === 'string' ? body.jobId.trim() : ''
+    if (!id) return { status: 400, body: { ok: false, error: 'jobId is required' } }
+    const controller = installJobs.get(id)
+    if (!controller) return { status: 200, body: { ok: true, aborted: false, detail: '没有正在跑的任务' } }
+    controller.abort()
+    installJobs.delete(id)
+    note('install-aborted', { jobId: id })
+    return { status: 200, body: { ok: true, aborted: true } }
+  })
+
   // 打开技能所在目录：只调用系统文件管理器，不写任何文件。
   post(ctx, '/zhiyin/reveal', async (body) => openSkillDirectory(ctx, body))
 
@@ -657,6 +669,7 @@ export function apply(ctx) {
     }),
   )
   post(ctx, '/zhiyin/restore', async (body) => restoreArchive(ctx, body))
+  post(ctx, '/zhiyin/archive/delete', async (body) => deleteArchive(body))
 
   // 导出配置：只导出可移植的编排状态（包 / 停用项 / 总开关），
   // 跟「导出配置 / 导入配置」呼应 PRD DR-10（配置丢失是唯一不可恢复事故）。
@@ -1065,6 +1078,40 @@ function listArchive() {
   return { root, entries }
 }
 
+/** 彻底删除归档条目（真删目录）。只在用户显式点击时调用。 */
+function deleteArchive(body) {
+  const keys = Array.isArray(body?.keys)
+    ? body.keys.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim())
+    : typeof body?.key === 'string' && body.key.trim()
+      ? [body.key.trim()]
+      : []
+  if (keys.length === 0) return { status: 400, body: { ok: false, error: 'key or keys is required' } }
+  const root = archiveRootPath()
+  const deleted = []
+  const failed = []
+  for (const key of keys) {
+    const target = join(root, key)
+    // 只允许删 archive 下的直接子目录，防止 ../ 越界。
+    if (resolve(target) !== join(resolve(root), key) || key.includes('..')) {
+      failed.push({ key, error: '非法路径' })
+      continue
+    }
+    if (!existsSync(target)) {
+      failed.push({ key, error: '归档里没有这一项' })
+      continue
+    }
+    try {
+      rmSync(target, { recursive: true, force: true })
+      forgetArchiveOrigin(key)
+      deleted.push(key)
+    } catch (error) {
+      failed.push({ key, error: String(error?.message ?? error) })
+    }
+  }
+  if (deleted.length > 0) note('archive-deleted', { count: deleted.length, keys: deleted })
+  return { status: 200, body: { ok: failed.length === 0, deleted, failed } }
+}
+
 function restoreArchive(ctx, body) {
   const key = typeof body?.key === 'string' ? body.key.trim() : ''
   if (!key) return { status: 400, body: { ok: false, error: 'key is required' } }
@@ -1194,8 +1241,52 @@ function safeJoin(base, rel) {
 
 const repoCache = new Map()
 
-/** 同一仓库 10 分钟内复用一次 clone：多技能勾选安装不再反复拉取。 */
-function cloneRepo(source) {
+/** 正在跑的安装任务：jobId -> AbortController，供「中止安装」用。 */
+const installJobs = new Map()
+
+/** 取某个安装任务的取消信号；没给 jobId 就返回 undefined（不可中止）。 */
+function jobSignal(jobId) {
+  const id = typeof jobId === 'string' ? jobId.trim() : ''
+  if (!id) return undefined
+  let controller = installJobs.get(id)
+  if (!controller) {
+    controller = new AbortController()
+    installJobs.set(id, controller)
+    // 兜底：10 分钟后自动清理，避免任务表无限增长。
+    setTimeout(() => installJobs.delete(id), 10 * 60 * 1000)
+  }
+  return controller.signal
+}
+
+/** 跑一次 git（异步、可中止）。signal 中止时杀掉子进程并抛 ABORTED。 */
+function runGit(args, signal) {
+  return new Promise((resolve, reject) => {
+    const child = execFile('git', args, { windowsHide: true, timeout: 120000 }, (error) => {
+      if (error) {
+        const err = new Error(String(error.message ?? error))
+        err.code = child.__aborted ? 'ABORTED' : 'GIT_FAILED'
+        reject(err)
+        return
+      }
+      resolve()
+    })
+    if (signal) {
+      const onAbort = () => {
+        child.__aborted = true
+        try { child.kill('SIGTERM') } catch {}
+      }
+      if (signal.aborted) onAbort()
+      else signal.addEventListener('abort', onAbort, { once: true })
+      child.on('close', () => signal.removeEventListener('abort', onAbort))
+    }
+  })
+}
+
+/**
+ * 同一仓库 10 分钟内复用一次 clone：多技能勾选安装不再反复拉取。
+ * 用异步 execFile：同步版本会阻塞宿主事件循环，克隆期间整个设置页都卡住。
+ */
+async function cloneRepo(source, signal) {
   const key = source.repoUrl + '#' + (source.branch || '')
   const hit = repoCache.get(key)
   if (hit && existsSync(hit.dir) && Date.now() - hit.at < 10 * 60 * 1000) {
@@ -1207,9 +1298,10 @@ function cloneRepo(source) {
     const args = ['clone', '--depth', '1']
     if (source.branch) args.push('--branch', source.branch)
     args.push(source.repoUrl, dir)
-    execFileSync('git', args, { stdio: 'ignore', timeout: 120000 })
-  } catch {
+    await runGit(args, signal)
+  } catch (error) {
     rmSync(dir, { recursive: true, force: true })
+    if (error?.code === 'ABORTED') return { error: '已中止安装', aborted: true }
     return { error: '拉取仓库失败：检查地址、网络或私有仓库权限' }
   }
   for (const [oldKey, entry] of repoCache) {
@@ -1307,7 +1399,9 @@ async function marketSearch(query, limit) {
     const url = installable
       ? 'https://www.skills.sh/' + item.source + '/' + item.skillId
       : 'https://www.skills.sh/' + item.source + '/skills/' + item.skillId
-    return { ...item, installable, url }
+    // 与 skills.sh 页面上的安装命令保持一致：npx skills add <repo> --skill <name>
+    const installCommand = installable ? 'npx skills add ' + item.source + ' --skill ' + item.skillId : ''
+    return { ...item, installable, url, installCommand }
   })
   const body = { ok: true, query: trending ? '' : trimmed, trending, count: out.length, skills: out }
   if (marketCache.size >= 20) {
@@ -1361,7 +1455,7 @@ async function marketDescription(source, skillId) {
 }
 
 /** 批量安装：一次 clone，多个子目录逐个装入，返回成功与失败清单。 */
-function installBatch(ctx, body) {
+async function installBatch(ctx, body) {
   const text = cleanPath(String(body?.text ?? ''))
   const source = resolveGithubSource(text)
   if (!source) return { status: 400, body: { ok: false, error: '批量安装只接受 GitHub 仓库地址' } }
@@ -1369,8 +1463,8 @@ function installBatch(ctx, body) {
     ? body.subpaths.filter((item) => typeof item === 'string' && item.trim()).slice(0, 50)
     : []
   if (subpaths.length === 0) return { status: 400, body: { ok: false, error: '没有选中要安装的技能' } }
-  const clone = cloneRepo(source)
-  if (clone.error) return { status: 400, body: { ok: false, error: clone.error } }
+  const clone = await cloneRepo(source, jobSignal(body?.jobId))
+  if (clone.error) return { status: clone.aborted ? 499 : 400, body: { ok: false, error: clone.error, aborted: clone.aborted === true } }
   const installed = []
   const failed = []
   for (const rel of subpaths) {
@@ -1402,18 +1496,28 @@ function installDirectory(ctx, body, source, fallbackName) {
   const root = installRoot(ctx, body?.target)
   if (!root) return { status: 400, body: { ok: false, error: '目标目录不可用' } }
   const dest = join(root, name)
-  if (existsSync(dest)) return { status: 409, body: { ok: false, error: '已存在同名技能：' + dest } }
+  // 重装：显式 overwrite 才覆盖，且旧目录先挪到备份名，失败可回滚。
+  const overwrite = body?.overwrite === true
+  const exists = existsSync(dest)
+  if (exists && !overwrite) return { status: 409, body: { ok: false, error: '已存在同名技能：' + dest } }
   // 先落到同目录临时名，再原子 rename：中途失败不会留下半个技能目录。
   const tmpDest = dest + '.zhiyin-tmp-' + Date.now().toString(36)
+  const backupDest = dest + '.zhiyin-old-' + Date.now().toString(36)
   try {
     mkdirSync(root, { recursive: true })
     cpSync(source, tmpDest, { recursive: true, errorOnExist: true, force: false, filter: (entry) => !/(^|[\\/])(\.git|node_modules)([\\/]|$)/.test(entry) })
+    if (exists) renameSync(dest, backupDest)
     renameSync(tmpDest, dest)
   } catch (error) {
     try { rmSync(tmpDest, { recursive: true, force: true }) } catch {}
+    // 覆盖失败：把旧目录放回去，别让用户丢技能。
+    try { if (exists && existsSync(backupDest) && !existsSync(dest)) renameSync(backupDest, dest) } catch {}
     return { status: 500, body: { ok: false, error: String(error?.message ?? error) } }
   }
-  note('skill-installed', { name, dest })
+  if (exists) {
+    try { rmSync(backupDest, { recursive: true, force: true }) } catch {}
+  }
+  note(exists ? 'skill-reinstalled' : 'skill-installed', { name, dest })
   // 装进技能库（.agents）后顺手在 .dsh/skills 建一条软链接，否则 DSH 看不到它。
   if (body?.target === 'agents') {
     try {
@@ -1480,8 +1584,8 @@ async function installFromText(ctx, body) {
     return { status: 400, body: { ok: false, error: '看不懂这个来源：支持 owner/repo、GitHub 链接、npx skills add …、SKILL.md 直链或本地文件夹' } }
   }
   // 扫描与随后勾选安装共用同一份 clone，避免一个仓库拉两遍。
-  const clone = cloneRepo(source)
-  if (clone.error) return { status: 400, body: { ok: false, error: clone.error } }
+  const clone = await cloneRepo(source, jobSignal(body?.jobId))
+  if (clone.error) return { status: clone.aborted ? 499 : 400, body: { ok: false, error: clone.error, aborted: clone.aborted === true } }
   const tmp = clone.dir
   const wanted = typeof body?.subpath === 'string' ? body.subpath.trim() : source.subpath
   const rels = []
@@ -2024,7 +2128,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive }
 
 function invalidateAll() {
   for (const entry of registrations) {
