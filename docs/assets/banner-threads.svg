@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-label="织音 ZhiYin —— 三层织线收成一个声部">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffe9dc" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=Noto+Serif+SC:wght@700;900&amp;display=swap');
+      .mono { font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="400" fill="#1a0f0c"/>
+  <rect width="1200" height="400" fill="url(#grid)"/>
+
+  <!-- ① 顶部全幅色带 -->
+  <rect x="0" y="0" width="1200" height="9" fill="#F26A1B"/>
+
+  <!-- ② 左下角 L 形取景标记 -->
+  <rect x="40" y="352" width="9" height="28" fill="#F26A1B"/>
+  <rect x="40" y="371" width="28" height="9" fill="#F26A1B"/>
+
+  <!-- 左区 -->
+  <text x="80" y="88" font-family="Inter" font-size="13" font-weight="700" letter-spacing="3" fill="#F26A1B">DSH PLUGIN · SKILL CONTROL</text>
+  <text x="80" y="178" font-family="Inter" font-size="96" font-weight="900" letter-spacing="-2" fill="#ffe9dc">ZhiYin</text>
+  <text x="80" y="212" font-family="Inter" font-size="16" font-weight="500" letter-spacing="4" fill="#c08a6e">ZHIYIN · WEAVE SKILLS INTO ONE VOICE</text>
+  <text x="80" y="252" font-family="'Noto Serif SC', serif" font-size="26" font-weight="700" letter-spacing="1" fill="#e6b49a">把技能织成谱，让模型奏成音</text>
+  <text x="80" y="284" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="17" font-weight="700" fill="#e6b49a">装技能<tspan font-weight="400" fill="#F26A1B"> · </tspan>编技能包<tspan font-weight="400" fill="#F26A1B"> · </tspan>归档<tspan font-weight="400" fill="#F26A1B"> · </tspan>算成本</text>
+  <text x="80" y="312" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="16" fill="#c08a6e"><tspan font-weight="700" fill="#F26A1B">v0.1.0</tspan> · Node 24 · DSH 组合包</text>
+  <text x="80" y="344" font-family="Inter" font-size="14" fill="#c08a6e">dsh plugin --profile web add github:ErgeAIA/dsh-skills-zhiyin</text>
+
+  <!-- 右区标签 -->
+  <text x="740" y="88" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="16" font-weight="700" letter-spacing="2" fill="#F26A1B">三层织线 · 一个声部</text>
+
+  <!-- 织线一：全部技能（密） -->
+  <text x="740" y="156" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="12" fill="#e6b49a">全部技能</text>
+  <line x1="872" y1="152" x2="1100" y2="152" stroke="#3a2018" stroke-width="1"/>
+  <rect x="872" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#F26A1B"/>
+  <rect x="904" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#4a2c22"/>
+  <rect x="936" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#4a2c22"/>
+  <rect x="968" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#4a2c22"/>
+  <rect x="1000" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#F26A1B"/>
+  <rect x="1032" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#4a2c22"/>
+  <rect x="1064" y="143" width="24" height="18" rx="3" fill="#241512" stroke="#4a2c22"/>
+
+  <!-- 织线二：技能包（成组） -->
+  <text x="740" y="216" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="12" fill="#e6b49a">技能包</text>
+  <line x1="872" y1="212" x2="1100" y2="212" stroke="#3a2018" stroke-width="1"/>
+  <rect x="872" y="201" width="56" height="22" rx="4" fill="#241512" stroke="#F26A1B"/>
+  <rect x="940" y="201" width="56" height="22" rx="4" fill="#241512" stroke="#4a2c22"/>
+  <rect x="1008" y="201" width="56" height="22" rx="4" fill="#241512" stroke="#4a2c22"/>
+
+  <!-- 织线三：单个技能 → 收成声波 -->
+  <text x="740" y="276" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="12" fill="#e6b49a">单个技能</text>
+  <line x1="872" y1="272" x2="996" y2="272" stroke="#3a2018" stroke-width="1"/>
+  <rect x="872" y="261" width="56" height="22" rx="4" fill="#241512" stroke="#4a2c22"/>
+  <rect x="940" y="261" width="56" height="22" rx="4" fill="#241512" stroke="#4a2c22"/>
+
+  <!-- 组内成员向下汇入声部 -->
+  <path d="M900 223 L900 259" stroke="#6b3d2c" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/>
+  <path d="M968 223 L968 259" stroke="#6b3d2c" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/>
+
+  <!-- 声波与收束点 -->
+  <path d="M996 272 q14 -20 28 0 t28 0 t28 0" fill="none" stroke="#F26A1B" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="1104" cy="272" r="6" fill="#F26A1B"/>
+
+  <!-- 右区图注 -->
+  <text x="740" y="358" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="17" font-weight="500" letter-spacing="1" fill="#ffe9dc">三层织线收成一个声部</text>
+</svg>

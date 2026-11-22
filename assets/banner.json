@@ -6,11 +6,12 @@
   },
   "theme": "ember",
   "accent": "#F26A1B",
+  "titleFont": "Noto Serif SC 900",
   "fields": {
     "category": "DSH PLUGIN · SKILL CONTROL",
-    "title": "ZhiYin",
+    "title": "织音",
     "captionEn": "ZHIYIN · WEAVE SKILLS INTO ONE VOICE",
-    "subtitle": "把技能织成谱，让模型奏成音",
+    "subtitle": "技能是散线，目录是谱子",
     "points": [
       "装技能",
       "编技能包",
@@ -23,29 +24,53 @@
       "DSH 组合包"
     ],
     "footer": "dsh plugin --profile web add github:ErgeAIA/dsh-skills-zhiyin",
-    "caption": "三层织线收成一个声部"
+    "caption": "散点收成卡片，卡片决定声部"
   },
   "glyph": {
-    "kind": "custom-threads",
-    "label": "三层织线 · 一个声部",
-    "note": "三条横线代表三层开关（全部技能 / 技能包 / 单个技能）；线上串联的技能块自上而下变少，第三层收束成声波，末端一个强调色圆点。用「织 → 谱 → 声」解释产品名：技能是线，可见性是谱，模型听见的是声部。",
-    "rows": [
+    "kind": "scatter-converge",
+    "label": "从散落到可见",
+    "note": "三段动线讲「从乱到治」：32 个技能条（散落）→ 4 个技能包卡（编组，卡内三条成员细杠）→ 一张带声波的成品卡（模型此刻读到的技能目录）。对应产品动作：装进来 → 编成包 → 只放出要的。",
+    "stages": [
       {
-        "label": "全部技能",
-        "y": 152,
-        "chips": 7
+        "label": "散落的技能",
+        "x": 744,
+        "marks": 32
       },
       {
         "label": "技能包",
-        "y": 212,
-        "chips": 3
+        "x": 890,
+        "cards": 4
       },
       {
-        "label": "单个技能",
-        "y": 272,
-        "chips": 2,
-        "tail": "wave"
+        "label": "可见目录",
+        "x": 1010,
+        "card": true
+      }
+    ],
+    "decorations": [
+      {
+        "kind": "note",
+        "where": "左右留白",
+        "opacity": 0.09,
+        "role": "水印级音符，不抢正文"
+      },
+      {
+        "kind": "skill-stack",
+        "where": "散点簇左侧",
+        "opacity": 0.15,
+        "role": "技能条目层叠示意"
+      },
+      {
+        "kind": "note",
+        "where": "成品卡上下",
+        "opacity": "0.45–0.9",
+        "role": "声波升起的三枚音符"
       }
     ]
+  },
+  "assets": {
+    "logo": "assets/logo.svg",
+    "icon": "icon.svg",
+    "archivedThreadsVersion": "docs/assets/banner-threads.svg"
   }
 }

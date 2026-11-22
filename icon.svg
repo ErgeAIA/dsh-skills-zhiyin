@@ -1,9 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="织音">
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="#1f2328"/>
-  <g fill="none" stroke="#e0743c" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M24 46V18l22-5.6v27.2"/>
-    <path d="M24 26.4l22-5.6"/>
-  </g>
-  <circle cx="19" cy="46" r="6" fill="#e0743c"/>
-  <circle cx="41" cy="40" r="6" fill="#e0743c"/>
+  <rect width="64" height="64" rx="15" fill="#1a0f0c"/>
+  <rect x="0.9" y="0.9" width="62.2" height="62.2" rx="14.2" fill="none" stroke="#F26A1B" stroke-opacity="0.35" stroke-width="1.8"/>
+  <ellipse cx="19.5" cy="46.5" rx="11.5" ry="8.8" transform="rotate(-18 19.5 46.5)" fill="#F26A1B"/>
+  <rect x="27" y="9" width="6" height="38" rx="2.6" fill="#F26A1B"/>
+  <path d="M33 9 q15.5 3.6 15.5 16.6 q-6.2 -8 -15.5 -8z" fill="#F26A1B"/>
 </svg>

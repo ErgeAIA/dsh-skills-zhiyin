@@ -30,7 +30,8 @@
     "README.md",
     "README.en.md",
     "assets/banner.svg",
-    "assets/banner.json"
+    "assets/banner.json",
+    "assets/logo.svg"
   ],
   "dependencies": {
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
