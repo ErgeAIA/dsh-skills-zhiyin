@@ -32,7 +32,9 @@
     "assets/logo.svg",
     "assets/banner-en.svg",
     "NOTICE",
-    "LICENSE"
+    "LICENSE",
+    "assets/icon-180.png",
+    "assets/icon-512.png"
   ],
   "dsh": {
     "bundle": {
