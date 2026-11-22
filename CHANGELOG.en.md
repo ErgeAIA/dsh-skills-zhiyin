@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Every UI string is bilingual: 86 strings that previously only had Chinese fallbacks — the catalog-characters dialog, market, archive and install flows — now have English entries
 - Dual entry points: a full ZhiYin page in the left sidebar alongside Settings → ZhiYin, both rendering the same component
 - Skill installation: GitHub repositories, a single skill inside a repo, skills.sh skill pages, `npx skills add` commands, direct SKILL.md URLs and local folders; pick individual skills when a repo contains several; installs can be cancelled and reinstalled
 - Skill market: proxies skills.sh search, shows install counts and the matching CLI command, and installs any skill backed by a public repository
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The package is now named `dsh-skills-zhiyin` (no `@local` prefix), matching the repository for GitHub and npm installs
 - The UI now shows user concepts only: internal terms such as "observe", "projection", "ensemble" and "takeover" are gone, as are entry points for removed features
 - The sidebar page is fluid width (capped at 1600px), and skill cards reflow into as many columns as fit
 - Typography and opacity are tokenised; spacing follows an 8pt grid
@@ -38,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Parts of the UI still rendered in Chinese under an English interface (86 strings had no English entry and fell back to Chinese)
 - The panel showed "Load failed: HTTP 400" and stayed in a loading state (a module-level variable shadowed a local one, causing a TDZ error)
 - The skill total drifted between 111 and 112 (shadow candidates iterated an append-only cache)
 - The market install button wrapped its icon and label onto two lines
@@ -52,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+- The combo and ensemble routes `/zhiyin/combo` and `/zhiyin/intent`, plus the obsolete `consumer.js` (the page had stopped calling them long ago)
 - The v1 ensemble, combo, exclude, always-on, conflict declaration and "surface matrix" UI, along with their dead code
 - The "takeover / not taken over" status badge: internal machinery the user could not act on
 - The hard catalog budget threshold and its over-budget warning

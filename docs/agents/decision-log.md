@@ -16,6 +16,18 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-017: 界面文案必须双语，包名去掉 @local，清掉组合层遗留
+
+- **日期**：2026-11-22
+- **背景**：用户发现「目录字符数」在英文界面仍是中文。排查后确认根因不是漏翻一条，而是 **86 个 say() 调用只有中文兜底、词典里从未有词条**——市场、归档、安装流程、成本弹窗整片都是这样。同时处理挂账已久的三条清理。
+- **决策**：
+  1. **翻译补进词典而不是继续靠兜底**：86 个 key 同时写入 zh 与 en 两个词典块，`say()` 不再有「词典查不到、只能吃中文字面」的路径；日后新增文案必须两边都写。
+  2. **包名改 `dsh-skills-zhiyin`**：`@local/` 是本地链接别名，既不能发布也无法在 GitHub 安装后自洽。四处联动改：`package.json` name、`cordis.patch.yml` name、`client.js` 模块 id、本机 profile 的依赖键 + `pnpm-lock.yaml` + `node_modules` 链接（后者已从 `@local/` 目录移到顶层，空目录一并删除）。
+  3. **删 `consumer.js`**：M0 预设级消费者的遗留实现，从未挂载；同步去掉 `exports["./consumer"]` 与 `files` 条目。
+  4. **删 `/zhiyin/combo` 与 `/zhiyin/intent`**：页面早已不调用，只留在宿主里当死代码；连带删掉只被它们使用的 `previewIntent` 与 `comboNameTaken`。`state.combos` / `state.intent` 字段**保留不删**，避免已存在的 state.json 失去结构。
+- **验证**：`node --check` 双半边 exit 0；假 ctx 跑 apply 得 **22 条路由**（原 24，减去 combo 与 intent）；`say()` 用到但词典缺失的 key **0 条**；客户端模块 id = `dsh-skills-zhiyin`，四个 slot 注册不变；`npm pack --dry-run` = 14 文件；通过新链接读到的包名与仓库一致。
+- **风险与回滚**：包名变更后必须完全重启 DSH 才会按新 key 解析；若新 key 未被识别，把 profile 里 `dsh-skills-zhiyin` 改回 `@local/dsh-zhiyin-proto` 并重建链接即可回退。
+
 ## DEC-016: banner 定稿用「散点汇聚」，并补齐 logo 与点缀
 
 - **日期**：2026-11-22

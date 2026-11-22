@@ -75,11 +75,6 @@ function packNameTaken(packs, name, exceptId) {
   return packs.some((pack) => pack.id !== exceptId && (pack.name ?? '').trim() === needle)
 }
 
-/** 组合名规则与技能包一致：1–40 字符；重名拒绝。 */
-function comboNameTaken(combos, name, exceptId) {
-  const needle = name.trim()
-  return combos.some((combo) => combo.id !== exceptId && (combo.name ?? '').trim() === needle)
-}
 
 function newId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
@@ -188,43 +183,6 @@ function incompleteGuard(state) {
   return null
 }
 
-/** 应用前预览：只算差异，不写 state，也不改任何技能包。 */
-async function previewIntent(ctx, state, packIds, stack) {
-  const base = normalizeIntent(state)
-  const next = {
-    ...base,
-    mode: 'orchestrated',
-    activePackIds: normalizePackIds(state, stack ? [...base.activePackIds, ...packIds] : packIds),
-  }
-  const draft = { ...state, intent: next }
-  const observed = await collectState(ctx)
-  const skills = Array.isArray(observed?.skills) ? observed.skills : []
-  const visible = (plan) =>
-    new Set(skills.filter((skill) => hiddenReason(plan, skill.name, skill.source) === null).map((skill) => skill.name))
-  const before = visible(state)
-  const after = visible(draft)
-  const packsBefore = (state.packs ?? []).filter((pack) => packActive(state, pack, base)).map((pack) => pack.id)
-  const packsAfter = (state.packs ?? []).filter((pack) => packActive(draft, pack, next)).map((pack) => pack.id)
-  const catalogChars =
-    skills
-      .filter((skill) => after.has(skill.name))
-      .reduce((total, skill) => total + Math.min((skill.description ?? '').length, DESCRIPTION_MAX_LENGTH), 0) + 200
-  const allPackIds = (state.packs ?? []).map((pack) => pack.id)
-  return {
-    mode: 'orchestrated',
-    activePackIds: next.activePackIds,
-    conflicts: conflictPairsFor(state, packsAfter),
-    // 生效面用「最终集合」而不是增量：用户看的是应用后哪些包在场上。
-    packsOn: packsAfter,
-    packsOff: allPackIds.filter((id) => !packsAfter.includes(id)),
-    packsEnter: packsAfter.filter((id) => !packsBefore.includes(id)),
-    packsLeave: packsBefore.filter((id) => !packsAfter.includes(id)),
-    enable: [...after].filter((name) => !before.has(name)).sort(),
-    hide: [...before].filter((name) => !after.has(name)).sort(),
-    unassigned: skills.filter((skill) => hiddenReason(draft, skill.name, skill.source) === 'unassigned').length,
-    catalogChars,
-  }
-}
 
 let cache = null
 /** agentSessionId -> { skills, dispose, invalidate } */
@@ -479,120 +437,7 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, packs: packs.length } }
   })
 
-  // 组合（PRD §7.3）：只保存包 ID 列表；应用/叠加写进 intent，改生效面而不是包本身。
-  post(ctx, '/zhiyin/combo', async (body) => {
-    const state = readState()
-    const combos = Array.isArray(state.combos) ? state.combos : (state.combos = [])
-    const action = typeof body?.action === 'string' ? body.action : ''
-    const id = typeof body?.id === 'string' ? body.id : ''
-    const index = combos.findIndex((combo) => combo.id === id)
-    const now = new Date().toISOString()
 
-    if (action === 'create') {
-      const name = typeof body?.name === 'string' ? body.name.trim() : ''
-      if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
-      if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '组合名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
-      if (comboNameTaken(combos, name)) return { status: 400, body: { ok: false, error: '已有同名组合' } }
-      const newComboId = newId('c')
-      combos.push({ id: newComboId, name, description: '', packIds: [], order: combos.length, createdAt: now, updatedAt: now })
-      saveState(state)
-      invalidateAll()
-      return { status: 200, body: { ok: true, id: newComboId } }
-    }
-
-    // 退出合奏：回到兼容模式，包自己的开关原样保留。
-    if (action === 'exit') {
-      const current = normalizeIntent(state)
-      state.intent = { ...current, mode: 'compat', activePackIds: [], revision: current.revision + 1, updatedAt: now }
-      saveState(state)
-      invalidateAll()
-      note('intent-exit', { revision: state.intent.revision })
-      return { status: 200, body: { ok: true, intent: normalizeIntent(state) } }
-    }
-
-    // 差异预览：不写 state；应用前必须让用户看到「会加入谁、会退出谁」。
-    if (action === 'preview') {
-      const combo = index >= 0 ? combos[index] : null
-      const packIds = Array.isArray(body?.packIds) ? body.packIds : (combo?.packIds ?? [])
-      const preview = await previewIntent(ctx, state, packIds, body?.stack === true)
-      return { status: 200, body: { ok: true, preview } }
-    }
-
-    if (index < 0) return { status: 404, body: { ok: false, error: 'combo not found' } }
-    const combo = combos[index]
-
-    if (action === 'rename') {
-      const name = typeof body?.name === 'string' ? body.name.trim() : ''
-      if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
-      if (!packNameValid(name)) return { status: 400, body: { ok: false, error: '组合名需为 1–40 个字符，仅限中文、字母、数字、空格、下划线、连字符' } }
-      if (comboNameTaken(combos, name, combo.id)) return { status: 400, body: { ok: false, error: '已有同名组合' } }
-      combo.name = name
-    } else if (action === 'setPacks') {
-      combo.packIds = normalizePackIds(state, body?.packIds)
-    } else if (action === 'delete') {
-      combos.splice(index, 1)
-    } else if (action === 'apply' || action === 'stack') {
-      const guard = incompleteGuard(state)
-      if (guard) return guard
-      const current = normalizeIntent(state)
-      const active = action === 'stack' ? [...current.activePackIds, ...combo.packIds] : combo.packIds
-      const nextActive = normalizePackIds(state, active)
-      const activeAfter = (state.packs ?? [])
-        .filter((pack) => nextActive.includes(pack.id) && pack.enabled !== false)
-        .map((pack) => pack.id)
-      const conflicts = conflictPairsFor(state, activeAfter)
-      if (conflicts.length > 0 && body?.ack !== true) {
-        return { status: 409, body: { ok: false, error: 'conflict', conflicts } }
-      }
-      if (conflicts.length > 0) {
-        note('conflict-ack', { scope: action, combo: combo.id, revision: current.revision, pairs: conflicts.map((pair) => [pair.a.id, pair.b.id]) })
-      }
-      state.intent = {
-        ...current,
-        mode: 'orchestrated',
-        activePackIds: nextActive,
-        revision: current.revision + 1,
-        updatedAt: now,
-      }
-      note('intent-applied', { combo: combo.id, action, packs: state.intent.activePackIds.length })
-    } else {
-      return { status: 400, body: { ok: false, error: 'unknown action: ' + action } }
-    }
-
-    combo.updatedAt = now
-    saveState(state)
-    invalidateAll()
-    return { status: 200, body: { ok: true, combos: combos.length, intent: normalizeIntent(state) } }
-  })
-
-  // 合奏层开关：单技能排除（FR-011）与常驻技能（FR-010）。只改 intent，不动任何包。
-  post(ctx, '/zhiyin/intent', async (body) => {
-    const state = readState()
-    const name = typeof body?.name === 'string' ? body.name.trim() : ''
-    if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
-    const field = body?.field === 'alwaysOn' ? 'alwaysOnSkillNames' : 'excludedSkillNames'
-    const on = body?.value === true
-    const current = normalizeIntent(state)
-    // 常驻与排除互斥（FR-010）：冲突时报错，不静默改写。
-    if (on && field === 'excludedSkillNames' && current.alwaysOnSkillNames.includes(name)) {
-      return { status: 400, body: { ok: false, error: '该技能已设为常驻，不能同时排除；请先取消常驻' } }
-    }
-    if (on && field === 'alwaysOnSkillNames' && current.excludedSkillNames.includes(name)) {
-      return { status: 400, body: { ok: false, error: '该技能已被排除，不能同时设为常驻；请先取消排除' } }
-    }
-    const next = { ...current }
-    const names = new Set(current[field])
-    if (on) names.add(name)
-    else names.delete(name)
-    next[field] = [...names]
-    next.revision = current.revision + 1
-    next.updatedAt = new Date().toISOString()
-    state.intent = next
-    saveState(state)
-    invalidateAll()
-    note('intent-updated', { field, name, on })
-    return { status: 200, body: { ok: true, intent: next } }
-  })
 
   // 技能备注：只存本地 state，不写技能文件；清空即删除。
   post(ctx, '/zhiyin/note', async (body) => {
