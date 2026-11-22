@@ -11,7 +11,7 @@
     "skills",
     "skill-manager"
   ],
-  "icon": "icon.svg",
+  "icon": "icon-small.svg",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

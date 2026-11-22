@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The package is named `dsh-skills-zhiyin` and the repository root is the plugin itself, so a GitHub download installs directly
 - Licensed under Apache-2.0, with LICENSE and NOTICE added; redistributors only need to keep the copyright notice, without opening their own source
 - Unused official dependencies were dropped; runtime dependencies now come entirely from the host
-- The plugin icon and horizontal lockup use a new mark of three interwoven skill strands, with real gaps at the crossings so the weave reads correctly
+- The in-app plugin icon now uses a small-size variant for the 30px / 36px list and card renderings; the full mark remains on the marketplace tile
 - The README banner now shares that visual language and uses the mark itself in its final stage; a separate small-size version covers 16–32px contexts
 - README and CHANGELOG are bilingual
 
