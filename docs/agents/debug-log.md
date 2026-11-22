@@ -2,7 +2,7 @@
 title: Debug Log
 type: debug-log
 project: dsh-skills-zhiyin
-updated: 2026-11-21
+updated: 2026-11-22
 description: >
   反复调试的 bug 追加记录，优先级与实现事实对齐。只追加，不删除或改写历史。
   AI 在本文件新增或修改任何条目后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -15,6 +15,19 @@ description: >
 > 字段：`- **日期**：` / `- **现象**：` / `- **根因**：` / `- **修复**：` / `- **验证限制**：` / `- **教训**：`
 
 ***
+
+## BUG-011: 插件包移到仓库根后，宿主不再加载织音
+
+- **日期**：2026-11-22
+- **现象**：把插件从 `prototype/` 移到仓库根目录后，完全重启 DSH，左栏没有「织音」入口，设置里也没有，插件整体消失。
+- **根因**：`link:` 依赖的解析状态分散在三处，改一处不生效 ——
+  ① 用户 profile 的 `package.json` 依赖写 `link:D:/Workspace/Code/dsh-skills-zhiyin`（新路径，已改）；
+  ② `node_modules/@local/dsh-zhiyin-proto` 是 pnpm 建的**符号链接**，仍指向已被删除的 `...\prototype`，宿主经它读 `package.json` 直接 ENOENT，包被跳过；
+  ③ `pnpm-lock.yaml` 的 `specifier` / `version` 两行还是旧路径。
+  `dsh.profile.bundles` 里本来就是包名，无需改动。
+- **修复**：删除失效符号链接 → 重建指向仓库根的新链接 → 把锁文件两行同步到新路径。三处对齐后，通过链接能读到 `name` / `version` / `dsh.bundle.patch` / `dsh.client.platform` 与 `index.js` / `client.js` / `cordis.patch.yml`。
+- **验证限制**：仅确认链接与锁文件对齐、包元数据可解析；真实 UI 是否恢复要等用户重启 DSH 观察，未由我确认。
+- **教训**：插件包物理位置一旦变动，`link:` 依赖的**三处（package.json、pnpm-lock.yaml、node_modules 链接）必须一起改**；且 `dsh plugin --profile desktop` 被 Electron 应用独占管理（实测报 `profile "desktop" is managed exclusively by the Electron application`），CLI 兜不了底，只能走应用内插件管理器的「卸载 + 安装」，或手工对齐三处。
 
 ## BUG-010: 设置页 400、一直「正在读取技能列表…」（TDZ 变量遮蔽）
 
