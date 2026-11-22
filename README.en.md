@@ -1,8 +1,14 @@
 # ZhiYin
 
+![ZhiYin · three threads, one voice](assets/banner.svg)
+
 A skill-management plugin for DeepSeek Harness: install skills, group them into packs, switch them on and off.
 
 English ｜ [中文](README.md)
+
+> **What the name means**: **织** (weave) — turning scattered skills into one score; **音** (voice) — the single piece the model actually plays.
+> Those two halves are the product: organise the skills, then decide which ones get to perform.
+> Skills are the instruments, packs are the sections, and the catalog the model reads is the score — ZhiYin keeps that score.
 
 ZhiYin turns "which skills can the model see right now" into something you can operate directly: what gets installed, which ones stay, and who has them on. It never edits skill files and never replaces DSH's own skill machinery — it only decides the visible set around them.
 
