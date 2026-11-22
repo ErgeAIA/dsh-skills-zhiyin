@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（英文 banner + 语言切换 + 双语 CHANGELOG 走 feat/i18n-and-changelog → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 banner v2：a77f2f7 → 1f8283c
+- **当前分支**：main（双语补全 + 三条清理 走 chore/i18n-and-cleanup → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 i18n：33c2122 → ab8cc82
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 22:xx 英文 banner + 界面语言切换 + 双语 CHANGELOG
+- **最后更新**：2026-11-22 22:4x 双语补全 + 三条清理
+  - 英文缺失根因：86 个 say() key 只有中文兜底、词典里没有词条（不止「目录字符数」，市场/归档/安装/成本弹窗整片都如此）。已把 86 条的 zh 与 en 同时写进两本词典，say() 回落到「词典 > 宿主 > 字面」。
+  - 包名 @local/dsh-zhiyin-proto → dsh-skills-zhiyin：package.json / cordis.patch.yml / client.js 模块 id / profile 依赖键 + bundles / pnpm-lock.yaml / node_modules 链接（移到顶层，@local 空目录已删）。
+  - 删 consumer.js（M0 遗留，从未挂载）+ exports 与 files 条目。
+  - 删死路由 /zhiyin/combo、/zhiyin/intent 及只被它们使用的 previewIntent、comboNameTaken；state 里的 combos/intent 字段保留，兼容已有 state.json。
+  - 验证：node --check 双半边 0；假 ctx 22 条路由（原 24）；say() 缺词条 0；模块 id = dsh-skills-zhiyin；4 个 slot 不变；npm pack = 14 文件。
+  - 待验收：重启 DSH 后插件按新包名加载、英文界面全部为英文（尤其目录字符数弹窗、市场、归档）。
+
+- 上一轮：2026-11-22 22:xx 英文 banner + 界面语言切换 + 双语 CHANGELOG
   - 英文 banner：assets/banner-en.svg，几何与中文版逐字一致，只替换文案（TITLE ZhiYin / 副题 Skills are threads; the catalog is the score / 阶段标签 SCATTERED SKILLS、PACKS、VISIBLE CATALOG / 图注 Scatter into packs; packs decide what plays）。README.en.md 指向它。
   - 界面语言切换：头部新增胶囊按钮（地球图标 + 目标语言两字母），在 zh / en 之间切换，选择写 localStorage（zhiyin.lang），下次打开沿用；say() 优先级改为「插件语言 > 宿主语言 > 字面兜底」；指南弹窗与渲染正文同步跟随该语言。
   - CHANGELOG：CHANGELOG.md（中文）+ CHANGELOG.en.md（英文）按 Keep a Changelog 补全，全部内容归入 [Unreleased]（尚未发版），分新增/变更/修复/移除四类，条目来自真实提交历史；中文文件用中文分类头、英文文件用英文分类头，两份额度一一对应。

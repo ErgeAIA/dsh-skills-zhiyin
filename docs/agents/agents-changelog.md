@@ -38,6 +38,7 @@ description: >
 - <References 无产品真相指针> → update → 新增「设计前先读产品真相 → 见 PRODUCT.md」
 - <Permissions「每次只推进一个阶段，完成即停，等用户验证」> → update → 「按任务需要连续推进多个阶段，每完成一个功能自行 review（语法、假 ctx 冒烟、真机数据），不需要 UI 验收时不要停下来等；最后整体交付验收」；原因：用户 2026-11-18 指出一步一停进度太慢
 - <Conventions 无「交付须附下一步计划」> → update → 新增「每次交付须附下一步计划」行；原因：用户 2026-11-19 要求每次交付除报告完成外还要给出下一步计划
+- <Conventions「仓库目录布局固定」列举文件含 consumer.js> → update → 去掉 consumer.js、补 assets/；原因：consumer.js 已删除，资产目录随包分发
 - <Conventions「仓库目录布局固定」白名单含 .gitignore，无 .gitattributes、无 README.en.md> → update → 白名单追加 README.en.md 与 .gitattributes；原因：双语 README 与源码导出白名单（export-ignore）需要落在这两处
 - <Conventions 无分发口径约束> → update → 新增「分发口径双白名单」行（npm files + gitattributes export-ignore，开发文档不随包分发）；细则见 docs/agents/decision-log.md DEC-010
 - <Conventions「仓库目录布局固定」：根目录只放契约/说明文件，插件包位于 prototype/> → update → 插件包本体移到仓库根目录（GitHub 下载即插件），开发文档只进 docs/；Toolchain、Commands、References 内所有 prototype/ 前缀同步去掉

@@ -1,5 +1,5 @@
 {
-  "name": "@local/dsh-zhiyin-proto",
+  "name": "dsh-skills-zhiyin",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,14 +14,12 @@
   "icon": "icon.svg",
   "exports": {
     ".": "./index.js",
-    "./consumer": "./consumer.js",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
-    "consumer.js",
     "paths.js",
     "client.js",
     "cordis.patch.yml",
