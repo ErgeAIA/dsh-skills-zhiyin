@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 18:xx 用户指南并入 README
+- **最后更新**：2026-11-22 18:3x 插件恢复加载（BUG-011）
+  - 用户反馈「重启后看不到插件，左栏与设置都没有」。定位：插件包移到仓库根后，profile 的 `link:` 依赖只改了 `package.json`，而 `node_modules/@local/dsh-zhiyin-proto` 符号链接仍指向已删除的 `prototype`，`pnpm-lock.yaml` 也是旧路径，宿主经链接读 `package.json` 得 ENOENT → 包被跳过。
+  - 已修复：删除失效链接、重建指向仓库根的链接、锁文件两行同步到新路径。`dsh.profile.bundles` 无需改动。
+  - 已核实：CLI 无法兜底（`dsh plugin --profile desktop` 报「profile desktop is managed exclusively by the Electron application」），修复后需重启 DSH。
+  - 待验收：重启后左栏出现「织音」，设置页与指南弹窗正常。
+
+- 上一轮：2026-11-22 18:xx 用户指南并入 README
   - 删除独立的 GUIDE.md / GUIDE.en.md，正文并入 README.md / README.en.md 的「使用」段：装技能六种粘贴方式、三个目标目录、三层开关优先级、技能包与「全部技能」互斥、归档恢复、目录字符数、备份导入导出、常见问题。
   - README 里用 `<!-- guide:start -->` / `<!-- guide:end -->` 圈出使用段（GitHub 渲染不可见）；宿主 /zhiyin/guide 改为读 README 并只返回这一段，已装插件的用户不会看到安装与开发步骤。标记缺失时退化为整篇。
   - package.json 的 files 去掉两份 GUIDE，现在 9 项；npm pack --dry-run = 11 文件。
