@@ -4,6 +4,13 @@
   "private": true,
   "type": "module",
   "description": "织音：把技能包编译成模型此刻看得见的技能目录，并给出成本与冲突",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "skills",
+    "skill-manager"
+  ],
   "icon": "icon.svg",
   "exports": {
     ".": "./index.js",
