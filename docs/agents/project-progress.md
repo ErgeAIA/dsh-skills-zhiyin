@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（品牌 banner + 名称释义 + dsh 标签 走 feat/brand-banner → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮说明弹窗：40b4bb4 → 005fb94
+- **当前分支**：main（banner 定稿 v2 + 点缀 + logo 走 feat/banner-v2-logo → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮品牌 banner：102f5c3 → b0a33da
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 21:xx 品牌 banner + 名称释义 + dsh 标签
+- **最后更新**：2026-11-22 21:5x banner 定稿 v2 + 点缀 + logo
+  - banner 换成「散点汇聚」：32 个技能条 → 4 个技能包卡（卡内三条成员细杠）→ 带声波的成品卡；标题改中文衬线「织音」。v1（三条织线）存档到 docs/assets/banner-threads.svg，留给宣传图。
+  - 点缀：左右留白两枚水印音符（0.09/0.07）、散点簇左侧技能层叠图标（0.15）、成品卡上下三枚音符（0.45–0.9）。第一版点缀压了「散落的技能」标签与右区标签，已挪位重排，最终渲染无压字。
+  - logo：icon.svg 改为方形徽标（加粗音符，去掉小尺寸会糊的谱线与琥珀线）；新增 assets/logo.svg 深色底板横版徽标（标记 + 织音 + ZHIYIN + tagline）。两者都进 files 白名单。
+  - assets/banner.json 同步成 v2 结构（glyph.kind = scatter-converge，含 stages 与 decorations 说明）。
+  - 验证：npm pack --dry-run = 14 文件；Puppeteer 渲染 banner / logo / icon 逐一目视；icon 在 140px 下清晰，32px 下仍可辨为音符。
+  - 待验收：GitHub README 顶部显示 v2 banner 与点缀；插件列表里图标为新的音符徽标。
+
+- 上一轮：2026-11-22 21:xx 品牌 banner + 名称释义 + dsh 标签
   - **说明弹窗宽度**：新增 css.modalWide（720px）只给「目录字符数 · 计算方式与建议上限」用；costBullet 加 text-wrap:pretty 避免末行只剩一两个字。用户已确认正常。
   - **dsh 标签**：社区索引靠 GitHub topic 识别（awesome-dsh-plugin 贡献指南原文要求 Add the dsh-plugin topic）。已用 gh repo edit --add-topic 打上 dsh-plugin / deepseek-harness / dsh / skill-manager，回读 repositoryTopics 确认；package.json 另补 npm keywords（5 个）。宿主识别插件本身仍靠 dsh.bundle.patch + dsh.client.platform，与 topic 无关。
   - **Banner**：走 tuhua 规范（该技能当前不在可调用目录里，skill 工具返回 not available for model invocation，改为直接读 ~/.agents/skills/tuhua 的 SKILL.md 与 references 执行）。产物 assets/banner.svg（4.9KB）+ assets/banner.json，已进 files 白名单；README 中英顶部各引用一次。图形为定制「三条织线 → 声波」，对应三层开关收成一个声部。
