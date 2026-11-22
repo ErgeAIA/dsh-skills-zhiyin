@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（banner 定稿 v2 + 点缀 + logo 走 feat/banner-v2-logo → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮品牌 banner：102f5c3 → b0a33da
+- **当前分支**：main（英文 banner + 语言切换 + 双语 CHANGELOG 走 feat/i18n-and-changelog → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 banner v2：a77f2f7 → 1f8283c
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 21:5x banner 定稿 v2 + 点缀 + logo
+- **最后更新**：2026-11-22 22:xx 英文 banner + 界面语言切换 + 双语 CHANGELOG
+  - 英文 banner：assets/banner-en.svg，几何与中文版逐字一致，只替换文案（TITLE ZhiYin / 副题 Skills are threads; the catalog is the score / 阶段标签 SCATTERED SKILLS、PACKS、VISIBLE CATALOG / 图注 Scatter into packs; packs decide what plays）。README.en.md 指向它。
+  - 界面语言切换：头部新增胶囊按钮（地球图标 + 目标语言两字母），在 zh / en 之间切换，选择写 localStorage（zhiyin.lang），下次打开沿用；say() 优先级改为「插件语言 > 宿主语言 > 字面兜底」；指南弹窗与渲染正文同步跟随该语言。
+  - CHANGELOG：CHANGELOG.md（中文）+ CHANGELOG.en.md（英文）按 Keep a Changelog 补全，全部内容归入 [Unreleased]（尚未发版），分新增/变更/修复/移除四类，条目来自真实提交历史；中文文件用中文分类头、英文文件用英文分类头，两份额度一一对应。
+  - 验证：node --check client.js exit 0；假 window（含 localStorage）跑 apply，4 个 slot 注册不变；banner-en 渲染目视无溢出；npm pack --dry-run = 15 文件。
+  - 已知边界：左侧竖栏与设置节的名字由宿主 locale 决定，插件内切换语言只影响页面内文案，不改变宿主渲染的入口名。
+  - 待验收：刷新后点语言胶囊，页面文案与指南弹窗应整体切换并记住；GitHub 英文 README 顶部显示英文 banner。
+
+- 上一轮：2026-11-22 21:5x banner 定稿 v2 + 点缀 + logo
   - banner 换成「散点汇聚」：32 个技能条 → 4 个技能包卡（卡内三条成员细杠）→ 带声波的成品卡；标题改中文衬线「织音」。v1（三条织线）存档到 docs/assets/banner-threads.svg，留给宣传图。
   - 点缀：左右留白两枚水印音符（0.09/0.07）、散点簇左侧技能层叠图标（0.15）、成品卡上下三枚音符（0.45–0.9）。第一版点缀压了「散落的技能」标签与右区标签，已挪位重排，最终渲染无压字。
   - logo：icon.svg 改为方形徽标（加粗音符，去掉小尺寸会糊的谱线与琥珀线）；新增 assets/logo.svg 深色底板横版徽标（标记 + 织音 + ZHIYIN + tagline）。两者都进 files 白名单。

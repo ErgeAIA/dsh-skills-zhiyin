@@ -12,6 +12,7 @@
 /AGENTS.md export-ignore
 /PRODUCT.md export-ignore
 /CHANGELOG.md export-ignore
+/CHANGELOG.en.md export-ignore
 
 # 本仓库自身的元文件：不进下载包
 /.gitignore export-ignore

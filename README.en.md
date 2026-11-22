@@ -1,6 +1,6 @@
 # ZhiYin
 
-![ZhiYin · three threads, one voice](assets/banner.svg)
+![ZhiYin — scattered skills gathered into one voice](assets/banner-en.svg)
 
 A skill-management plugin for DeepSeek Harness: install skills, group them into packs, switch them on and off.
 
