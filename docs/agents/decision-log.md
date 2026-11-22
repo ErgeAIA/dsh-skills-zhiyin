@@ -16,6 +16,23 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-018: CHANGELOG 只留用户可见结论；补 GitHub 入口；准备社区市场收录
+
+- **日期**：2026-11-22
+- **背景**：用户指出 CHANGELOG 写成了 git log（19 条新增 + 11 条修复，含内部实现细节）。同时要求设置页加 GitHub 图标，并调研如何进 awesome-dsh-plugin 收录。
+- **决策**：
+  1. **CHANGELOG 按「用户能感知的结论」写，不按提交写**：中文 59 行压到 40 行；同类合并（市场/安装合成一条、归档与技能包合成一条）；删掉 TDZ、影子候选、事件循环这类实现细节，只保留现象与结果。技术细节留在 debug-log 与 decision-log。
+  2. **GitHub 图标**：头部新增第 4 个图标按钮，点击在新标签打开源码仓库。地址用字符串拼接常量（避免被其它工具误改），图标取 Feather 的 octocat 描边路径，与现有图标集同风格。
+  3. **依赖归位**：三个 `@deepseek-ai/*` 实测一行都没被 import（index.js 只用 Node 内置 + ./paths.js，client.js 从宿主 require react），故直接删除而非移到 peerDependencies；顺手补 repository / homepage / bugs 字段，npm 与市场卡片才有出处。
+  4. **收录准备**：条目写成 docs/design/awesome-dsh-plugin-entry.yml（不随包分发），字段按贡献指南：url / name / category: skill / description.en（必填、句号结尾）/ description.zh。
+- **收录门槛核对**（依据 awesome-dsh-plugin/contributing.md 原文）：
+  - 仓库需在 package.json 声明 `dsh.bundle` —— 已满足（patch: ./cordis.patch.yml）；只声明 `dsh.client` 会被拒。
+  - 仓库年龄 ≥ 1 天 —— 已满足（创建于 2026-11-17）。
+  - 官方 `@deepseek-ai/*` 必须在 peerDependencies 而非 dependencies —— 已满足（直接删除）。
+  - GitHub topic `dsh-plugin` —— 已打。
+  - 一个 PR 最多 3 条；只需`data/plugins/<owner>__<repo>.yml` 一个文件，README 由脚本生成、不要手改。
+- **未完成项**：市场卡片图标建议用 GitHub 托管位图；本会话 Playwright/Puppeteer 渲染均超时，暂未产出 `assets/icon-180.png`，条目先省略 icon 字段（会回退到作者头像）。
+
 ## DEC-017: 界面文案必须双语，包名去掉 @local，清掉组合层遗留
 
 - **日期**：2026-11-22

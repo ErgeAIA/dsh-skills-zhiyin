@@ -10,6 +10,8 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
     const NS = 'zhiyin'
+    // 仓库地址：源码仓库即插件仓库，设置页右上角的 GitHub 图标指向这里。
+    const REPO_URL = 'https://github.com/' + 'ErgeAIA' + '/' + 'dsh-skills-zhiyin'
 
     const dictionary = {
       zh: {
@@ -19,6 +21,7 @@ window.__ModuleLoader__.load({
         guideFailed: '读取使用指南失败：',
         guideLang: 'zh',
         langSwitch: 'EN',
+        repoHint: '在 GitHub 上打开仓库',
         langSwitchTitle: '切换到 English 界面',
         nav: '织音',
         title: '织音',
@@ -276,6 +279,7 @@ window.__ModuleLoader__.load({
         guideFailed: 'Could not load the guide: ',
         guideLang: 'en',
         langSwitch: '中',
+        repoHint: 'Open the repository on GitHub',
         langSwitchTitle: 'Switch to Chinese',
         nav: 'Zhiyin',
         title: 'Zhiyin',
@@ -1311,6 +1315,9 @@ window.__ModuleLoader__.load({
   ],
   folder: [
     ['path', 'M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .22 1.33.6l1.1 1.2c.33.38.83.6 1.33.6h4.04A2.5 2.5 0 0 1 19 9.9v6.6A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5z'],
+  ],
+  github: [
+    ['path', 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22'],
   ],
   globe: [
     ['circle', { cx: 12, cy: 12, r: 9 }],
@@ -2366,6 +2373,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(Icon, { name: 'globe', size: 15 }),
               h('span', { style: css.langTag }, say('langSwitch', 'English')),
             ),
+            h('button', {
+              type: 'button',
+              style: css.iconBtn,
+              title: say('repoHint', '在 GitHub 上打开仓库'),
+              'aria-label': say('repoHint', '在 GitHub 上打开仓库'),
+              onClick: () => window.open(REPO_URL, '_blank', 'noreferrer'),
+            }, h(Icon, { name: 'github', size: 15 })),
             h('button', {
               type: 'button',
               style: css.iconBtn,

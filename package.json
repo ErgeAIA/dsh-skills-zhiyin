@@ -32,11 +32,6 @@
     "assets/logo.svg",
     "assets/banner-en.svg"
   ],
-  "dependencies": {
-    "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
-    "@deepseek-ai/dsh-skill": "0.2.2-rc.3",
-    "@deepseek-ai/dsh-tools": "0.2.2-rc.3"
-  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -45,5 +40,13 @@
       "platform": "web",
       "immediately": true
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ErgeAIA/dsh-skills-zhiyin.git"
+  },
+  "homepage": "https://github.com/ErgeAIA/dsh-skills-zhiyin#readme",
+  "bugs": {
+    "url": "https://github.com/ErgeAIA/dsh-skills-zhiyin/issues"
   }
 }
