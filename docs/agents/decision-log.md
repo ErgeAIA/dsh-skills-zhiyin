@@ -2,7 +2,7 @@
 title: Decision Log
 type: decision-log
 project: dsh-skills-zhiyin
-updated: 2026-11-21
+updated: 2026-11-22
 priority: higher-than-prd
 description: >
   开发过程决策日志，优先级高于 PRD；冲突时以本文件最新条目为准（PRD/ADR 由用户自行同步，本技能不代改）。

@@ -2,7 +2,7 @@
 title: Project Progress
 type: project-progress
 project: dsh-skills-zhiyin
-updated: 2026-11-21
+updated: 2026-11-22
 description: >
   项目开发进度实时记录：阶段、分支、代码状态、最近进展。每次会话更新。
   AI 在本文件新增进展或修改当前状态后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
