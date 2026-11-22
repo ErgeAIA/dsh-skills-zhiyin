@@ -403,7 +403,14 @@ window.__ModuleLoader__.load({
       modalFoot: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
       costSection: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 8 },
       costHead: { fontSize: fs.body, fontWeight: 600, marginTop: 16, color: 'var(--zhiyin-accent, #e0743c)' },
-      costBullet: { fontSize: fs.hint, lineHeight: 1.65, opacity: 0.88, marginTop: 8 },
+      costBullet: {
+        fontSize: fs.hint,
+        lineHeight: 1.65,
+        opacity: 0.88,
+        marginTop: 8,
+        // 支持 text-wrap: pretty 的浏览器会主动避免末行只剩一两个字。
+        textWrap: 'pretty',
+      },
       costLink: { color: 'var(--zhiyin-accent, #e0743c)', textDecoration: 'none' },
       // 首屏骨架屏：市场要并发拉 5 组 skills.sh 数据，先占位，避免空白让人以为没加载。
       skeletonCard: {
@@ -689,6 +696,8 @@ window.__ModuleLoader__.load({
       },
       modalSm: { width: 420 },
       modalMd: { width: 520 },
+      // 说明类弹窗：正文是长句，520px 下常出现「第二行只剩一两个字」，这里放宽一档。
+      modalWide: { width: 720 },
       modalGuide: { width: 900, maxWidth: '92vw', maxHeight: '84vh' },
       guideBody: { fontSize: fs.hint, lineHeight: 1.7, opacity: 0.94 },
       guideH1: { fontSize: fs.title - 4, fontWeight: 600, margin: '0 0 10px' },
@@ -3211,7 +3220,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               { style: css.overlay, onClick: () => setCostInfoOpen(false) },
               h(
                 'div',
-                { style: { ...css.modal, ...css.modalMd }, onClick: (event) => event.stopPropagation() },
+                { style: { ...css.modal, ...css.modalWide }, onClick: (event) => event.stopPropagation() },
                 h(
                   'div',
                   { style: css.modalHead },
