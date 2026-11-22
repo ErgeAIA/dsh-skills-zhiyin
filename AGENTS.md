@@ -27,26 +27,27 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | 工具 | 精确版本 | 锁定位置 |
 | ---- | -------- | -------- |
 | Node.js | v24.22.1 | node --version（实测） |
-| @deepseek-ai/dsh-skill | 0.2.2-rc.3 | prototype/package.json |
-| @deepseek-ai/dsh-tools | 0.2.2-rc.3 | prototype/package.json |
-| @deepseek-ai/dsh-llm | 0.2.2-rc.3 | prototype/package.json |
+| @deepseek-ai/dsh-skill | 0.2.2-rc.3 | package.json |
+| @deepseek-ai/dsh-tools | 0.2.2-rc.3 | package.json |
+| @deepseek-ai/dsh-llm | 0.2.2-rc.3 | package.json |
 
 ## Commands
 
 | 场景 | 命令原文 | 来源 |
 | ---- | -------- | ---- |
-| 校验宿主半边语法 | node --check prototype/index.js | 本次实测 |
-| 校验页面半边语法 | node --check prototype/client.js | 本次实测 |
-| 安装插件包依赖 | npm install（工作目录 prototype/） | prototype/package-lock.json |
-| 让宿主改动生效 | 完全退出并重开 DSH，不是刷新页面 | prototype/README.md |
-| 观测当前目录数据 | GET http://127.0.0.1:<port>/zhiyin/state | prototype/index.js |
+| 校验宿主半边语法 | node --check index.js | 本次实测 |
+| 校验页面半边语法 | node --check client.js | 本次实测 |
+| 安装插件包依赖 | npm install（仓库根目录） | package-lock.json |
+| 让宿主改动生效 | 完全退出并重开 DSH，不是刷新页面 | README.md |
+| 观测当前目录数据 | GET http://127.0.0.1:<port>/zhiyin/state | index.js |
+| 查看发布内容 | npm pack --dry-run（仓库根目录） | package.json 的 files |
 
 ## Conventions
 
 | 观察到的现象 | 要求 Agent 的行为 |
 | ------------ | ----------------- |
-| 仓库目录布局固定 | 根目录只留 AGENTS.md、README.md、README.en.md、CHANGELOG.md、PRODUCT.md、DESIGN.md、.gitignore、.gitattributes、.impeccable/ 与 docs/、prototype/；其他新文档进 docs/ 对应子目录（prd、adr、design、handoff、agents），不再散落根目录 |
-| 分发口径双白名单 | npm 包内容看 prototype/package.json 的 files；源码归档看 .gitattributes 的 export-ignore。开发文档一律不随包分发，也不进下载归档 |
+| 仓库目录布局固定 | 插件包本体就在仓库根目录（index.js、client.js、paths.js、consumer.js、cordis.patch.yml、package.json、locale/、icon.svg、README.md、README.en.md、GUIDE.md、GUIDE.en.md），这样 GitHub 下载 / git clone 得到的就是可装插件；开发文档只进 docs/ 对应子目录（prd、adr、design、handoff、agents），根目录不再新增文档；AGENTS.md、PRODUCT.md、CHANGELOG.md、.gitignore、.gitattributes 属仓库自身文件 |
+| 分发口径双白名单 | npm 包内容看 package.json 的 files；源码归档看 .gitattributes 的 export-ignore。开发文档一律不随包分发，也不进下载归档 |
 | 会话文档体系固定 | 进度写 docs/agents/project-progress.md；决策写 docs/agents/decision-log.md；两者只追加不删历史 |
 | bug 追加 docs/agents/debug-log.md | 格式 BUG-NNN；只追加不删历史 |
 | 交接写 docs/handoff | 命名 handoff-YYYY-MM-DD-*.md |
@@ -56,7 +57,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | 经验库按领域分目录 | 可复用经验落 docs/agents/experience/<领域>/；正文可改写、历史靠 changelog.md，与 docs/agents 其余三份的「只追加」不同 |
 | AGENTS.md 杂音归宿 | 变更日志 → CHANGELOG.md（无则 decision-log.md）；人读说明 → README.md（无则不写）；决策叙事与踩坑 → decision-log.md 与 debug-log.md；执行流水 → init-report.md 与 project-progress.md |
 | 仓库文档归属 | README 生成或优化 → shuxu；CHANGELOG 建立、改结构、归档版本 → changelog-manager，日常只按既有格式追加 `[Unreleased]`；.gitignore 新增或修正 → git-manager；其他角色只报告缺口，不代写 |
-| 插件仍在开发阶段 | prototype/package.json 的 version 锁定 0.1.0，开发期不升版，改动靠重启 DSH 加载 |
+| 插件仍在开发阶段 | package.json 的 version 锁定 0.1.0，开发期不升版，改动靠重启 DSH 加载 |
 | 启停只写本地状态 | 写 <profile>/zhiyin-proto/state.json 与 events.ndjson；启停不改动技能文件 |
 | 安装卸载写盘边界 | 安装新建技能目录；卸载移入归档目录；两者都是用户显式动作，不得由启停或轮询触发 |
 | 停用机制唯一 | 按 Agent 注册策略 provider，modelInvocable 与 userInvocable 双置 false；启用项不列，落回原生 provider |
@@ -74,7 +75,8 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 - 查架构取舍与被否方案 → 见 docs/adr/ZhiYin-M0-ADR.md：M0 架构决策记录与实测证据
 - 查 UI 结构与交互决议 → 见 docs/design/ZhiYin-UI-决议.md：设置页信息架构与已定样式
 - 接着上一轮实现往下做 → 见 docs/handoff/handoff-2026-11-17-m0-skills-provider.md：已实现范围、待验证项与下一步
-- 安装、回滚插件 → 见 prototype/README.md：profile 注册方式与卸载步骤
+- 安装、回滚插件 → 见 README.md：profile 注册方式与卸载步骤
+- 用户怎么用 → 见 GUIDE.md / GUIDE.en.md：装技能、技能包、归档恢复（随包分发，插件页内可看）
 - 会话开始复述现状 → 见 docs/agents/project-progress.md：当前分支、阶段与最近进展
 - 核对最近交接 → 见 docs/handoff/：上一轮做到哪、卡在哪
 - 规则冲突、回溯口径 → 见 docs/agents/decision-log.md：技术与流程决策记录，只追加

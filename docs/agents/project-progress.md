@@ -17,13 +17,22 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（收尾：UI 清理 + 使用指南 + 双语 README 走 chore/finish-polish → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮整页宽度：442ddc2 → 621e6b4
+- **当前分支**：main（插件包提到仓库根 + README 面向用户重写 + 插件页内指南 走 chore/plugin-to-root → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一回收尾：c10b812 → 9e4142a
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 17:xx 收尾三件：UI 清理、使用指南、双语 README
+- **最后更新**：2026-11-22 17:5x 仓库结构改正 + README 面向用户 + 插件页内指南
+  - **插件包移到仓库根**：prototype/ 整个目录移到根（index.js、client.js、paths.js、consumer.js、cordis.patch.yml、package.json、package-lock.json、locale/、icon.svg、GUIDE*.md），node_modules 一并移到根；prototype/ 已删除。现在 git clone / GitHub Download ZIP 得到的就是可装插件本身，不用再 cd 进子目录。
+  - 同步：.gitattributes 去掉 /README*.md 的 export-ignore（README 属于插件本体）；.gitignore 头注释与 prototype/*.tgz 规则清理；AGENTS.md 的 Toolchain/Commands/Conventions/References 全部去掉 prototype/ 前缀。
+  - 桌面 profile 的 link 从 .../prototype 改到仓库根（本机已改，重启 DSH 生效）。
+  - **README 重写为对外说明**：删掉「开发期私有仓库」「界面中英双语」「分发口径」等内部约定（这些属于进度/决策文档，不进 README）；保留功能表、安装、入口、写盘边界、已知限制、开发命令。中英互链。
+  - **插件页内可看指南**：宿主新增 GET /zhiyin/guide，直接读随包分发的 GUIDE.md 与 GUIDE.en.md 并一次返回两份；页面右上一个「书」图标按钮打开弹窗，用 client.js 内的轻量 Markdown 渲染器（标题/列表/表格/代码块/行内代码/粗体/链接）显示。指南正文只有 md 一份，代码里不抄第二份。
+  - 验证：node --check 双半边 exit 0；假 ctx 跑 apply 注册 24 条路由，/zhiyin/guide 返回 200 且 zh 2930 / en 6238 字符；渲染器对两份指南各产出 50 / 49 个块（表格 2/3/3 列，列表 3/3/4/4 项）；假 window 冒烟 4 个 slot 注册不变；npm pack --dry-run = 13 文件、零文档。
+  - 待验收：重启 DSH 确认插件从新路径加载、右上角「使用指南」按钮能打开弹窗、弹窗内排版正常。
+
+- 上一轮：2026-11-22 17:xx 收尾三件：UI 清理、使用指南、双语 README
   - UI 清理：删除 v1 遗留的死文案 176 条（zh 88 + en 88）——合奏/combo/排除/常驻/冲突声明/生效面矩阵；删掉两个死代码块（矩阵 useMemo、合奏未编配告警）与「接管」徽标（策略 provider 是内部机制，用户不需要看到）。
   - 措辞去行话：观测→读取（观测于→更新于、观测完整→已完整读取、读取失败）、投影/组合/合奏全部改写、重新观测→刷新；版本行从「@local/dsh-zhiyin-proto v0.1.0」改为「织音 v0.1.0」；副标题从 v1 的「让技能自由编组，让能力彼此协奏」改为「安装、启停、编组技能，随时看清模型此刻能用什么」。
   - 使用指南：新增 prototype/GUIDE.md 与 GUIDE.en.md（随包分发），覆盖装技能六种粘贴方式与目标目录区别、三层开关配合与优先级、技能包与「全部技能」的互斥、归档与恢复、目录字符数成本、备份导入导出、常见问题。
