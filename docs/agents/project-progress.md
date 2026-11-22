@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（Apache-2.0 许可 走 chore/license → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 CHANGELOG：4602348 → c2aa18a
+- **当前分支**：main（市场卡片图标 走 chore/market-icon → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮许可：34d5c4f → 0257666
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 23:2x 采用 Apache-2.0
+- **最后更新**：2026-11-22 23:4x 市场卡片图标 + 许可调研
+  - 许可调研（取样）：本机安装的 16 个插件 = MIT 10 / Apache-2.0 6；社区热门仓库取样 = MIT 6 / Apache-2.0 2 / GPL-3.0 1 / 自定义或缺失 4。结论：生态以 MIT 与 Apache-2.0 为主，GPL 属少数。
+  - 市场卡片图标：Playwright/Puppeteer 不可用，改用 Node zlib 自写光栅器 + PNG 编码器（无第三方依赖），4×4 超采样输出 assets/icon-180.png（3.0KB）与 icon-512.png（9.5KB），圆角外透明。
+  - 条目 docs/design/awesome-dsh-plugin-entry.yml 已补 icon（raw.githubusercontent 指向 icon-180.png）。
+  - 验证：PNG 签名与 IHDR 尺寸正确；read_image 目视确认；npm pack 含两张位图。
+  - 待验收：GitHub 上 https://raw.githubusercontent.com/<owner>/dsh-skills-zhiyin/main/assets/icon-180.png 可直接打开；市场卡片效果等收录后可见。
+
+- 上一轮：2026-11-22 23:2x 采用 Apache-2.0
   - 澄清需求：Apache-2.0 不是「用了必须开源」，那是 MPL/GPL/AGPL；Apache-2.0 只要求保留版权与 NOTICE、注明修改，允许闭源与商业使用。
   - LICENSE 用 apache.org 原文逐字落盘（11,358 字节）；新增 NOTICE（项目名 + 版权所有）；package.json 加 license 字段并把 LICENSE/NOTICE 加入 files。
   - README 中英各加人话版许可说明（能做什么、三件必做、专利与商标边界）。
