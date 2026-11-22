@@ -60,5 +60,15 @@ temp/
 Thumbs.db
 desktop.ini
 
-# 织音调试产物（宿主 state 快照转储）
+# 织音调试产物（宿主 state 快照转储与临时验证脚本）
 .tmp-state.json
+*.tgz
+prototype/*.tgz
+
+# 设计/调研的一次性工作目录（HTML demo、截图、临时产物）
+_temp/
+.impeccable/
+
+# 打包与本地验证输出
+*.zip
+pack-out/

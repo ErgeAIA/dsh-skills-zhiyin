@@ -531,7 +531,7 @@ window.__ModuleLoader__.load({
         boxSizing: 'border-box',
         padding: '24px 32px 56px',
       },
-      page: { maxWidth: 780, padding: '2px 0 48px', color: 'inherit' },
+      page: { maxWidth: 780, margin: '0 auto', padding: '2px 0 48px', color: 'inherit' },
       overlay: {
         position: 'fixed',
         inset: 0,
