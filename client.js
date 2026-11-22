@@ -18,6 +18,8 @@ window.__ModuleLoader__.load({
         guideLoading: '正在读取使用指南…',
         guideFailed: '读取使用指南失败：',
         guideLang: 'zh',
+        langSwitch: 'EN',
+        langSwitchTitle: '切换到 English 界面',
         nav: '织音',
         title: '织音',
         subtitle: '安装、启停、编组技能，随时看清模型此刻能用什么',
@@ -187,6 +189,8 @@ window.__ModuleLoader__.load({
         guideLoading: 'Loading the guide…',
         guideFailed: 'Could not load the guide: ',
         guideLang: 'en',
+        langSwitch: '中',
+        langSwitchTitle: 'Switch to Chinese',
         nav: 'Zhiyin',
         title: 'Zhiyin',
         subtitle: 'Install, toggle and group skills — see what the model can use right now',
@@ -772,6 +776,8 @@ window.__ModuleLoader__.load({
         background: 'rgba(128,128,128,0.045)',
         border: '1px solid rgba(128,128,128,0.10)',
       },
+      // 语言切换按钮上的小字：标出点下去切到哪种语言
+      langTag: { fontSize: 10, fontWeight: 600, letterSpacing: 0.4, opacity: 0.8 },
       iconBtn: {
         flex: '0 0 auto',
         width: 30,
@@ -1134,6 +1140,11 @@ window.__ModuleLoader__.load({
   folder: [
     ['path', 'M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .22 1.33.6l1.1 1.2c.33.38.83.6 1.33.6h4.04A2.5 2.5 0 0 1 19 9.9v6.6A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5z'],
   ],
+  globe: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', 'M3 12h18'],
+    ['path', 'M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18'],
+  ],
   book: [
     ['path', 'M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z'],
     ['path', 'M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5A1.5 1.5 0 0 0 20 18.5z'],
@@ -1342,12 +1353,29 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       return blocks
     }
     function Page({ close, t, wide }) {
+      // 界面语言：默认跟随宿主（t 返回的就是宿主当前语言），用户可在这里覆盖并记住。
+      const hostLang = typeof t === 'function' && t('guideLang') === 'en' ? 'en' : 'zh'
+      const [lang, setLang] = React.useState(() => {
+        try {
+          const saved = window.localStorage.getItem('zhiyin.lang')
+          if (saved === 'zh' || saved === 'en') return saved
+        } catch {
+          /* localStorage 不可用就走宿主语言 */
+        }
+        return hostLang
+      })
+      React.useEffect(() => {
+        try { window.localStorage.setItem('zhiyin.lang', lang) } catch { /* 忽略 */ }
+      }, [lang])
+      // 优先级：本插件的语言设置 > 宿主语言 > 字面兜底。
       const say = React.useCallback(
         (key, fallback) => {
+          const own = dictionary[lang]
+          if (own && Object.prototype.hasOwnProperty.call(own, key) && own[key]) return own[key]
           const value = typeof t === 'function' ? t(key) : undefined
           return value && value !== key ? value : fallback
         },
-        [t],
+        [t, lang],
       )
       // 骨架屏的 shimmer 动画需要 @keyframes，行内样式写不了，挂一次 <style>。
       React.useEffect(() => {
@@ -2156,6 +2184,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           h(
             'div',
             { style: css.headActions },
+            h('button', {
+              type: 'button',
+              style: { ...css.iconBtn, width: 'auto', padding: '0 9px', gap: 4 },
+              title: say('langSwitchTitle', '切换界面语言'),
+              'aria-label': say('langSwitchTitle', '切换界面语言'),
+              onClick: () => setLang(lang === 'zh' ? 'en' : 'zh'),
+            },
+              h(Icon, { name: 'globe', size: 15 }),
+              h('span', { style: css.langTag }, say('langSwitch', 'English')),
+            ),
             h('button', {
               type: 'button',
               style: css.iconBtn,
@@ -3208,7 +3246,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     : !guideData
                       ? h('div', { style: css.hint }, say('guideLoading', '正在读取使用指南…'))
                       : h('div', { style: css.guideBody },
-                          renderMarkdown(say('guideLang', 'zh') === 'en' ? guideData.en : guideData.zh)),
+                          renderMarkdown(lang === 'en' ? guideData.en : guideData.zh)),
                 ),
               ),
             )
