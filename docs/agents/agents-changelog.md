@@ -43,3 +43,4 @@ description: >
 - <Conventions「仓库目录布局固定」：根目录只放契约/说明文件，插件包位于 prototype/> → update → 插件包本体移到仓库根目录（GitHub 下载即插件），开发文档只进 docs/；Toolchain、Commands、References 内所有 prototype/ 前缀同步去掉
 - <Commands「node --check prototype/index.js」「npm install（工作目录 prototype/）」> → update → `node --check index.js`、`npm install（仓库根目录）`，并补一行 `npm pack --dry-run`
 - <References「安装、回滚插件 → 见 prototype/README.md」> → update → 见 README.md；新增「用户怎么用 → 见 GUIDE.md / GUIDE.en.md」
+- <独立 GUIDE.md / GUIDE.en.md 两份用户指南> → merge → 并入 README.md / README.en.md 的「使用」段，用 `<!-- guide:start -->` / `<!-- guide:end -->` 圈定；插件页指南弹窗读这一段。References 与布局白名单同步去掉 GUIDE 文件

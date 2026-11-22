@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（插件包提到仓库根 + README 面向用户重写 + 插件页内指南 走 chore/plugin-to-root → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一回收尾：c10b812 → 9e4142a
+- **当前分支**：main（指南并入 README 走 docs/guide-into-readme → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮结构改造：26b61a6 → 4bb87b0
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 17:5x 仓库结构改正 + README 面向用户 + 插件页内指南
+- **最后更新**：2026-11-22 18:xx 用户指南并入 README
+  - 删除独立的 GUIDE.md / GUIDE.en.md，正文并入 README.md / README.en.md 的「使用」段：装技能六种粘贴方式、三个目标目录、三层开关优先级、技能包与「全部技能」互斥、归档恢复、目录字符数、备份导入导出、常见问题。
+  - README 里用 `<!-- guide:start -->` / `<!-- guide:end -->` 圈出使用段（GitHub 渲染不可见）；宿主 /zhiyin/guide 改为读 README 并只返回这一段，已装插件的用户不会看到安装与开发步骤。标记缺失时退化为整篇。
+  - package.json 的 files 去掉两份 GUIDE，现在 9 项；npm pack --dry-run = 11 文件。
+  - 验证：node --check 双半边 exit 0；假 ctx 24 条路由，/zhiyin/guide 200 且返回标记段（zh 2766 / en 5867 字符）；渲染器对两段各产出 39 / 38 块（10 标题、4 表格、4 列表）；README 相对链接 0 断链。
+  - 待验收：重启后右上角书本按钮打开的弹窗内容为「装技能 → 常见问题」这段，不含安装命令；README 在 GitHub 上阅读顺序正常。
+
+- 上一轮：2026-11-22 17:5x 仓库结构改正 + README 面向用户 + 插件页内指南
   - **插件包移到仓库根**：prototype/ 整个目录移到根（index.js、client.js、paths.js、consumer.js、cordis.patch.yml、package.json、package-lock.json、locale/、icon.svg、GUIDE*.md），node_modules 一并移到根；prototype/ 已删除。现在 git clone / GitHub Download ZIP 得到的就是可装插件本身，不用再 cd 进子目录。
   - 同步：.gitattributes 去掉 /README*.md 的 export-ignore（README 属于插件本体）；.gitignore 头注释与 prototype/*.tgz 规则清理；AGENTS.md 的 Toolchain/Commands/Conventions/References 全部去掉 prototype/ 前缀。
   - 桌面 profile 的 link 从 .../prototype 改到仓库根（本机已改，重启 DSH 生效）。
