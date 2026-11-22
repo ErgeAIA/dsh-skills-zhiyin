@@ -196,6 +196,6 @@ You may use, modify and redistribute this project freely, **including inside clo
 
 - keep the copyright notice together with `LICENSE` and `NOTICE`;
 - state clearly where you changed the files;
-- do not use the name "ZhiYin / 织音" or the author's name to endorse your derivative.
+- do not use the name "ZhiYin" or the author's name to endorse your derivative.
 
 The license includes a **patent grant** from contributors (section 3); trademark rights are not granted.
