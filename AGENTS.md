@@ -45,7 +45,8 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 
 | 观察到的现象 | 要求 Agent 的行为 |
 | ------------ | ----------------- |
-| 仓库目录布局固定 | 根目录只留 AGENTS.md、README.md、CHANGELOG.md、PRODUCT.md、DESIGN.md、.gitignore、.impeccable/ 与 docs/、prototype/；其他新文档进 docs/ 对应子目录（prd、adr、design、handoff、agents），不再散落根目录 |
+| 仓库目录布局固定 | 根目录只留 AGENTS.md、README.md、README.en.md、CHANGELOG.md、PRODUCT.md、DESIGN.md、.gitignore、.gitattributes、.impeccable/ 与 docs/、prototype/；其他新文档进 docs/ 对应子目录（prd、adr、design、handoff、agents），不再散落根目录 |
+| 分发口径双白名单 | npm 包内容看 prototype/package.json 的 files；源码归档看 .gitattributes 的 export-ignore。开发文档一律不随包分发，也不进下载归档 |
 | 会话文档体系固定 | 进度写 docs/agents/project-progress.md；决策写 docs/agents/decision-log.md；两者只追加不删历史 |
 | bug 追加 docs/agents/debug-log.md | 格式 BUG-NNN；只追加不删历史 |
 | 交接写 docs/handoff | 命名 handoff-YYYY-MM-DD-*.md |
