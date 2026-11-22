@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（市场卡片图标 走 chore/market-icon → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮许可：34d5c4f → 0257666
+- **当前分支**：main（Logo Kit v2 走 feat/logo-kit-v2 → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮图标：8c285e3 → e6e4c11
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 23:4x 市场卡片图标 + 许可调研
+- **最后更新**：2026-11-22 00:2x 换用 Logo Kit v2 + 修 kit 缺陷
+  - 采用 kit 的 `zhiyin-icon.svg` 作插件图标：`icon.svg` 替换为新标识（三条技能股线交织），`assets/logo.svg` 换成 kit 的深色横版。
+  - 修 kit 三处缺陷：① 横版 logo 多一个 `</g>`，是非法 XML（已重建）；② 说明里的「交叉间隙」未落到文件，用 mask 真正实现（A×B 交于 42.7,57.3；B×C 交于 33.8,38.7）；③ README 重复段落 ×4（未改 kit 文件，仅记录）。
+  - svgo 4.1.0 清理：icon.svg 1486→1305B、logo 1992B；mask / title / aria-label 保留，`role="img"` 手动补回。
+  - 位图：用自带光栅器按新几何重出 `assets/icon-180.png`（3.9KB）与 `icon-512.png`（12.7KB），512 下可见正确穿织。
+  - 小尺寸实测：40px 仍可辨为弧线，20px 退化为色块（间隙 2 单位在 96 坐标系中不足 1px）。需要小尺寸时另做 compact 变体，不能直接缩放。
+  - 待决：README banner 还是旧视觉（音符 + Ember），与新标识不一致，需重做。
+
+- 上一轮：2026-11-22 23:4x 市场卡片图标 + 许可调研
   - 许可调研（取样）：本机安装的 16 个插件 = MIT 10 / Apache-2.0 6；社区热门仓库取样 = MIT 6 / Apache-2.0 2 / GPL-3.0 1 / 自定义或缺失 4。结论：生态以 MIT 与 Apache-2.0 为主，GPL 属少数。
   - 市场卡片图标：Playwright/Puppeteer 不可用，改用 Node zlib 自写光栅器 + PNG 编码器（无第三方依赖），4×4 超采样输出 assets/icon-180.png（3.0KB）与 icon-512.png（9.5KB），圆角外透明。
   - 条目 docs/design/awesome-dsh-plugin-entry.yml 已补 icon（raw.githubusercontent 指向 icon-180.png）。
