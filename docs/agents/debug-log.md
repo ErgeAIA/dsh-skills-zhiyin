@@ -16,6 +16,16 @@ description: >
 
 ***
 
+## BUG-012 英文版 banner 是非法 XML：属性值缺引号
+
+- **现象**：中文版 banner 正常，英文版用浏览器打开直接显示 XML 解析错误页（`error on line 10 at column 34: AttValue: " or ' expected`），页面只渲染到第一个错误之前。
+- **根因**：生成脚本里 `font-family` 属性写成了模板拼接：`font-family=${tf}`。中文分支的 `tf` 自带双引号，拼出来恰好合法；英文分支的 `tf` 是 `Inter, sans-serif`，拼出裸值 `font-family=Inter, sans-serif`，属性值没有引号，XML 直接拒收。
+- **为什么没早发现**：该轮英文版截图「渲染成功但无可用描述」，我当成了视觉模型的问题，没有追查。实际是截图截到的是错误页——**渲染成功不等于内容正确**。
+- **修复**：统一 `font-family="..."`，内部改用单引号；对 `icon.svg`、`icon-small.svg`、`banner.svg`、`banner-en.svg`、`logo.svg` 五个对外文件加**严格 XML 解析校验**（.NET XmlDocument），全部通过。
+- **预防规则**：
+  1. 所有对外 SVG 在提交前跑一次严格 XML 解析，不依赖浏览器宽容；
+  2. 截图成功不等于渲染正确——目视描述缺失或可疑时，必须检查页面是否报了错；
+  3. 生成脚本里任何属性都不要写成 `attr=${value}` 的无引号形式。
 ## BUG-011: 插件包移到仓库根后，宿主不再加载织音
 
 - **日期**：2026-11-22
