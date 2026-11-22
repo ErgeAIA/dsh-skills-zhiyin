@@ -14,6 +14,10 @@ window.__ModuleLoader__.load({
     const dictionary = {
       zh: {
         versionLabel: '织音',
+        guideOpen: '使用指南',
+        guideLoading: '正在读取使用指南…',
+        guideFailed: '读取使用指南失败：',
+        guideLang: 'zh',
         nav: '织音',
         title: '织音',
         subtitle: '安装、启停、编组技能，随时看清模型此刻能用什么',
@@ -179,6 +183,10 @@ window.__ModuleLoader__.load({
       },
       en: {
         versionLabel: 'ZhiYin',
+        guideOpen: 'User guide',
+        guideLoading: 'Loading the guide…',
+        guideFailed: 'Could not load the guide: ',
+        guideLang: 'en',
         nav: 'Zhiyin',
         title: 'Zhiyin',
         subtitle: 'Install, toggle and group skills — see what the model can use right now',
@@ -681,6 +689,21 @@ window.__ModuleLoader__.load({
       },
       modalSm: { width: 420 },
       modalMd: { width: 520 },
+      modalGuide: { width: 900, maxWidth: '92vw', maxHeight: '84vh' },
+      guideBody: { fontSize: fs.hint, lineHeight: 1.7, opacity: 0.94 },
+      guideH1: { fontSize: fs.title - 4, fontWeight: 600, margin: '0 0 10px' },
+      guideH2: { fontSize: fs.cardName, fontWeight: 600, margin: '20px 0 8px' },
+      guideH3: { fontSize: fs.body, fontWeight: 600, margin: '14px 0 6px' },
+      guidePara: { margin: '8px 0', opacity: 0.9 },
+      guideList: { margin: '6px 0', paddingLeft: 18 },
+      guideBullet: { margin: '4px 0', opacity: 0.9 },
+      guideCode: { padding: '1px 5px', borderRadius: 4, background: 'rgba(128,128,128,0.18)', fontSize: fs.meta },
+      guidePre: { padding: 10, borderRadius: 8, background: 'rgba(128,128,128,0.1)', overflowX: 'auto', fontSize: fs.meta, margin: '8px 0' },
+      guideTable: { width: '100%', borderCollapse: 'collapse', margin: '10px 0', fontSize: fs.meta },
+      guideTh: { textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid rgba(128,128,128,0.28)', fontWeight: 600, whiteSpace: 'nowrap' },
+      guideTd: { textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid rgba(128,128,128,0.12)', verticalAlign: 'top' },
+      guideHr: { border: 'none', borderTop: '1px solid rgba(128,128,128,0.2)', margin: '16px 0' },
+      guideLink: { color: 'inherit', textDecoration: 'underline' },
       textarea: {
         flex: '1 1 auto',
         minHeight: 120,
@@ -1102,6 +1125,10 @@ window.__ModuleLoader__.load({
   folder: [
     ['path', 'M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .22 1.33.6l1.1 1.2c.33.38.83.6 1.33.6h4.04A2.5 2.5 0 0 1 19 9.9v6.6A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5z'],
   ],
+  book: [
+    ['path', 'M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z'],
+    ['path', 'M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5A1.5 1.5 0 0 0 20 18.5z'],
+  ],
 }
 
 function Icon({ name, size = 15 }) {
@@ -1216,6 +1243,95 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       )
     }
 
+    /**
+     * 使用指南渲染：GUIDE.md 只用到 Markdown 的最小子集（标题、列表、表格、代码块、
+     * 行内代码、粗体、链接）。这里只实现这个子集，不引第三方依赖。
+     */
+    function renderMarkdown(markdown) {
+      const source = String(markdown ?? '').replace(/\r\n/g, '\n').split('\n')
+      const blocks = []
+      let seq = 0
+      const nextKey = () => 'g' + seq++
+      const inline = (text) => {
+        const nodes = []
+        const pattern = /\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)/g
+        let last = 0
+        let match
+        while ((match = pattern.exec(text)) !== null) {
+          if (match.index > last) nodes.push(text.slice(last, match.index))
+          const token = match[0]
+          if (token.slice(0, 2) === '**') {
+            nodes.push(h('strong', { key: nextKey() }, token.slice(2, -2)))
+          } else if (token.charAt(0) === '\x60') {
+            nodes.push(h('code', { key: nextKey(), style: css.guideCode }, token.slice(1, -1)))
+          } else {
+            const parts = token.match(/\[([^\]]+)\]\(([^)]+)\)/) ?? []
+            nodes.push(h('a', { key: nextKey(), href: parts[2] ?? '#', target: '_blank', rel: 'noreferrer', style: css.guideLink }, parts[1] ?? token))
+          }
+          last = match.index + token.length
+        }
+        if (last < text.length) nodes.push(text.slice(last))
+        return nodes
+      }
+      let i = 0
+      while (i < source.length) {
+        const line = source[i]
+        const trimmed = line.trim()
+        if (!trimmed) { i += 1; continue }
+        if (trimmed.slice(0, 3) === '\x60\x60\x60') {
+          const code = []
+          i += 1
+          while (i < source.length && source[i].trim().slice(0, 3) !== '\x60\x60\x60') { code.push(source[i]); i += 1 }
+          i += 1
+          blocks.push(h('pre', { key: nextKey(), style: css.guidePre }, h('code', null, code.join('\n'))))
+          continue
+        }
+        const heading = trimmed.match(/^(#{1,3})\s+(.*)$/)
+        if (heading) {
+          const level = heading[1].length
+          const style = level === 1 ? css.guideH1 : level === 2 ? css.guideH2 : css.guideH3
+          blocks.push(h('div', { key: nextKey(), style }, inline(heading[2])))
+          i += 1
+          continue
+        }
+        if (trimmed === '---') {
+          blocks.push(h('hr', { key: nextKey(), style: css.guideHr }))
+          i += 1
+          continue
+        }
+        if (trimmed.charAt(0) === '|') {
+          const rows = []
+          while (i < source.length && source[i].trim().charAt(0) === '|') { rows.push(source[i]); i += 1 }
+          const cells = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim())
+          const head = cells(rows[0] ?? '')
+          const body = rows.slice(1).filter((row) => !/^[\s|:-]+$/.test(row)).map(cells)
+          blocks.push(h('table', { key: nextKey(), style: css.guideTable },
+            h('thead', null, h('tr', null, head.map((cell, ci) => h('th', { key: ci, style: css.guideTh }, inline(cell))))),
+            h('tbody', null, body.map((row, ri) => h('tr', { key: ri }, row.map((cell, ci) => h('td', { key: ci, style: css.guideTd }, inline(cell)))))),
+          ))
+          continue
+        }
+        if (/^[-*]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed)) {
+          const items = []
+          while (i < source.length && (/^[-*]\s+/.test(source[i].trim()) || /^\d+\.\s+/.test(source[i].trim()))) {
+            items.push(source[i].trim().replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, ''))
+            i += 1
+          }
+          blocks.push(h('ul', { key: nextKey(), style: css.guideList },
+            items.map((item, ii) => h('li', { key: ii, style: css.guideBullet }, inline(item)))))
+          continue
+        }
+        const para = []
+        while (i < source.length) {
+          const t = source[i].trim()
+          if (!t || t.charAt(0) === '|' || /^#{1,3}\s/.test(t) || /^[-*]\s+/.test(t) || /^\d+\.\s+/.test(t) || t === '---' || t.slice(0, 3) === '\x60\x60\x60') break
+          para.push(t)
+          i += 1
+        }
+        blocks.push(h('p', { key: nextKey(), style: css.guidePara }, inline(para.join(' '))))
+      }
+      return blocks
+    }
     function Page({ close, t, wide }) {
       const say = React.useCallback(
         (key, fallback) => {
@@ -1296,6 +1412,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [archiveError, setArchiveError] = React.useState('')
       const [archiveTarget, setArchiveTarget] = React.useState('origin')
       const [costInfoOpen, setCostInfoOpen] = React.useState(false)
+      const [guideOpen, setGuideOpen] = React.useState(false)         // 使用指南弹窗
+      const [guideData, setGuideData] = React.useState(null)          // { zh, en } 两份正文
+      const [guideBusy, setGuideBusy] = React.useState(false)
+      const [guideError, setGuideError] = React.useState('')
       const [archivePicked, setArchivePicked] = React.useState([])   // 勾选的归档 key，用于批量删除
       const [installJobId, setInstallJobId] = React.useState('')     // 本次安装任务 id，用于中止
       React.useEffect(() => { try { window.localStorage.setItem('zhiyin.view', view) } catch {} }, [view])
@@ -1306,6 +1426,22 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         const timer = setTimeout(() => setQuery(queryInput), 250)
         return () => clearTimeout(timer)
       }, [queryInput])
+
+      // 使用指南：宿主直接读随包分发的 GUIDE.md / GUIDE.en.md，页面不再抄一份正文。
+      const openGuide = React.useCallback(() => {
+        setGuideOpen(true)
+        if (guideData || guideBusy) return
+        setGuideBusy(true)
+        setGuideError('')
+        fetch('/zhiyin/guide', { headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error('HTTP ' + response.status)
+            return response.json()
+          })
+          .then((payload) => setGuideData(payload))
+          .catch((error) => setGuideError(String(error?.message ?? error)))
+          .finally(() => setGuideBusy(false))
+      }, [guideData, guideBusy])
 
       const load = React.useCallback(() => {
         setState((previous) => ({ ...previous, loading: true, error: null, exportError: null }))
@@ -2011,6 +2147,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           h(
             'div',
             { style: css.headActions },
+            h('button', {
+              type: 'button',
+              style: css.iconBtn,
+              title: say('guideOpen', '使用指南'),
+              'aria-label': say('guideOpen', '使用指南'),
+              onClick: openGuide,
+            }, h(Icon, { name: 'book', size: 15 })),
             h('button', {
               type: 'button',
               style: css.iconBtn,
@@ -3027,6 +3170,39 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ),
               )
             })()
+          : null,
+
+        guideOpen
+          ? h(
+              'div',
+              { style: css.overlay, onClick: () => setGuideOpen(false) },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalGuide }, onClick: (event) => event.stopPropagation() },
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, say('guideOpen', '使用指南')),
+                  h('button', {
+                    type: 'button',
+                    style: css.iconBtn,
+                    title: say('close', '关闭'),
+                    'aria-label': say('close', '关闭'),
+                    onClick: () => setGuideOpen(false),
+                  }, h(Icon, { name: 'close', size: 13 })),
+                ),
+                h(
+                  'div',
+                  { style: css.modalBody },
+                  guideError
+                    ? h('div', { style: css.errorBox }, say('guideFailed', '读取使用指南失败：') + guideError)
+                    : !guideData
+                      ? h('div', { style: css.hint }, say('guideLoading', '正在读取使用指南…'))
+                      : h('div', { style: css.guideBody },
+                          renderMarkdown(say('guideLang', 'zh') === 'en' ? guideData.en : guideData.zh)),
+                ),
+              ),
+            )
           : null,
 
         costInfoOpen

@@ -252,6 +252,24 @@ export function apply(ctx) {
     }),
   )
 
+  // 使用指南：直接读随包分发的 GUIDE.md / GUIDE.en.md，一次返回两种语言，
+  // 页面切换语言时不需要再请求。正文只存在于 md 文件里，不在代码里抄第二份。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/guide',
+      resource: async () => {
+        const read = (name) => {
+          try {
+            return readFileSync(new URL('./' + name, import.meta.url), 'utf8')
+          } catch {
+            return ''
+          }
+        }
+        return json({ zh: read('GUIDE.md'), en: read('GUIDE.en.md') })
+      },
+    }),
+  )
   // 技能市场：代理 skills.sh 公开搜索（浏览器跨域拿不到，必须经宿主）。
   // 空查询 = 热门：skills.sh 没有 trending API，用通用词 "skill" 拉一批再按 installs 降序。
   ctx.effect(() =>

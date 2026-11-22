@@ -2,8 +2,8 @@
 # 织音 · 源码导出规则（git archive / GitHub「Download ZIP」都遵守）
 #
 # 目的：别人下载到的是可装的插件本体，开发过程中的文档不进下载包。
-#   · npm 包的内容由 prototype/package.json 的 files 白名单决定（实测 10 个文件、0 文档）
-#   · 本文件决定「源码归档」的内容
+#   · 插件包在仓库根目录，npm 包内容由 package.json 的 files 白名单决定
+#   · 本文件决定「源码归档 / GitHub Download ZIP」的内容
 #   · .gitignore 只对未跟踪文件生效，管不了已跟踪的文档——所以规则写在这里
 # ─────────────────────────────────────────────────────────────
 
@@ -12,8 +12,6 @@
 /AGENTS.md export-ignore
 /PRODUCT.md export-ignore
 /CHANGELOG.md export-ignore
-/README.md export-ignore
-/README.en.md export-ignore
 
 # 本仓库自身的元文件：不进下载包
 /.gitignore export-ignore
@@ -22,5 +20,5 @@
 /.dsh-file-attachment export-ignore
 /.impeccable export-ignore
 
-# 插件包本体照常导出，不做任何排除
-# （prototype/ 下的 index.js、client.js、paths.js、cordis.patch.yml、locale/、icon.svg、README.md 都要在）
+# 插件包本体照常导出：index.js、client.js、paths.js、consumer.js、cordis.patch.yml、
+# package.json、locale/、icon.svg、README.md、README.en.md、GUIDE.md、GUIDE.en.md

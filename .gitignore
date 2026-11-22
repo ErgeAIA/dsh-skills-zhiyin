@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────
-# 织音（ZhiYin）· DSH 插件原型仓库忽略规则
+# 织音（ZhiYin）· DSH 插件仓库忽略规则
 # 生成：git-manager 技能（新建文件，未覆盖任何既有文件）
-# 栈：根目录无 package.json；Node ESM 包位于 prototype/（package-lock.json 入库）
+# 栈：Node ESM 插件包在仓库根目录（package-lock.json 入库）；开发文档在 docs/
 # ─────────────────────────────────────────────────────────────
 
 # 依赖目录（不带前导斜杠，任意层级生效，覆盖 prototype/node_modules）
@@ -62,8 +62,6 @@ desktop.ini
 
 # 织音调试产物（宿主 state 快照转储与临时验证脚本）
 .tmp-state.json
-*.tgz
-prototype/*.tgz
 
 # 设计/调研的一次性工作目录（HTML demo、截图、临时产物）
 _temp/

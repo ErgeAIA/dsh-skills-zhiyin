@@ -40,3 +40,6 @@ description: >
 - <Conventions 无「交付须附下一步计划」> → update → 新增「每次交付须附下一步计划」行；原因：用户 2026-11-19 要求每次交付除报告完成外还要给出下一步计划
 - <Conventions「仓库目录布局固定」白名单含 .gitignore，无 .gitattributes、无 README.en.md> → update → 白名单追加 README.en.md 与 .gitattributes；原因：双语 README 与源码导出白名单（export-ignore）需要落在这两处
 - <Conventions 无分发口径约束> → update → 新增「分发口径双白名单」行（npm files + gitattributes export-ignore，开发文档不随包分发）；细则见 docs/agents/decision-log.md DEC-010
+- <Conventions「仓库目录布局固定」：根目录只放契约/说明文件，插件包位于 prototype/> → update → 插件包本体移到仓库根目录（GitHub 下载即插件），开发文档只进 docs/；Toolchain、Commands、References 内所有 prototype/ 前缀同步去掉
+- <Commands「node --check prototype/index.js」「npm install（工作目录 prototype/）」> → update → `node --check index.js`、`npm install（仓库根目录）`，并补一行 `npm pack --dry-run`
+- <References「安装、回滚插件 → 见 prototype/README.md」> → update → 见 README.md；新增「用户怎么用 → 见 GUIDE.md / GUIDE.en.md」

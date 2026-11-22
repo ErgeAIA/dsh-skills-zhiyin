@@ -51,6 +51,7 @@ status: 已调研，未实施
 | `private: true` | 有 | npm 直接拒绝发布 |
 | `engines` | 无 | 市场无法判断兼容性 |
 | 宿主依赖位置 | 三个 `@deepseek-ai/*` 放在 `dependencies` 且固定 `0.2.2-rc.3` | 应按官方规则移到 `peerDependencies` + `devDependencies`（实测 index.js 只 import Node 内置与 `./paths.js`） |
+| 仓库目录 | 插件包已移到仓库根目录（2026-11-22） | GitHub 下载即为可装插件；`files` 与 `export-ignore` 已按新布局更新 |
 | `client.js` 模块 id | 硬编码旧包名 | 改名后必须同步，否则客户端半边挂不上 |
 | `cordis.patch.yml` 的 `name` | 旧包名 | 同上 |
 | LICENSE | 无 | 社区索引评审会看 |
