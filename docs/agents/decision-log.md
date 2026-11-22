@@ -16,6 +16,23 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-009: 织音采用「双入口」，设置页与左侧竖栏并存
+
+- **日期**：2026-11-22
+- **背景**：DSH 支持第三方插件注册 `main`（整页）与 `sidebar.panellist`（左侧竖栏一行）。参考实现是官方「插件」页（`PANEL_ID='plugins'` 同时注册两者）与社区 dshmarket（另有可开关的侧栏行 + `layout.selectPanel` 跳转）。
+- **决策**：采用方案 A —— 保留设置页 `settings.section`（传统做法、老用户习惯），同时新增整页 `main(key='zhiyin')` 与竖栏行 `sidebar.panellist(id='zhiyin', order=10)`。不做「最后一扇门」开关逻辑（方案 C 留待后续需要时再上）。
+- **代价**：两个入口语义重复，用户可能不知道哪个是「正门」；可通过两边渲染同一个 Page 组件保证内容一致来缓解。
+- **验证**：假 window/假 ctx 冒烟确认 4 个 slot 注册成功；待用户重启后在真实宿主验收左侧竖栏与整页渲染。
+
+## DEC-010: 分发白名单双轨 —— npm 用 files，源码归档用 gitattributes
+
+- **日期**：2026-11-22
+- **背景**：要求「开发文档不随插件分发，用户下载到的是干净可用的插件」。曾考虑把 docs/ 加进 .gitignore。
+- **决策**：不使用 .gitignore 达到该目的（它只对未跟踪文件生效，对已跟踪的 docs/ 无效；真要生效必须 `git rm --cached`，会丢掉文档的版本历史，而会话开工依赖 docs/agents）。改为双轨：
+  1. **npm 包**：`prototype/package.json` 的 `files` 白名单（实测 `npm pack --dry-run` = 10 文件、0 文档）。
+  2. **源码归档**：新增 `.gitattributes`，对 `/docs`、`/AGENTS.md`、`/PRODUCT.md`、`/CHANGELOG.md`、`/README.md`、`/.gitignore`、`/.gitattributes` 等加 `export-ignore`（实测 `git archive HEAD` 只剩 `prototype/`）。
+- **验证**：两条实测结果如上；文档因此既保留 git 历史，又不会出现在任何下载产物里。
+
 ## DEC-008: 目录预算撤下阈值，只展示成本
 
 - **日期**：2026-11-21
