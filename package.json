@@ -30,7 +30,9 @@
     "assets/banner.svg",
     "assets/banner.json",
     "assets/logo.svg",
-    "assets/banner-en.svg"
+    "assets/banner-en.svg",
+    "NOTICE",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {
@@ -48,5 +50,6 @@
   "homepage": "https://github.com/ErgeAIA/dsh-skills-zhiyin#readme",
   "bugs": {
     "url": "https://github.com/ErgeAIA/dsh-skills-zhiyin/issues"
-  }
+  },
+  "license": "Apache-2.0"
 }

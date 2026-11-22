@@ -190,4 +190,12 @@ Host-half changes need a DSH restart; page-half changes only need a page reload.
 
 ## License
 
-No open-source license chosen yet.
+This project is licensed under the **Apache License 2.0**. The full text is in [`LICENSE`](LICENSE), attribution is in [`NOTICE`](NOTICE).
+
+You may use, modify and redistribute this project freely, **including inside closed-source or commercial products** — you are not required to open-source your own work. Only three things are asked:
+
+- keep the copyright notice together with `LICENSE` and `NOTICE`;
+- state clearly where you changed the files;
+- do not use the name "ZhiYin / 织音" or the author's name to endorse your derivative.
+
+The license includes a **patent grant** from contributors (section 3); trademark rights are not granted.
