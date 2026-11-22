@@ -34,7 +34,8 @@
     "NOTICE",
     "LICENSE",
     "assets/icon-180.png",
-    "assets/icon-512.png"
+    "assets/icon-512.png",
+    "icon-small.svg"
   ],
   "dsh": {
     "bundle": {

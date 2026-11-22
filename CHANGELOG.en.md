@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Licensed under Apache-2.0, with LICENSE and NOTICE added; redistributors only need to keep the copyright notice, without opening their own source
 - Unused official dependencies were dropped; runtime dependencies now come entirely from the host
 - The plugin icon and horizontal lockup use a new mark of three interwoven skill strands, with real gaps at the crossings so the weave reads correctly
+- The README banner now shares that visual language and uses the mark itself in its final stage; a separate small-size version covers 16–32px contexts
 - README and CHANGELOG are bilingual
 
 ### Fixed

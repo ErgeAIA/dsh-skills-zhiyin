@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（Logo Kit v2 走 feat/logo-kit-v2 → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮图标：8c285e3 → e6e4c11
+- **当前分支**：main（banner 重做 走 feat/banner-v3 → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮标识：98f31f8 → d68c313
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:2x 换用 Logo Kit v2 + 修 kit 缺陷
+- **最后更新**：2026-11-23 00:1x banner 重做 + 小尺寸变体
+  - banner 换成新标识语言：Ink/Paper/Muted + Weave 双橙，标题改无衬线 800，删掉全部音符点缀；成品卡内直接嵌入三股线标识，收尾与 logo 同构。中英两版同步（assets/banner.svg / banner-en.svg）。
+  - 新增 icon-small.svg（compact 变体）：描边 7.4→9.6、去掉交叉间隙，供 ≤32px 使用；20/24/32px 目视验证线条连通可辨。
+  - assets/banner.json 升到 v3（identity 段记录新配色与「不得叠加音符」约束，decorations 清空）。
+  - 验证：中英 banner 文本宽度自检 11 项全过；中文版渲染目视通过；命令串与 owner 字符串比对一致。
+  - 未验证：英文版仅几何自检，需用户目视。
+  - 待验收：README 顶部中英 banner 是否与图标同语言；若要插件列表用小尺寸，把 package.json 的 icon 指向 icon-small.svg 即可。
+
+- 上一轮：2026-11-22 00:2x 换用 Logo Kit v2 + 修 kit 缺陷
   - 采用 kit 的 `zhiyin-icon.svg` 作插件图标：`icon.svg` 替换为新标识（三条技能股线交织），`assets/logo.svg` 换成 kit 的深色横版。
   - 修 kit 三处缺陷：① 横版 logo 多一个 `</g>`，是非法 XML（已重建）；② 说明里的「交叉间隙」未落到文件，用 mask 真正实现（A×B 交于 42.7,57.3；B×C 交于 33.8,38.7）；③ README 重复段落 ×4（未改 kit 文件，仅记录）。
   - svgo 4.1.0 清理：icon.svg 1486→1305B、logo 1992B；mask / title / aria-label 保留，`role="img"` 手动补回。

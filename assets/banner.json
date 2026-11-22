@@ -4,9 +4,20 @@
     "w": 1200,
     "h": 400
   },
-  "theme": "ember",
-  "accent": "#F26A1B",
-  "titleFont": "Noto Serif SC 900",
+  "theme": "ink-paper",
+  "identity": {
+    "name": "Logo Kit v2 · 三股技能线交织",
+    "accent": "#F26A1B",
+    "accents": [
+      "#FF955C",
+      "#F26A1B",
+      "#F7EDE4"
+    ],
+    "ink": "#202022",
+    "paper": "#F7EDE4",
+    "muted": "#A99A8F",
+    "note": "新标识不再使用音符、声波、谱线或乐器图形；三条股线交织并在交叉点留出背景间隙。"
+  },
   "fields": {
     "category": "DSH PLUGIN · SKILL CONTROL",
     "title": "织音",
@@ -24,17 +35,17 @@
       "DSH 组合包"
     ],
     "footer": "dsh plugin --profile web add github:ErgeAIA/dsh-skills-zhiyin",
-    "caption": "散点收成卡片，卡片决定声部"
+    "caption": "散点收成卡片，卡片编成一份谱"
   },
   "glyph": {
-    "kind": "scatter-converge",
+    "kind": "scatter-weave",
     "label": "从散落到可见",
-    "note": "三段动线讲「从乱到治」：32 个技能条（散落）→ 4 个技能包卡（编组，卡内三条成员细杠）→ 一张带声波的成品卡（模型此刻读到的技能目录）。对应产品动作：装进来 → 编成包 → 只放出要的。",
+    "note": "30 个技能条（散落）→ 4 个技能包卡（编组）→ 一张内嵌三股线标识的成品卡（模型此刻读到的目录）。第三段用标识本身收尾，把「编成一份目录」直接画成「织成一条线」。",
     "stages": [
       {
         "label": "散落的技能",
         "x": 744,
-        "marks": 32
+        "marks": 30
       },
       {
         "label": "技能包",
@@ -44,33 +55,20 @@
       {
         "label": "可见目录",
         "x": 1010,
-        "card": true
+        "card": true,
+        "markInside": true
       }
     ],
-    "decorations": [
-      {
-        "kind": "note",
-        "where": "左右留白",
-        "opacity": 0.09,
-        "role": "水印级音符，不抢正文"
-      },
-      {
-        "kind": "skill-stack",
-        "where": "散点簇左侧",
-        "opacity": 0.15,
-        "role": "技能条目层叠示意"
-      },
-      {
-        "kind": "note",
-        "where": "成品卡上下",
-        "opacity": "0.45–0.9",
-        "role": "声波升起的三枚音符"
-      }
-    ]
+    "decorations": []
+  },
+  "variants": {
+    "zh": "assets/banner.svg",
+    "en": "assets/banner-en.svg"
   },
   "assets": {
     "logo": "assets/logo.svg",
     "icon": "icon.svg",
-    "archivedThreadsVersion": "docs/assets/banner-threads.svg"
+    "iconSmall": "icon-small.svg",
+    "iconPng": "assets/icon-180.png"
   }
 }
