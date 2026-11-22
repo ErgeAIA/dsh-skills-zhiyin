@@ -531,7 +531,9 @@ window.__ModuleLoader__.load({
         boxSizing: 'border-box',
         padding: '24px 32px 56px',
       },
+      // 设置弹窗里用固定窄宽；左侧入口是整页，用流式宽度（窗口能拉多宽就用多宽，封顶 1600）。
       page: { maxWidth: 780, margin: '0 auto', padding: '2px 0 48px', color: 'inherit' },
+      pageWide: { width: '100%', maxWidth: 1600, margin: '0 auto', padding: '2px 0 48px', color: 'inherit' },
       overlay: {
         position: 'fixed',
         inset: 0,
@@ -758,8 +760,10 @@ window.__ModuleLoader__.load({
       hint: { fontSize: fs.hint, opacity: op.hint, lineHeight: 1.55 },
       grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))',
         gap: 8,
+        // 整页模式下页面能到 1600px，统计卡摊太开会显得松散，这里封住。
+        maxWidth: 900,
         marginTop: 16,
       },
       card: {
@@ -1386,7 +1390,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       )
     }
 
-    function Page({ close, t }) {
+    function Page({ close, t, wide }) {
       const say = React.useCallback(
         (key, fallback) => {
           const value = typeof t === 'function' ? t(key) : undefined
@@ -2205,7 +2209,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       return h(
         'div',
-        { style: css.page },
+        { style: wide ? css.pageWide : css.page },
         h(
           'div',
           { style: css.head },
@@ -3830,7 +3834,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
     /** 左侧入口的整页外壳：给 Page 一个可滚动的容器，其余交给 Page 自己。 */
     function MainPage(props) {
-      return h('div', { style: css.mainPage }, h(Page, props))
+      return h('div', { style: css.mainPage }, h(Page, { ...props, wide: true }))
     }
 
     function NavIcon({ size = 16, active }) {
