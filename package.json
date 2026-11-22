@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "织音：把技能包编译成模型此刻看得见的技能目录，并给出成本与冲突",
+  "description": "织音：把散落的技能织成一支谱——装技能、编技能包、按需启停，模型只奏你想要的声部。",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -28,7 +28,9 @@
     "locale/*.json",
     "icon.svg",
     "README.md",
-    "README.en.md"
+    "README.en.md",
+    "assets/banner.svg",
+    "assets/banner.json"
   ],
   "dependencies": {
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",

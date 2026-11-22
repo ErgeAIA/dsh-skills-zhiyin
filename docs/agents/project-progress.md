@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（指南并入 README 走 docs/guide-into-readme → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮结构改造：26b61a6 → 4bb87b0
+- **当前分支**：main（品牌 banner + 名称释义 + dsh 标签 走 feat/brand-banner → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮说明弹窗：40b4bb4 → 005fb94
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 18:3x 插件恢复加载（BUG-011）
+- **最后更新**：2026-11-22 21:xx 品牌 banner + 名称释义 + dsh 标签
+  - **说明弹窗宽度**：新增 css.modalWide（720px）只给「目录字符数 · 计算方式与建议上限」用；costBullet 加 text-wrap:pretty 避免末行只剩一两个字。用户已确认正常。
+  - **dsh 标签**：社区索引靠 GitHub topic 识别（awesome-dsh-plugin 贡献指南原文要求 Add the dsh-plugin topic）。已用 gh repo edit --add-topic 打上 dsh-plugin / deepseek-harness / dsh / skill-manager，回读 repositoryTopics 确认；package.json 另补 npm keywords（5 个）。宿主识别插件本身仍靠 dsh.bundle.patch + dsh.client.platform，与 topic 无关。
+  - **Banner**：走 tuhua 规范（该技能当前不在可调用目录里，skill 工具返回 not available for model invocation，改为直接读 ~/.agents/skills/tuhua 的 SKILL.md 与 references 执行）。产物 assets/banner.svg（4.9KB）+ assets/banner.json，已进 files 白名单；README 中英顶部各引用一次。图形为定制「三条织线 → 声波」，对应三层开关收成一个声部。
+  - **名称释义**：README 中英各加一段解释「织 = 编成一支谱；音 = 模型奏响的那一支」；package.json description 与 GitHub 仓库 Description 同步改成同一口径（旧描述残留已移除的「冲突」）。
+  - 验证：node --check client.js exit 0；banner 自检（viewBox / 顶带 / L 形标记 / 网格 opacity / 无 script 与外链图 / <15KB）全过；Puppeteer 渲染截图目视确认无压字越界；npm pack --dry-run = 13 文件。
+  - 待验收：README 在 GitHub 上显示 banner；仓库 Description 与页面一致。
+
+- 上一轮：2026-11-22 18:3x 插件恢复加载（BUG-011）
   - 用户反馈「重启后看不到插件，左栏与设置都没有」。定位：插件包移到仓库根后，profile 的 `link:` 依赖只改了 `package.json`，而 `node_modules/@local/dsh-zhiyin-proto` 符号链接仍指向已删除的 `prototype`，`pnpm-lock.yaml` 也是旧路径，宿主经链接读 `package.json` 得 ENOENT → 包被跳过。
   - 已修复：删除失效链接、重建指向仓库根的链接、锁文件两行同步到新路径。`dsh.profile.bundles` 无需改动。
   - 已核实：CLI 无法兜底（`dsh plugin --profile desktop` 报「profile desktop is managed exclusively by the Electron application」），修复后需重启 DSH。

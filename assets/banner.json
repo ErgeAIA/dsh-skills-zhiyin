@@ -1,0 +1,51 @@
+{
+  "preset": "banner-3:1",
+  "size": {
+    "w": 1200,
+    "h": 400
+  },
+  "theme": "ember",
+  "accent": "#F26A1B",
+  "fields": {
+    "category": "DSH PLUGIN · SKILL CONTROL",
+    "title": "ZhiYin",
+    "captionEn": "ZHIYIN · WEAVE SKILLS INTO ONE VOICE",
+    "subtitle": "把技能织成谱，让模型奏成音",
+    "points": [
+      "装技能",
+      "编技能包",
+      "归档",
+      "算成本"
+    ],
+    "feature": [
+      "v0.1.0",
+      "Node 24",
+      "DSH 组合包"
+    ],
+    "footer": "dsh plugin --profile web add github:ErgeAIA/dsh-skills-zhiyin",
+    "caption": "三层织线收成一个声部"
+  },
+  "glyph": {
+    "kind": "custom-threads",
+    "label": "三层织线 · 一个声部",
+    "note": "三条横线代表三层开关（全部技能 / 技能包 / 单个技能）；线上串联的技能块自上而下变少，第三层收束成声波，末端一个强调色圆点。用「织 → 谱 → 声」解释产品名：技能是线，可见性是谱，模型听见的是声部。",
+    "rows": [
+      {
+        "label": "全部技能",
+        "y": 152,
+        "chips": 7
+      },
+      {
+        "label": "技能包",
+        "y": 212,
+        "chips": 3
+      },
+      {
+        "label": "单个技能",
+        "y": 272,
+        "chips": 2,
+        "tail": "wave"
+      }
+    ]
+  }
+}
