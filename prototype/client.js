@@ -524,6 +524,13 @@ window.__ModuleLoader__.load({
     const op = { hint: 0.78, meta: 0.65, dim: 0.72, faint: 0.55 }
 
     const css = {
+      // 左侧入口打开的整页：自己承担页边距与滚动（设置弹窗那套外壳不在这里）。
+      mainPage: {
+        height: '100%',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
+        padding: '24px 32px 56px',
+      },
       page: { maxWidth: 780, padding: '2px 0 48px', color: 'inherit' },
       overlay: {
         position: 'fixed',
@@ -3821,7 +3828,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       })
     }
 
-    function NavIcon({ size, active }) {
+    /** 左侧入口的整页外壳：给 Page 一个可滚动的容器，其余交给 Page 自己。 */
+    function MainPage(props) {
+      return h('div', { style: css.mainPage }, h(Page, props))
+    }
+
+    function NavIcon({ size = 16, active }) {
       return h(
         'svg',
         {
@@ -3863,6 +3875,32 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         ctx.slots.inject('settings.section.icon', () =>
           ctx.slots.register(
             { name: 'settings.section.icon', id: 'zhiyin' },
+            NavIcon,
+          ),
+        )
+
+        // 方案 A（双入口）：设置页保留传统做法，同时加一个左侧竖栏入口。
+        // 左侧那行点下去是把 layout 的当前面板切到 key 为 zhiyin 的整页。
+        ctx.slots.inject('main', () =>
+          ctx.slots.register(
+            {
+              name: 'main',
+              key: 'zhiyin',
+              locale: NS,
+              inject: () => ({ t: ctx.locale.bind(NS) }),
+            },
+            MainPage,
+          ),
+        )
+        ctx.slots.inject('sidebar.panellist', () =>
+          ctx.slots.register(
+            {
+              name: 'sidebar.panellist',
+              id: 'zhiyin',
+              order: 10,
+              label: () => ctx.locale.bind(NS)('nav'),
+              locale: NS,
+            },
             NavIcon,
           ),
         )

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "织音：把技能包编译成模型此刻看得见的技能目录，并给出成本与冲突",
+  "icon": "icon.svg",
   "exports": {
     ".": "./index.js",
     "./consumer": "./consumer.js",
