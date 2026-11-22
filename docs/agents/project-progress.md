@@ -17,13 +17,23 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（UI 收尾：市场骨架屏 + 技能卡统一走 style/final-polish → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮按钮折行：58aa616 → c731358
+- **当前分支**：main（方案 A 左侧入口 + 分发白名单走 feat/sidebar-entry-and-dist → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 UI 收尾：fc15567 → 04e7253
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 00:5x UI 收尾：市场首屏骨架屏 + 技能列表卡片统一
+- **最后更新**：2026-11-22 13:1x 方案 A：左侧竖栏入口 + 整页；分发白名单
+  - 左侧入口：client.js 新增两处注册 —— `main`（key: zhiyin，inject 提供 t）与 `sidebar.panellist`（id: zhiyin，order: 10，label 用 nav 文案，组件复用 NavIcon）。设置页入口按方案 A 保留，两个入口并存。
+  - NavIcon 补 `size = 16` 默认值（侧栏行与「更多」菜单传不同尺寸）；新增 css.mainPage（整页自担 padding 与滚动）与 MainPage 包装组件；css.page 加 `margin: 0 auto` 让整页居中。
+  - 冒烟（假 window.__ModuleLoader__ + 假 React + 假 ctx）：module id 正确、apply 跑通，4 个 slot 全部注册 —— settings.section / settings.section.icon / main(key=zhiyin) / sidebar.panellist(id=zhiyin, order=10)。
+  - 分发白名单：npm 包由 prototype/package.json 的 files 决定，实测 `npm pack --dry-run` = 10 个文件、零文档；源码归档由新增 .gitattributes 的 export-ignore 决定，实测 `git archive HEAD` 只产出 prototype/ 一个目录（docs/、AGENTS.md、PRODUCT.md、CHANGELOG.md、README.md 全部剥离）。
+  - 补 prototype/icon.svg（files 与 exports["./icon"] 早前引用了却不存在的文件），package.json 增顶层 `icon: icon.svg`。
+  - .gitignore 增 *.tgz / prototype/*.tgz / _temp/ / .impeccable/ / *.zip / pack-out/（调试产物与一次性工作目录）。
+  - node --check client exit 0。
+  - 待验收：重启 DSH 后左侧竖栏出现「织音」，点进去是整页；设置里的织音仍可用；两处状态一致。
+
+- 上一轮：2026-11-22 00:5x UI 收尾：市场首屏骨架屏 + 技能列表卡片统一
   - 市场骨架屏：首屏要并发拉 5 组 skills.sh 数据，原来只显示一行「正在读取技能市场…」。现改为 6 张骨架卡（瀑布流同构：标题/来源/三行描述/底部按钮占位），带 shimmer 渐变动画；@keyframes 通过 useEffect 挂一次 <style> 注入，并加 prefers-reduced-motion 关闭动画。
   - 技能列表卡片统一：css.skillCard 由静态对象改为 (hover) => ({...})，与市场卡片同一套视觉语言——hover 上浮 2px、品牌橙边框、0 8px 24px 阴影、140ms 过渡；新增 skillHover 状态与 onMouseEnter/onMouseLeave。
   - 卡片结构重排：头部（名称 + 来源徽标 + 软链/只读）→ 信息带（描述字符数 · 引用数，复用 css.marketCardMeta）→ 描述 → 备注 → 底部分隔线 + 圆点状态 + 操作区（打开目录/备注/卸载/开关）。去掉原来在头部和底部重复出现的状态文案与 refBadge。
