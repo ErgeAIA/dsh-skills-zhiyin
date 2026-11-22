@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 00:2x banner 定稿（去版本行 + 恢复音乐元素）
+- **最后更新**：2026-11-23 01:0x 图标尺寸由宿主源码确认并切换
+  - 从 app.asar 解包第一方 dsh-client-ui-plugin-manager 源码：ROW_ARTWORK_SIZE=30、CARD_ARTWORK_SIZE=36（列表行外框 40px、卡片外框 48px）。
+  - 据此把 package.json 的 icon 改为 icon-small.svg（30px 下列表可读）；市场条目仍用 assets/icon-180.png（带间隙完整版）。
+  - 用户确认 banner 现状可用；PR 暂缓——用户会提供「织音 / ZhiYin」的 SVG 字标（不用文字渲染），到时替换横版 logo 与 banner 的标题后再提。
+  - 验证：node --check 双半边 0；npm pack 19 文件；icon-small 32px 渲染目视通过。
+
+- 上一轮：2026-11-23 00:2x banner 定稿（去版本行 + 恢复音乐元素）
   - 按用户要求：① 删掉「v0.1.0 · Node 24 · DSH 组合包」整行——版本号会随发版变化，写死在图里就得每次同步；② 恢复音乐与技能元素：留白淡音符 ×2、散点簇左上技能层叠图标、成品卡下方五线谱表 + 三枚音符（Weave/WLight/Muted）。标识本体保持干净，不加音符。
   - 修 BUG-012：英文版 banner 属性值缺引号导致非法 XML（`font-family=Inter, sans-serif`），浏览器显示错误页；已统一加引号，并对五个对外 SVG 做严格 XML 校验。
   - 中英两版均重新渲染目视通过：结构完整、音符/谱表可见、无文字溢出。

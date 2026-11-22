@@ -16,6 +16,18 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-023: 图标尺寸以第一方代码为准——列表 30px / 卡片 36px
+
+- **日期**：2026-11-23
+- **背景**：我曾把「插件列表图标多大」当成需要用户目视确认的事，被用户纠正。正确做法是从 DSH 第一方代码里查，不靠猜。
+- **证据（从 app.asar 解包 `@deepseek-ai/dsh-client-ui-plugin-manager` 源码取得）**：
+  - `src/client/PluginManagerPage.tsx`：`const ROW_ARTWORK_SIZE = 30`、`const CARD_ARTWORK_SIZE = 36`；`PackageArtwork` 用 `<img width={size} height={size}>` 直接渲染。
+  - `src/client/PluginManagerPage.module.css`：`.rowIcon` 外框 40×40px、`.cardIcon` 外框 `var(--card-icon-size)` = 48px。
+  - 即 package.json 的 `icon` 实际以 **30px（列表）/ 36px（卡片）**显示，不是我先前假设的 16–20px。
+- **决策**：`package.json` 的 `icon` 从 `icon.svg` 改为 `icon-small.svg`。理由：带间隙的主标识在 36px 下间隙仅 0.75px，会被抗锯齿吃掉、股线碎成弧（见 40px 与 20px 实测）；紧凑版无间隙、描边加粗到 9.6，在 32px 下三股线连通可辨。
+- **分面**：`icon-small.svg` 用于 DSH 内；`assets/icon-180.png`（带间隙的完整标识）仍用于 awesome-dsh-plugin 市场条目——两个尺寸两个版本，不要用同一张缩放。
+- **教训**：推测渲染尺寸并把它当成用户要确认的问题，是把自己的调研义务外包。以后凡是宿主 UI 的行为，先查宿主代码（asar 头部索引可解包），再问人。
+
 ## DEC-022: banner 换成新标识语言；小尺寸另做 compact 变体
 
 - **日期**：2026-11-23
