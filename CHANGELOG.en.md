@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Disabling a skill now means fully invisible: absent from the model catalog, rejected by the `skill` tool, missing from the slash menu
 - The page is fluid width, with typography and spacing unified
 - The package is named `dsh-skills-zhiyin` and the repository root is the plugin itself, so a GitHub download installs directly
+- Licensed under Apache-2.0, with LICENSE and NOTICE added; redistributors only need to keep the copyright notice, without opening their own source
 - Unused official dependencies were dropped; runtime dependencies now come entirely from the host
 - README and CHANGELOG are bilingual
 

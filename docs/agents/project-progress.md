@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（CHANGELOG 精简 + GitHub 入口 + 收录准备 走 chore/changelog-and-github → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮清理：7cf52ca → 5cb6469
+- **当前分支**：main（Apache-2.0 许可 走 chore/license → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 CHANGELOG：4602348 → c2aa18a
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 23:0x CHANGELOG 精简 + GitHub 入口 + 收录准备
+- **最后更新**：2026-11-22 23:2x 采用 Apache-2.0
+  - 澄清需求：Apache-2.0 不是「用了必须开源」，那是 MPL/GPL/AGPL；Apache-2.0 只要求保留版权与 NOTICE、注明修改，允许闭源与商业使用。
+  - LICENSE 用 apache.org 原文逐字落盘（11,358 字节）；新增 NOTICE（项目名 + 版权所有）；package.json 加 license 字段并把 LICENSE/NOTICE 加入 files。
+  - README 中英各加人话版许可说明（能做什么、三件必做、专利与商标边界）。
+  - 验证：LICENSE 六个关键锚点命中；npm pack = 16 文件，含 LICENSE 11.4kB 与 NOTICE。
+  - 待验收：GitHub 仓库首页右侧显示 Apache-2.0；README 许可段与实际条款一致。
+
+- 上一轮：2026-11-22 23:0x CHANGELOG 精简 + GitHub 入口 + 收录准备
   - CHANGELOG：中文/英文均从 58-59 行压到 40 行，按用户可感知结论归类，删实现细节（TDZ、影子候选、事件循环等留在 debug-log）。
   - 设置页头部新增 GitHub 图标按钮（第 4 个），新标签打开源码仓库；图标用 Feather octocat 描边路径，与现有图标集统一。
   - package.json：删除三个未被 import 的 @deepseek-ai/* 依赖（index.js 只用 Node 内置与 ./paths.js）；补 repository / homepage / bugs；锁文件随之清空。
