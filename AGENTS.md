@@ -46,7 +46,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 
 | 观察到的现象 | 要求 Agent 的行为 |
 | ------------ | ----------------- |
-| 仓库目录布局固定 | 插件包本体就在仓库根目录（index.js、client.js、paths.js、consumer.js、cordis.patch.yml、package.json、locale/、icon.svg、README.md、README.en.md、GUIDE.md、GUIDE.en.md），这样 GitHub 下载 / git clone 得到的就是可装插件；开发文档只进 docs/ 对应子目录（prd、adr、design、handoff、agents），根目录不再新增文档；AGENTS.md、PRODUCT.md、CHANGELOG.md、.gitignore、.gitattributes 属仓库自身文件 |
+| 仓库目录布局固定 | 插件包本体就在仓库根目录（index.js、client.js、paths.js、consumer.js、cordis.patch.yml、package.json、locale/、icon.svg、README.md、README.en.md），这样 GitHub 下载 / git clone 得到的就是可装插件；开发文档只进 docs/ 对应子目录（prd、adr、design、handoff、agents），根目录不再新增文档；AGENTS.md、PRODUCT.md、CHANGELOG.md、.gitignore、.gitattributes 属仓库自身文件 |
 | 分发口径双白名单 | npm 包内容看 package.json 的 files；源码归档看 .gitattributes 的 export-ignore。开发文档一律不随包分发，也不进下载归档 |
 | 会话文档体系固定 | 进度写 docs/agents/project-progress.md；决策写 docs/agents/decision-log.md；两者只追加不删历史 |
 | bug 追加 docs/agents/debug-log.md | 格式 BUG-NNN；只追加不删历史 |
@@ -76,7 +76,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 - 查 UI 结构与交互决议 → 见 docs/design/ZhiYin-UI-决议.md：设置页信息架构与已定样式
 - 接着上一轮实现往下做 → 见 docs/handoff/handoff-2026-11-17-m0-skills-provider.md：已实现范围、待验证项与下一步
 - 安装、回滚插件 → 见 README.md：profile 注册方式与卸载步骤
-- 用户怎么用 → 见 GUIDE.md / GUIDE.en.md：装技能、技能包、归档恢复（随包分发，插件页内可看）
+- 用户怎么用 → 见 README.md / README.en.md 的「使用」段（`<!-- guide:start -->` 与 `<!-- guide:end -->` 之间）：装技能、技能包、归档恢复；插件页内的指南弹窗读的就是这一段，勿在代码里复制正文
 - 会话开始复述现状 → 见 docs/agents/project-progress.md：当前分支、阶段与最近进展
 - 核对最近交接 → 见 docs/handoff/：上一轮做到哪、卡在哪
 - 规则冲突、回溯口径 → 见 docs/agents/decision-log.md：技术与流程决策记录，只追加

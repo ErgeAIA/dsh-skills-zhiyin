@@ -252,8 +252,9 @@ export function apply(ctx) {
     }),
   )
 
-  // 使用指南：直接读随包分发的 GUIDE.md / GUIDE.en.md，一次返回两种语言，
-  // 页面切换语言时不需要再请求。正文只存在于 md 文件里，不在代码里抄第二份。
+  // 使用指南：正文就是 README 里 <!-- guide:start --> 与 <!-- guide:end --> 之间的那段，
+  // 一次返回两种语言，页面切换语言时不用再请求。指南只有 README 一份来源，
+  // 代码里不抄正文；标记缺失时退化为整篇 README。
   ctx.effect(() =>
     ctx.webServer.register({
       kind: 'exact',
@@ -266,7 +267,13 @@ export function apply(ctx) {
             return ''
           }
         }
-        return json({ zh: read('GUIDE.md'), en: read('GUIDE.en.md') })
+        const pick = (text) => {
+          const start = text.indexOf('<!-- guide:start -->')
+          const end = text.indexOf('<!-- guide:end -->')
+          if (start >= 0 && end > start) return text.slice(start + '<!-- guide:start -->'.length, end).trim()
+          return text
+        }
+        return json({ zh: pick(read('README.md')), en: pick(read('README.en.md')) })
       },
     }),
   )
