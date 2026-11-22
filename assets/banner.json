@@ -16,7 +16,7 @@
     "ink": "#202022",
     "paper": "#F7EDE4",
     "muted": "#A99A8F",
-    "note": "新标识不再使用音符、声波、谱线或乐器图形；三条股线交织并在交叉点留出背景间隙。"
+    "note": "标识本体不叠加音符；「音」的意象放在版面里——留白淡音符、成品卡下方谱表与三枚音符。"
   },
   "fields": {
     "category": "DSH PLUGIN · SKILL CONTROL",
@@ -29,13 +29,9 @@
       "归档",
       "算成本"
     ],
-    "feature": [
-      "v0.1.0",
-      "Node 24",
-      "DSH 组合包"
-    ],
     "footer": "dsh plugin --profile web add github:ErgeAIA/dsh-skills-zhiyin",
-    "caption": "散点收成卡片，卡片编成一份谱"
+    "caption": "散点收成卡片，卡片编成一份谱",
+    "note": "左区不放版本号：版本会随发版变化，写死在图里就得每次同步。"
   },
   "glyph": {
     "kind": "scatter-weave",
@@ -59,7 +55,26 @@
         "markInside": true
       }
     ],
-    "decorations": []
+    "decorations": [
+      {
+        "kind": "note",
+        "where": "左右留白",
+        "opacity": 0.08,
+        "role": "水印级音符"
+      },
+      {
+        "kind": "skill-stack",
+        "where": "散点簇左上",
+        "opacity": 0.16,
+        "role": "技能条目层叠示意"
+      },
+      {
+        "kind": "staff+notes",
+        "where": "成品卡下方",
+        "opacity": "0.5–0.9",
+        "role": "五线谱表与三枚音符，把「目录是谱子」画出来"
+      }
+    ]
   },
   "variants": {
     "zh": "assets/banner.svg",

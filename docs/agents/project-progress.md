@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 00:1x banner 重做 + 小尺寸变体
+- **最后更新**：2026-11-23 00:2x banner 定稿（去版本行 + 恢复音乐元素）
+  - 按用户要求：① 删掉「v0.1.0 · Node 24 · DSH 组合包」整行——版本号会随发版变化，写死在图里就得每次同步；② 恢复音乐与技能元素：留白淡音符 ×2、散点簇左上技能层叠图标、成品卡下方五线谱表 + 三枚音符（Weave/WLight/Muted）。标识本体保持干净，不加音符。
+  - 修 BUG-012：英文版 banner 属性值缺引号导致非法 XML（`font-family=Inter, sans-serif`），浏览器显示错误页；已统一加引号，并对五个对外 SVG 做严格 XML 校验。
+  - 中英两版均重新渲染目视通过：结构完整、音符/谱表可见、无文字溢出。
+  - 验证：五份 SVG 严格 XML 全部 OK；宽度自检 7 项全过；npm pack 19 文件。
+
+- 上一轮：2026-11-23 00:1x banner 重做 + 小尺寸变体
   - banner 换成新标识语言：Ink/Paper/Muted + Weave 双橙，标题改无衬线 800，删掉全部音符点缀；成品卡内直接嵌入三股线标识，收尾与 logo 同构。中英两版同步（assets/banner.svg / banner-en.svg）。
   - 新增 icon-small.svg（compact 变体）：描边 7.4→9.6、去掉交叉间隙，供 ≤32px 使用；20/24/32px 目视验证线条连通可辨。
   - assets/banner.json 升到 v3（identity 段记录新配色与「不得叠加音符」约束，decorations 清空）。

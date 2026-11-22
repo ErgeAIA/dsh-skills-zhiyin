@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The English banner rendered an XML parsing error in the browser (an attribute value lost its quotes)
 - The settings page returned 400 and stayed loading, and the skill total drifted between 111 and 112
 - The market install button wrapped, cards showed a duplicate "Installed" badge, and requests returned 502
 - "Open folder" did nothing, and symlinked skills showed no badge
