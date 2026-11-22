@@ -17,13 +17,21 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（左侧入口整页宽度走 style/wide-main-page → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮方案 A + 分发：70cf444 → ba10394
+- **当前分支**：main（收尾：UI 清理 + 使用指南 + 双语 README 走 chore/finish-polish → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮整页宽度：442ddc2 → 621e6b4
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 14:0x 左侧入口整页改为流式宽度
+- **最后更新**：2026-11-22 17:xx 收尾三件：UI 清理、使用指南、双语 README
+  - UI 清理：删除 v1 遗留的死文案 176 条（zh 88 + en 88）——合奏/combo/排除/常驻/冲突声明/生效面矩阵；删掉两个死代码块（矩阵 useMemo、合奏未编配告警）与「接管」徽标（策略 provider 是内部机制，用户不需要看到）。
+  - 措辞去行话：观测→读取（观测于→更新于、观测完整→已完整读取、读取失败）、投影/组合/合奏全部改写、重新观测→刷新；版本行从「@local/dsh-zhiyin-proto v0.1.0」改为「织音 v0.1.0」；副标题从 v1 的「让技能自由编组，让能力彼此协奏」改为「安装、启停、编组技能，随时看清模型此刻能用什么」。
+  - 使用指南：新增 prototype/GUIDE.md 与 GUIDE.en.md（随包分发），覆盖装技能六种粘贴方式与目标目录区别、三层开关配合与优先级、技能包与「全部技能」的互斥、归档与恢复、目录字符数成本、备份导入导出、常见问题。
+  - README 重写（shuxu 优化模式）：根 README.md + README.en.md 双语互链；prototype/README.md 与 README.en.md 取代废弃的 M0 实验说明。修正全部过时声明（技能包/安装卸载「未做」、8000 预算、consumer 已废弃、icon.svg 缺失等），命令均标注验证状态。
+  - 验证：node --check 双半边 exit 0；npm pack --dry-run = 13 文件零文档；6 份 Markdown 共 22 条相对链接 0 断链；git archive 仅 prototype/。
+  - 待验收：重启 DSH 后界面无「开关已生效 / 未接管 / 观测 / 合奏 / 组合」等字样；使用指南与 README 内容与实际一致。
+
+- 上一轮：2026-11-22 14:0x 左侧入口整页改为流式宽度
   - 原来 Page 只有一个 maxWidth 780 的窄版（为设置弹窗设计），挂到整页后在大窗口里只占中间一条。实测截图：1920 窗口下内容区约 1400px，我们只用 780px，市场页则铺满。
   - 新增 css.pageWide（width 100% + maxWidth 1600 + margin auto），Page 接受 wide 开关，MainPage 传 wide: true。设置弹窗仍用 780 窄版。
   - 统计卡在 1600px 下会摊得过开：css.grid 的 minmax 由 96px 提到 132px 并加 maxWidth 900 封顶。

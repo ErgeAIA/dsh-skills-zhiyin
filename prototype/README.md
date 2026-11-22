@@ -1,52 +1,64 @@
-# 织音 M0 原型（可卸载）
+# 织音（ZhiYin）
 
-一次性实验装置，不是产品。它只回答一个问题：**在预设组合里替换掉 DSH 自带的技能消费者之后，接管是否真的成立。**
+DeepSeek Harness（DSH）的技能管理插件：安装、卸载、启停技能，并把技能编成**技能包**批量开关。
 
-## 为什么是「预设」而不是「全局」
+一句话边界：**织音决定「模型此刻看得见什么」，不决定「技能本身是什么」。**
 
-实测已经排除两条路（细节见 `../docs/adr/ZhiYin-M0-ADR.md` §1）：
-
-- 全局注册同名 `skill` 工具：注册成功，但 `ctx.tools.get('skill', agent)` 仍解析到预设里那条更近的消费者 → `visible: false`。
-- 关掉 `dsh-base` 的全局 `tool-skill` 行：关掉的是另一条，预设里那条照样生效。
-
-Web profile 的技能消费者是**预设级**装配的（`dsh-web-app/presets/standard.patch.yml` 的 `plugins` 里挂着 `tool-skill`）。所以原型改成：**新增一个我们自己的预设**，在其清单里把 `tool-skill` 换成我们的消费者。
+- 使用说明：[GUIDE.md](GUIDE.md) ｜ English: [GUIDE.en.md](GUIDE.en.md)
+- 界面入口：左侧竖栏「织音」，或 设置 → 织音
 
 ## 它做了什么
 
-`cordis.patch.yml` 声明一个预设 `zhiyin-proto`（显示名「织音原型」），清单是标准预设的精简版，唯一的差异是最后一行：
+| 能力 | 说明 |
+| --- | --- |
+| 技能观测 | 汇总当前技能总数、模型可用数、目录字符数；数据来自 `GET /zhiyin/state` |
+| 安装技能 | 支持 GitHub 仓库 / 仓库内单个技能 / skills.sh 页面 / `npx skills add` 命令 / SKILL.md 直链 / 本地目录；只新建技能目录 |
+| 卸载技能 | **不删除**，移入归档目录；可恢复，也可在归档页永久删除 |
+| 启停技能 | 按 Agent 注册策略 provider，不列已停用项并关闭双调用策略；开关即时生效 |
+| 技能包 | 分组启停；「全部技能」默认包与其他包互斥 |
+| 技能市场 | 代理 skills.sh 搜索，可直接安装有公开仓库的技能 |
+| 配置备份 | 导出／导入 JSON 配置，最多保留 20 份备份可回滚 |
 
-```yaml
-- id: zhiyin-consumer
-  name: '@local/dsh-zhiyin-proto'
+## 安装
+
+本包是 DSH **组合包（bundle）**：`package.json` 声明 `dsh.bundle.patch`，安装进 profile 后由 `cordis.patch.yml` 插入一行插件。
+
+```bash
+# 从本地目录安装（开发期常用）
+dsh plugin --profile <profile> add /path/to/this/folder
+
+# 从 tarball 安装
+npm pack
+dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
 ```
 
-该插件注册同名 `skill` 工具、在 pre-step 发布/退役技能目录、处理 `/name` 手势。它**不碰任何现有预设的清单**。
+安装后需要**完全退出并重开 DSH**（宿主半边在进程启动时加载，刷新页面不生效）。
 
-## 怎么试（E1c）
+依赖：Node.js ≥ 24；宿主共享包 `@deepseek-ai/dsh-llm`、`@deepseek-ai/dsh-skill`、`@deepseek-ai/dsh-tools`（以 `dependencies` 固定版本引入）。
 
-1. 新开一个会话；
-2. 在预设选择器里选**「织音原型」**；
-3. 随便问一句，让它跑完一个模型步骤；
-4. 看 `%DSH_HOME%\profiles\desktop\zhiyin-proto\events.ndjson`：
+## 数据
 
-| 判据 | 期望 |
-|---|---|
-| `register` 事件 | `globalHoldsOurs: true` |
-| `pre-step` 事件 | **`visible: true`**（这一步是 E1c 的核心） |
-| `publish` 事件 | `action: initial`，`entries > 0` |
-| 连续多步 | 只有一条目录，不再重复追加 |
+状态目录：`<DSH_HOME>/zhiyin-proto/`（`DSH_HOME` 为空时回退进程工作目录）。
 
-## 回滚
+| 文件／目录 | 用途 |
+| --- | --- |
+| `state.json` | 持久状态：`agentsRoot`、`allOff`、`disabled`、`notes`、`packs`、`known` |
+| `events.ndjson` | 诊断日志，逐行追加 |
+| `archive/` | 卸载后的技能归档，含 `origins.json` 记录原位置 |
 
-- 方式一：**Plugins** → 移除 `@local/dsh-zhiyin-proto`（预设随之消失）；
-- 方式二：新会话里换回原预设即可，无需卸载；
-- 方式三：`plugin_manager` `action: remove_bundle`。
+## 路由
 
-> 本原型不写任何技能文件，不改 profile 的 `cordis.patch.yml`，卸载即恢复。
+同源 HTTP（第三方插件没有 Typert Remote）。写路由只接受 `POST`，校验 `Origin` 与 `Host` 同源，请求体上限 64 KB。
 
-## 已知不做的
+`GET /zhiyin/state`、`/zhiyin/archive`、`/zhiyin/export`、`/zhiyin/backups`、`/zhiyin/market`
+`POST /zhiyin/skill`、`/settings`、`/pack`、`/install`、`/install/batch`、`/install/abort`、`/uninstall`、`/restore`、`/archive/delete`、`/import`、`/rollback`、`/repair`、`/reveal`、`/note`
 
-- 不持久化意图、不读包/组合（`ALLOWLIST` 是代码常量，空数组＝不筛选）；
-- 不做预算阻断、冲突检测；
-- 不接管 GUI 斜杠菜单（它读注册表，属已知漂移）；
-- 不复制 `standard` 预设里 `skill-filesystem` 的 `customSkillDirs` 表达式，所以内置技能目录在这个预设里可能少一批——这不影响 E1c 的判定。
+## 写盘边界
+
+- 启停与观测**不碰技能文件**，只写本地状态；
+- 只有用户显式发起的**安装**（新建目录）与**卸载**（移入归档）会写技能目录；
+- 安装到 `~/.agents/skills` 时会在 `~/.dsh/skills` 建软链，卸载时一并清理断链。
+
+## 许可
+
+开发期私有，尚未选择开源许可证。

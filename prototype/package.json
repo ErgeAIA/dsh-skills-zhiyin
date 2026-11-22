@@ -20,7 +20,10 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "README.en.md",
+    "GUIDE.md",
+    "GUIDE.en.md"
   ],
   "dependencies": {
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
