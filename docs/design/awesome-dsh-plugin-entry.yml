@@ -1,0 +1,11 @@
+# awesome-dsh-plugin 收录条目（提交到该仓库的 data/plugins/ 下）
+# 文件名应为：ErgeAIA__dsh-skills-zhiyin.yml
+
+url: https://github.com/ErgeAIA/dsh-skills-zhiyin
+name: ErgeAIA/dsh-skills-zhiyin
+category: skill
+description:
+  en: Organises DSH skills into packs so you control which ones the model can see, with one-click install, archive and cost visibility.
+  zh: 把 DSH 技能编成技能包，控制模型此刻能看见哪些，并提供一键安装、归档与目录成本。
+# icon: 省略则回退到作者头像；若要指定，需 GitHub 托管的位图（PNG/JPG/WebP），例如
+#   https://raw.githubusercontent.com/ErgeAIA/dsh-skills-zhiyin/main/assets/icon-180.png

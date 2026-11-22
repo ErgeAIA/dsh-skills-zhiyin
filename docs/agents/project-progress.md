@@ -17,13 +17,22 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（双语补全 + 三条清理 走 chore/i18n-and-cleanup → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮 i18n：33c2122 → ab8cc82
+- **当前分支**：main（CHANGELOG 精简 + GitHub 入口 + 收录准备 走 chore/changelog-and-github → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮清理：7cf52ca → 5cb6469
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-22 22:4x 双语补全 + 三条清理
+- **最后更新**：2026-11-22 23:0x CHANGELOG 精简 + GitHub 入口 + 收录准备
+  - CHANGELOG：中文/英文均从 58-59 行压到 40 行，按用户可感知结论归类，删实现细节（TDZ、影子候选、事件循环等留在 debug-log）。
+  - 设置页头部新增 GitHub 图标按钮（第 4 个），新标签打开源码仓库；图标用 Feather octocat 描边路径，与现有图标集统一。
+  - package.json：删除三个未被 import 的 @deepseek-ai/* 依赖（index.js 只用 Node 内置与 ./paths.js）；补 repository / homepage / bugs；锁文件随之清空。
+  - 收录准备：docs/design/awesome-dsh-plugin-entry.yml（category: skill，description 中英各一句）；门槛已核对（dsh.bundle ✓、仓库年龄 ✓、官方包不在 dependencies ✓、topic ✓）。
+  - 未完成：市场卡片位图图标（Playwright/Puppeteer 渲染本会话均超时），条目先省略 icon。
+  - 验证：node --check 双半边 0；npm pack = 14 文件；锁文件无 @deepseek-ai；entry yml 的 url/name/句号结尾逐项核对通过。
+  - 待验收：设置页右上角 GitHub 图标能打开仓库；CHANGELOG 读起来是「用户能看懂的变化」而不是提交清单。
+
+- 上一轮：2026-11-22 22:4x 双语补全 + 三条清理
   - 英文缺失根因：86 个 say() key 只有中文兜底、词典里没有词条（不止「目录字符数」，市场/归档/安装/成本弹窗整片都如此）。已把 86 条的 zh 与 en 同时写进两本词典，say() 回落到「词典 > 宿主 > 字面」。
   - 包名 @local/dsh-zhiyin-proto → dsh-skills-zhiyin：package.json / cordis.patch.yml / client.js 模块 id / profile 依赖键 + bundles / pnpm-lock.yaml / node_modules 链接（移到顶层，@local 空目录已删）。
   - 删 consumer.js（M0 遗留，从未挂载）+ exports 与 files 条目。
