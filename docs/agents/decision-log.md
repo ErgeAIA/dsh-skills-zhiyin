@@ -16,6 +16,23 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-035: 依据 npm v12 / 2FA-bypass GAT 弃用公告，否决「路 B」，改用 OTP 首发 + 可信发布
+
+- **日期**：2026-11-24
+- **依据**：GitHub Changelog 2026-07-08《npm install-time security and GAT bypass2FA deprecation》（用户提供）。三条与织音相关：
+  1. **npm v12 GA，安装期安全默认值开启**：`allowScripts` 默认关（不跑 preinstall/install/postinstall 与隐式 node-gyp）；`--allow-git` 默认 `none`（**git 依赖不再自动解析**）；`--allow-remote` 默认 `none`。
+  2. **2FA-bypass 细粒度令牌不再能跳过 2FA 做账户/包/组织管理动作**，预计 2026 年 8 月初生效（**已过期，即已生效**）。
+  3. **2FA-bypass 令牌将失去直接发布能力**，预计 **2027 年 1 月**生效；发布面收窄为「读私有包 + 暂存发布（staged publish）」，真正公开需人工 2FA 批准。
+- **对 DEC-034 的修正**：我给出的「路 B（创建带 bypass 2FA 的细粒度令牌后由我发布）」按第 3 条正在被废弃，属**短期可行、方向错误**的方案，予以否决。
+- **修正后的发布路径**：
+  1. **首发 0.1.0 用交互式 OTP**（`npm publish` 后按提示输入一次性验证码）。这是文章仍支持的路径，且首发必须先有包体存在，之后才能在 npmjs 配置可信发布。
+  2. **后续版本走可信发布（OIDC）**：GitHub Actions + `id-token: write` + `npm publish --provenance`，长期不再持有发布令牌。仓库目前**没有 `.github/` 目录**，需新建工作流。
+- **对分发策略的影响（比上一轮更重要）**：
+  - 我们的包**零依赖、零生命周期脚本**（`scripts` 为空、`dependencies` 为空），因此 `allowScripts` 与 `--allow-git` 的收紧**不影响 npm 装织音**——这是 npm 分发相对 git 分发的结构性优势。
+  - 反向风险：市场条目的 `url` 是 GitHub，用户若走 `github:` 安装，走的是**git 依赖**。DSH 转发给 pnpm（本机 pnpm 12.21.0），实测 git 安装当前可用；但这条路径依赖 pnpm 是否跟进 npm 的 `--allow-git` 收紧，**属需持续盯的边界，不是我们可以控制的**。
+  - 结论：越早把 npm 分发打通，用户越不必依赖 git 安装。
+- **本机现状**：npm 11.19.1（尚未升 v12）；pnpm 12.21.0（DSH 实际使用）。v12 的安装期收紧暂未影响本机，但发布侧 2FA 要求已经生效（E403 实测）。
+
 ## DEC-034: npm 首次发布被 2FA 策略拦下（E403），发布授权方式待定
 
 - **日期**：2026-11-24
