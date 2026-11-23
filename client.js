@@ -159,6 +159,11 @@ window.__ModuleLoader__.load({
         alertUnpacked: '有技能未加入技能包，当前不生效',
         noteEdit: '编辑备注',
         noteViewTitle: '技能备注',
+        favoriteOn: '收藏并置顶',
+        favoriteOff: '取消收藏',
+        favoriteFailed: '收藏失败：',
+        marketMore: '加载更多',
+        marketMoreLoading: '加载中…',
         noteHint: '备注只存在本地配置里，不会写进技能文件；导出配置时会一起带走。',
         notePlaceholder: '例如：做前端评审时先留着；下个项目再用',
         consistencySynced: '一致',
@@ -416,6 +421,11 @@ window.__ModuleLoader__.load({
         alertUnpacked: 'Some skills are not in any pack and do not play',
         noteEdit: 'Edit note',
         noteViewTitle: 'Skill note',
+        favoriteOn: 'Favourite and pin to top',
+        favoriteOff: 'Remove from favourites',
+        favoriteFailed: 'Could not update favourites: ',
+        marketMore: 'Load more',
+        marketMoreLoading: 'Loading…',
         noteHint: 'Notes live in the local config only, never in skill files, and travel with config export.',
         notePlaceholder: 'e.g. keep for frontend reviews; revisit next project',
         consistencySynced: 'In sync',
@@ -1126,6 +1136,25 @@ window.__ModuleLoader__.load({
         minHeight: 20,
       },
       cardFoot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' },
+      // 收藏按钮：未收藏是灰色空心星，收藏后点亮为主题强调色。
+      favBtn: (active) => ({
+        flex: '0 0 auto',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 20,
+        height: 20,
+        padding: 0,
+        marginRight: 2,
+        border: 'none',
+        borderRadius: 5,
+        background: 'transparent',
+        cursor: 'pointer',
+        color: active ? 'var(--zhiyin-accent, #e0743c)' : 'inherit',
+        opacity: active ? 1 : 0.32,
+        transition: 'opacity 120ms ease, color 120ms ease',
+      }),
+      loadMoreWrap: { display: 'flex', justifyContent: 'center', marginTop: 4, marginBottom: 8 },
       dot: (on) => ({
         width: 7,
         height: 7,
@@ -1291,6 +1320,12 @@ window.__ModuleLoader__.load({
   folder: [
     ['path', 'M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .22 1.33.6l1.1 1.2c.33.38.83.6 1.33.6h4.04A2.5 2.5 0 0 1 19 9.9v6.6A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5z'],
   ],
+  chevronDown: [
+    ['path', 'M6 9l6 6 6-6'],
+  ],
+  star: [
+    ['path', 'M12 3.5l2.6 5.3 5.9 0.86-4.25 4.14 1 5.87L12 16.9l-5.25 2.76 1-5.87L3.5 9.66l5.9-0.86z'],
+  ],
   github: [
     ['path', 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22'],
   ],
@@ -1305,7 +1340,7 @@ window.__ModuleLoader__.load({
   ],
 }
 
-function Icon({ name, size = 15 }) {
+function Icon({ name, size = 15, filled = false }) {
   const shapes = ICONS[name] ?? []
   return h(
     'svg',
@@ -1313,7 +1348,8 @@ function Icon({ name, size = 15 }) {
       width: size,
       height: size,
       viewBox: '0 0 24 24',
-      fill: 'none',
+      // filled 用于收藏星标这类「点亮」状态：填充当前色，描边保留轮廓。
+      fill: filled ? 'currentColor' : 'none',
       stroke: 'currentColor',
       strokeWidth: 1.7,
       strokeLinecap: 'round',
@@ -1631,8 +1667,24 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketBusy, setMarketBusy] = React.useState(null)   // 正在安装的条目 id
       const [marketDone, setMarketDone] = React.useState({})     // 已装完的条目 id
       const [marketHover, setMarketHover] = React.useState(null) // 鼠标悬停的卡片 id
+      const [marketLimit, setMarketLimit] = React.useState(40)   // 每次加载条数；「加载更多」按 20 递增（宿主上限 60）
+      const [marketMore, setMarketMore] = React.useState(false)  // 正在加载更多
       const [skillHover, setSkillHover] = React.useState(null)   // 鼠标悬停的技能卡 name
       const [marketDesc, setMarketDesc] = React.useState({})
+      // 收藏：点一次切换，成功后重载 state 让置顶顺序生效。
+      const toggleFavorite = (name, next) => {
+        fetch('/zhiyin/favorite', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name, value: next }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? '收藏失败')
+            load()
+          })
+          .catch((error) => setState((previous) => ({ ...previous, error: say('favoriteFailed', '收藏失败：') + String(error?.message ?? error) })))
+      }
       // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录。
       const [archiveEntries, setArchiveEntries] = React.useState([])
       const [archiveLoading, setArchiveLoading] = React.useState(false)
@@ -1887,7 +1939,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setMarketLoaded(true)
         setMarketLoading(true)
         setMarketError('')
-        fetch('/zhiyin/market?q=' + encodeURIComponent(q || '') + '&limit=40', { headers: { accept: 'application/json' } })
+        fetch('/zhiyin/market?q=' + encodeURIComponent(q || '') + '&limit=' + marketLimit, { headers: { accept: 'application/json' } })
           .then((response) => {
             if (!response.ok) throw new Error('HTTP ' + response.status)
             return response.json()
@@ -1900,7 +1952,24 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           })
           .catch((error) => setMarketError(String(error?.message ?? error)))
           .finally(() => setMarketLoading(false))
-      }, [])
+      }, [marketLimit])
+      // 加载更多：把 limit 加到宿主上限 60 后再取一次（skills.sh 单次最多返回 60 条）。
+      const loadMoreMarket = React.useCallback(() => {
+        setMarketMore(true)
+        const next = Math.min(60, marketLimit + 20)
+        fetch('/zhiyin/market?q=' + encodeURIComponent(marketQuery || '') + '&limit=' + next, { headers: { accept: 'application/json' } })
+          .then((response) => {
+            if (!response.ok) throw new Error('HTTP ' + response.status)
+            return response.json()
+          })
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '请求失败')
+            setMarketItems(Array.isArray(payload.skills) ? payload.skills : [])
+            setMarketLimit(next)
+          })
+          .catch((error) => setMarketError(String(error?.message ?? error)))
+          .finally(() => setMarketMore(false))
+      }, [marketLimit, marketQuery])
       // 市场点安装：直接在卡片上安装（进行中转圈 + 完成标记），失败才回落到安装弹窗。
       const installFromMarket = (item, reinstall = false) => {
         if (!item?.source || item.installable === false) return
@@ -2953,10 +3022,26 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   )
                 }),
               ),
+              marketItems.length > 0 && marketItems.length < 60
+                ? h(
+                    'div',
+                    { style: css.loadMoreWrap },
+                    h('button', {
+                      type: 'button',
+                      style: marketMore ? { ...css.btn, opacity: 0.7, cursor: 'progress' } : css.btn,
+                      disabled: marketMore,
+                      onClick: loadMoreMarket,
+                    },
+                      marketMore ? h(Spinner, { size: 14 }) : h(Icon, { name: 'chevronDown', size: 14 }),
+                      marketMore
+                        ? say('marketMoreLoading', '加载中…')
+                        : say('marketMore', '加载更多') + '（' + marketItems.length + ' / 60）'),
+                  )
+                : null,
             )
           : null,
 
-        // 归档：被「卸载」移入 archive 的技能，可查看并恢复到指定目录
+        // 归档：被「卸载」移入 archive 的技能，可查看或恢复到指定目录
         data && tab === 'archive'
           ? h(
               'div',
@@ -3102,6 +3187,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       h(
                         'div',
                         { style: css.cardHead },
+                        h('button', {
+                          type: 'button',
+                          style: css.favBtn(skill.favorite === true),
+                          title: skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
+                          'aria-label': skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
+                          'aria-pressed': skill.favorite === true ? 'true' : 'false',
+                          disabled: busy,
+                          onClick: () => toggleFavorite(skill.name, skill.favorite !== true),
+                        }, h(Icon, { name: 'star', size: 13, filled: skill.favorite === true })),
                         h('span', { style: css.cardName }, skill.name),
                         h('span', { style: { ...css.badge(on), flex: '0 0 auto' } }, sourceShort(skill)),
                         skill.linkTarget
@@ -3246,6 +3340,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         h(
                           'div',
                           { style: css.itemHead },
+                          h('button', {
+                            type: 'button',
+                            style: css.favBtn(skill.favorite === true),
+                            title: skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
+                            'aria-label': skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
+                            'aria-pressed': skill.favorite === true ? 'true' : 'false',
+                            disabled: busy,
+                            onClick: () => toggleFavorite(skill.name, skill.favorite !== true),
+                          }, h(Icon, { name: 'star', size: 13, filled: skill.favorite === true })),
                           h('span', { style: css.name }, skill.name),
                         skill.readOnly
                           ? h('span', { style: { ...css.metaText, opacity: op.meta }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
