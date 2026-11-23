@@ -46,7 +46,7 @@ dsh plugin --profile <profile> add /path/to/dsh-skills-zhiyin
 
 # from a tarball
 npm pack
-dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
+dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.1.tgz
 ```
 
 After installing, **fully quit and reopen DSH** — the host half loads at process start, so reloading the page is not enough.
@@ -187,7 +187,7 @@ Toggling and viewing **never** touch skill files. Installation and uninstallatio
 - Disabling works by registering a strategy provider on every running agent; new sessions are hooked by polling;
 - Catalog characters are an estimate (each description capped at 500 characters plus fixed overhead), not real token counts;
 - Skills hosted only on a skills.sh domain, with no public repository, cannot be installed directly — the UI only links to them;
-- In development; the version stays at `0.1.0`.
+- Versions follow semantic versioning; the package is published to npm, so later fixes land in the next patch release.
 
 ## Development
 

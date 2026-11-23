@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-24
+
+### Fixed
+
+- The README shipped inside the published package was out of date: it offered no npm install route and declared three host-shared package dependencies that do not exist (this package has zero runtime dependencies). Both languages corrected
+- The `npm install` line in the README development section was a no-op (no dependencies) and is replaced with commands that do something
+
+### Changed
+
+- Added `.github/workflows/publish.yml`: releases now go through npm trusted publishing (OIDC), with no publish token held or used
+
+## [0.1.0] - 2026-11-24
+
 ### Added
 
 - Two entry points: a full ZhiYin page in the left sidebar alongside Settings → ZhiYin, both rendering the same component

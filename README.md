@@ -46,7 +46,7 @@ dsh plugin --profile <profile> add /path/to/dsh-skills-zhiyin
 
 # 从 tarball
 npm pack
-dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
+dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.1.tgz
 ```
 
 安装后需**完全退出并重开 DSH**：宿主半边在进程启动时加载，刷新页面不生效。
@@ -189,7 +189,7 @@ dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
 - 停用通过给每个运行中的 Agent 注册策略 provider 实现，新会话由轮询补挂；
 - 目录字符数是估算值（每条描述截断到 500 字符 + 固定开销），不是真实 token 数；
 - skills.sh 上仅域名托管、没有公开仓库的技能无法直接安装，界面只提供跳转；
-- 处于开发期，版本停留在 `0.1.0`。
+- 版本按语义化版本递增；已发布到 npm，发布后的改动会体现在下一个补丁版本里。
 
 ## 开发
 
