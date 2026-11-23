@@ -16,6 +16,24 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-036: 路线 A 失败的真因——账户根本没有 2FA，npm 要求「先开 2FA」而不是「发布时输验证码」
+
+- **日期**：2026-11-24
+- **用户实测**：`npm publish` 仍报同一个 E403，且**全程没有出现 OTP 输入提示**。
+- **`npm profile get` 关键事实**：
+  - `name: ergeaia`，邮箱已验证；
+  - **`two-factor auth: disabled`** ← 根因；
+  - `created: 2026-11-23`（全新账号）。
+- **诊断修正**：我此前把 E403 理解为「发布时需要输入 OTP」，实际是 npm 要求**账户自身先开启 2FA**才允许发布。`.npmrc` 里的 `_authToken`（来自 `npm login`）只能证明登录，不能替代账户级 2FA。所以「路 A」不是被 2FA 弹窗挡住，而是账户还没开 2FA，npm 连问都不问直接拒绝。
+- **正确步骤（必须由用户本人做，涉及扫码与恢复码）**：
+  1. npmjs.com 登录 `ergeaia` → 头像 → **Account Settings** → **Two-Factor Authentication** → **Enable 2FA**；
+  2. 选 **Authenticator app (TOTP)**（用手机验证器扫二维码，输入 6 位码确认）；
+  3. **务必保存恢复码（recovery codes）**——换手机/丢验证器时唯一入口；
+  4. 2FA 模式选 **Authorization and Writes**（发布会要求 OTP）；
+  5. 回到仓库根目录重跑 `npm publish` → 这次会提示输入 OTP → 输入即发布成功。
+- **与公告的关系**：DEC-035 的结论不变——bypass-2FA 令牌路线（2027/01 起失去直接发布）仍然否决；先开 2FA 是公告之外、npm 一直就有的前置条件，也是后续走可信发布（OIDC）的前提之一。
+- **后续**：发布成功后，我验证 `dsh plugin add dsh-skills-zhiyin`，然后建 GitHub Actions OIDC 可信发布工作流。
+
 ## DEC-035: 依据 npm v12 / 2FA-bypass GAT 弃用公告，否决「路 B」，改用 OTP 首发 + 可信发布
 
 - **日期**：2026-11-24

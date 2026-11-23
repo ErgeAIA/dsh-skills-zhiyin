@@ -23,7 +23,12 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 00:3x 按 npm 安全公告修正发布路径：否决 bypass-GAT，改 OTP 首发 + 可信发布
+- **最后更新**：2026-11-24 00:4x 路线 A 失败真因：账户未开 2FA（不是缺 OTP 提示）
+  - npm profile：two-factor auth: disabled，账号 2026-11-23 新建。npm 要求账户级 2FA 才允许发布，登录 token 不能替代。
+  - 给用户的步骤：npmjs.com 开 2FA（TOTP）→ 存恢复码 → 模式选 Authorization and Writes → 重跑 npm publish 输 OTP。
+  - bypass-2FA 令牌路线维持否决（DEC-035）。
+
+- 上一轮：2026-11-24 00:3x 按 npm 安全公告修正发布路径
   - 用户提供 GitHub Changelog（2026-07-08）：npm v12 安装期默认收紧（allowScripts 关、--allow-git 默认 none）；2FA-bypass GAT 已不能做账户管理（8/2026 生效）、2027/01 起失去直接发布能力。
   - 据此否决上一轮的「路 B」（bypass-2FA 细粒度令牌），改为：首发用交互式 OTP；后续版本走 GitHub Actions + OIDC 可信发布（需新建 .github/workflows）。
   - 关键判断：织音零依赖零脚本，npm v12 的 allowScripts/allow-git 收紧不影响 npm 安装；但市场条目的 github: 安装属 git 依赖，受 pnpm 是否跟进影响，属不可控边界。故 npm 分发价值上升。
