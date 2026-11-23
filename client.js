@@ -617,7 +617,7 @@ window.__ModuleLoader__.load({
       // 技能市场卡片：瀑布流（多列、高度随内容）、hover 抬升；与列表视图明显区分。
       marketGrid: {
         marginTop: 16,
-        columnWidth: 280,
+        columnWidth: 360,
         columnGap: 16,
       },
       marketCard: (hover) => ({
@@ -662,6 +662,9 @@ window.__ModuleLoader__.load({
         wordBreak: 'break-word',
       },
       marketCardCmd: {
+        display: 'block',            // code 默认是 inline，overflow/ellipsis 对它无效，长命令会撑破卡片
+        maxWidth: '100%',
+        boxSizing: 'border-box',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSize: fs.meta,
         opacity: 0.62,
@@ -1084,7 +1087,7 @@ window.__ModuleLoader__.load({
       // 瀑布流：按列宽自动分栏，卡片高度随内容变化，不再被同一行拉齐。
       cardGrid: {
         marginTop: 16,
-        columnWidth: 320,
+        columnWidth: 380,
         columnGap: 16,
       },
       // 技能卡：与市场卡片同一套视觉语言（hover 抬升、品牌色边框、阴影）。
@@ -1615,6 +1618,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketItems, setMarketItems] = React.useState([])
       const [marketTrending, setMarketTrending] = React.useState(true)
       const [marketLoading, setMarketLoading] = React.useState(false)
+      // 骨架屏占位数量跟随窗口宽度，而不是写死 6 个：最大化时列数变多，占位也要跟上。
+      const skeletonCount = (() => {
+        const width = typeof window === 'undefined' ? 1280 : window.innerWidth
+        return Math.max(4, Math.min(12, Math.floor((width - 260) / 320)))
+      })()
       const [marketError, setMarketError] = React.useState('')
       const [marketLoaded, setMarketLoaded] = React.useState(false)
       const [marketBusy, setMarketBusy] = React.useState(null)   // 正在安装的条目 id
@@ -2831,7 +2839,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ? h(
                     'div',
                     { style: css.marketGrid },
-                    Array.from({ length: 6 }).map((_, index) =>
+                    Array.from({ length: skeletonCount }).map((_, index) =>
                       h(
                         'div',
                         { key: 'sk-' + index, style: css.skeletonCard },
