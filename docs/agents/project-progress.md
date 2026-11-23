@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 00:1x 版本锁定约定改掉；待 npm publish
+- **最后更新**：2026-11-24 00:2x npm 发布被 2FA 拦下（E403），等用户授权方式
+  - AGENTS.md 版本约定已改：锁 0.1.0 → 按 SemVer，发布后任何改动必须升版再发。顺带修正 Toolchain 三个不存在的依赖声明与 npm install 空操作，均已留 changelog。
+  - npm 登录有效（ergeaia），但 npm publish 返回 E403：npmjs 要求发布动作具备 2FA 或带 2FA 绕过的细粒度令牌。npm profile 显示 two-factor disabled，属 npm 侧发布策略。
+  - 包名仍未占用（404）；dry-run 与 tarball 安装均已通过。
+  - 待用户选择：自行 npm publish 并输 OTP，或创建绕过 2FA 的细粒度令牌写入 ~/.npmrc 后由我发布。
+  - 市场 PR #18245 仍 OPEN / mergeable / 1 文件；CI check 仍在排队。
+
+- 上一轮：2026-11-24 00:1x 版本锁定约定改掉；待 npm publish
   - AGENTS.md：Conventions「插件仍在开发阶段 / version 锁定 0.1.0」→「版本与发布：已发布 npm 包，version 按 SemVer 递增，发布后任何改动必须升版再发」。
   - 顺带修正 AGENTS.md 两处过期：Toolchain 声称三个 @deepseek-ai 依赖锁定在 package.json（实际为空）→ 改为 DSH 实测版本 + 运行时依赖无；Commands 的 npm install 行注明为空操作。全部已在 agents-changelog.md 留记录。
   - npm 登录已确认：账号 ergeaia（指定 registry.npmjs.org 时有效；本机默认 registry 是华为云镜像，靠 publishConfig 指向 npmjs）。

@@ -16,6 +16,21 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-034: npm 首次发布被 2FA 策略拦下（E403），发布授权方式待定
+
+- **日期**：2026-11-24
+- **实测**：`npm publish` 返回 `E403` —— 原文 `Two-factor authentication or granular access token with bypass 2fa enabled is required to publish packages.`
+- **排查结果**：
+  - `npm whoami --registry=https://registry.npmjs.org/` → `ergeaia`，登录有效；
+  - `npm profile get` → `two-factor auth: disabled`；
+  - 也就是说：账户虽已登录、2FA 显示未开启，npmjs 侧仍要求「发布动作」具备 2FA 或带 2FA 绕过的细粒度令牌。这是 npm 的发布策略，不是我们的配置问题。
+  - 包名 `dsh-skills-zhiyin` 仍为 404（未被他人占用，也未发布成功）。
+- **两种可行授权方式（都不需要把凭据交给我）**：
+  1. **用户自行执行发布**：`npm publish`（在仓库根目录），按提示输入 OTP。凭据全程只在用户终端。
+  2. **细粒度令牌 + 绕过 2FA**：用户在 npmjs.com → Access Tokens 创建 Granular Access Token，权限勾 `Read and write`、开启 `Bypass 2FA`，自己写进 `~/.npmrc`（`//registry.npmjs.org/:_authToken=...`），之后由我执行发布。**用户不要把 token 贴进对话**。
+- **已就绪、与授权无关的部分**：`npm publish --dry-run` 通过（22 文件 / 119.9 kB，目标 registry.npmjs.org，shasum `6d3d15c327446655cf4865f4b2ce4ca24e5b271c`）；`npm pack` 的 tarball 在隔离 `DSH_HOME` 里安装成功。
+- **市场 PR 同步状态**：`#18245` 仍 OPEN、mergeable、只改 1 个文件；CI `check` 长时间处于 pending（同时段其它 PR 也在排队）。
+
 ## DEC-033: 发 npm（首次分发）+ 同步提交 awesome-dsh-plugin PR
 
 - **日期**：2026-11-23
