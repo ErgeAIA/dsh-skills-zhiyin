@@ -53,6 +53,7 @@ const EMPTY_STATE = {
   allOff: false,
   disabled: {},
   notes: {},
+  favorites: {},
   packs: [],
   combos: [],
   intent: { ...EMPTY_INTENT },
@@ -459,15 +460,15 @@ export function apply(ctx) {
   post(ctx, '/zhiyin/favorite', async (body) => {
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
-    const on = body?.value === true
+    const favorited = body?.value === true
     const state = readState()
     const favorites = { ...(state.favorites ?? {}) }
-    if (on) favorites[name] = Date.now()
+    if (favorited) favorites[name] = Date.now()
     else delete favorites[name]
     state.favorites = favorites
     saveState(state)
-    note('skill-favorite', { name, on })
-    return { status: 200, body: { ok: true, name, favorite: on } }
+    note('skill-favorite', { name, favorited })
+    return { status: 200, body: { ok: true, name, favorite: favorited } }
   })
 
   post(ctx, '/zhiyin/install', async (body) => {
@@ -576,6 +577,7 @@ export function apply(ctx) {
           allOff: state.allOff === true,
           disabled: state.disabled ?? {},
           notes: state.notes ?? {},
+          favorites: state.favorites ?? {},
           packs: (state.packs ?? []).map((pack, index) => ({
             id: pack?.id,
             name: pack?.name,
@@ -670,6 +672,14 @@ export function apply(ctx) {
             .filter(([key, value]) => typeof key === 'string' && typeof value === 'string')
             .map(([key, value]) => [key, value.trim().slice(0, NOTE_MAX)])
             .filter(([, value]) => value.length > 0),
+        )
+      }
+      // 收藏也跟着配置走：只收时间戳为正数的条目，避免导入脏值后置顶顺序错乱。
+      if (payload.favorites && typeof payload.favorites === 'object' && !Array.isArray(payload.favorites)) {
+        state.favorites = Object.fromEntries(
+          Object.entries(payload.favorites)
+            .filter(([key, value]) => typeof key === 'string' && Number.isFinite(value) && value > 0)
+            .map(([key, value]) => [key, Math.trunc(value)]),
         )
       }
       // 组合引用的包可能在本机不存在：先落地，再把幽灵 ID 洗干净。
@@ -2173,16 +2183,12 @@ async function collectState(ctx) {
 
   // 只读来源（FR-026）：不在织音管理的安装根里的技能，只能启停、不能卸载。
   const uninstallRoots = [installRoot(ctx, 'user'), installRoot(ctx, 'project')].filter(Boolean)
-  // 收藏置顶：收藏项按收藏时间倒序在前，其余按名称。
+  // 顺序权威只在前端（DEC-029 教训）：后端只按名称稳定输出，收藏置顶由页面按 favorites 计算，
+  // 避免「两处各算一次、一处覆盖另一处」。
   const favoriteOrder = state.favorites ?? {}
   const isFavorite = (name) => Object.prototype.hasOwnProperty.call(favoriteOrder, name)
   const skills = [...byName.values()]
-    .sort((left, right) => {
-      const lf = isFavorite(left.name), rf = isFavorite(right.name)
-      if (lf !== rf) return lf ? -1 : 1
-      if (lf && rf) return (favoriteOrder[right.name] ?? 0) - (favoriteOrder[left.name] ?? 0)
-      return left.name.localeCompare(right.name)
-    })
+    .sort((left, right) => left.name.localeCompare(right.name))
     .map((skill) => {
       const current = readState()
       const meta = current.known?.[skill.name]

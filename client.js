@@ -163,6 +163,7 @@ window.__ModuleLoader__.load({
         noteEdit: '编辑备注',
         noteViewTitle: '技能备注',
         statFavorite: '收藏',
+        statFavoriteHint: '已收藏的技能，始终置顶；点一下只看收藏',
         favoriteOn: '收藏并置顶',
         favoriteOff: '取消收藏',
         favoriteFailed: '收藏失败：',
@@ -429,6 +430,7 @@ window.__ModuleLoader__.load({
         noteEdit: 'Edit note',
         noteViewTitle: 'Skill note',
         statFavorite: 'Favourites',
+        statFavoriteHint: 'Favourited skills stay pinned to the top; click to show only these',
         favoriteOn: 'Favourite and pin to top',
         favoriteOff: 'Remove from favourites',
         favoriteFailed: 'Could not update favourites: ',
@@ -744,7 +746,7 @@ window.__ModuleLoader__.load({
       },
       title: { fontSize: fs.title, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' },
       subtitle: { opacity: op.hint, fontSize: fs.body },
-      // Star 入口：与副标题同一行、视觉重量比副标题轻一档，悬停才亮起来。
+      // Star 入口：与副标题同一行、视觉重量比副标题轻一档（opacity 0.7），点击进入仓库。
       starLink: {
         flex: '0 0 auto',
         display: 'inline-flex',
@@ -1341,6 +1343,11 @@ window.__ModuleLoader__.load({
     ['circle', { cx: 11, cy: 11, r: 7 }],
     ['path', 'm21 21-4.3-4.3'],
   ],
+  alert: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', 'M12 7.5v5'],
+    ['path', 'M12 16.2v.1'],
+  ],
   info: [
     ['circle', { cx: 12, cy: 12, r: 9 }],
     ['path', 'M12 11v6'],
@@ -1383,6 +1390,7 @@ function Icon({ name, size = 15, filled = false, spin = false }) {
       strokeWidth: 1.7,
       strokeLinecap: 'round',
       strokeLinejoin: 'round',
+      className: spin ? 'zhiyin-spin' : undefined,
       style: spin
         ? { flex: '0 0 auto', display: 'block', animation: 'zhiyin-spin 0.9s linear infinite' }
         : { flex: '0 0 auto', display: 'block' },
@@ -1573,21 +1581,25 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       }
       return blocks
     }
-    // 品牌字标「织音」的路径（描摹稿）：底笔画用 currentColor 跟随主题，橙色点缀保留品牌色。
+    /**
+     * 品牌字标「织音」的路径（描摹稿）。三种颜色与三条股线一一对应：
+     * paper 跟随主题前景色，weave / light 用品牌双橙——与交叉标记、logo.svg 保持同步。
+     */
+    const WORDMARK_COLORS = { paper: 'currentColor', weave: '#F26A1B', light: '#FF955C' }
     const WORDMARK_PATHS = [
-        ['M98.13 139.26 L94.36 133.57 L83.87 134.83 L57.97 144.04 L50.49 150.28 L56.53 155.08 L70.16 152.22 L89.5 146.4 L95.69 143.19 Z', false],
-        ['M81.67 39.72 L75.72 40.5 L65.75 47.32 L58.59 55.47 L54.81 66.03 L55.4 76.75 L62.84 86.18 L54.34 99.87 L52.66 110.38 L57.64 122.03 L69.29 128.38 L82.75 125.46 L90.32 120.12 L92.91 114.15 L87.59 108.66 L75.26 115.09 L68.22 115.12 L64.08 107.11 L71.46 93.91 L86.42 83.73 L90.29 79.37 L89.44 75.06 L84.95 71.22 L75.71 76 L69.37 76 L64.91 69.92 L69.62 58.51 L83.86 48.17 L85.11 42.97 Z', false],
-        ['M122.71 41.96 L113.7 46.49 L101.76 59.31 L96.54 74.49 L99.07 85.33 L107.91 95.28 L122.51 103.02 L134.82 103.98 L147.01 100.8 L157.21 95.36 L164.77 84.68 L166.47 73.17 L163.7 61.42 L152.03 48.38 L134.3 41.93 Z M128.97 66.25 L124.71 52.6 L137.97 52.51 L149.61 63.6 L153 70.02 L140.09 73.52 L147.88 87.27 L136.21 92 L127.74 92 L118.03 89.05 L125.84 79.71 L108.49 69.4 Z', false],
-        ['M121.58 117.67 L111.05 118.82 L103.73 128.37 L104.43 139.29 L111.57 146.26 L122.52 146.51 L131.11 137.52 L131.23 126.99 L128.02 120.73 Z M117 122.5 L118.75 141 L110.45 136.25 Z', true],
-        ['M158.25 117.25 C140.34 123.52 143.76 141.46 161.25 144.5 C177.42 139.58 178.13 129.14 167.5 118 C164.42 117.75 161.33 117.5 152.77 119.61 Z M166.75 123.75 C166.81 123.97 156.81 144.47 154.09 136.25 C157.42 133.33 159.08 130.67 153.85 125.67 C165.41 123.34 163 123.75 168.18 133.97 Z', true],
-        ['M207.36 84.49 L212.41 91.75 L310.42 91.75 L318.86 94.1 L312.16 83.24 L215.42 86.11 Z', false],
-        ['M216.75 58.88 L220.77 63.48 L304.42 63.51 L308.34 59.32 L305.55 53.88 L220.29 53.74 Z', false],
-        ['M229.44 110.37 L224.05 123.03 L223.97 137.75 L229.76 146.7 L239 153.24 L255.21 156.76 L271.36 156.73 L287.84 150.47 L295.24 142.42 L297.75 135.24 L297.75 118.41 L292.25 108.93 L283.74 102.66 L272.28 98.94 L249.78 98.89 L239.6 102.77 Z M237.25 133.32 L277.16 127.34 L287.57 133.92 L285.17 138.82 L274.78 142.5 L255.18 143.67 L240.75 141.97 Z M235.75 121.75 C240.25 104.88 263.82 106.88 276.4 107.66 C281.1 111.93 291.7 118.14 285.91 125.06 C268.42 121.92 252.08 121.83 235.75 121.75 Z', false],
-        ['M244 69 C239.71 72.58 241.19 70.21 240.25 76.5 C249.05 87.94 258.79 69 246.91 75.42 Z', true],
-        ['M266.32 38.99 L261.9 37.85 L257 41.15 L257 47.07 L259.47 49.75 L263.96 49.75 L268.75 46.81 L268.75 41.97 Z', false],
-        ['M277.31 69 L274 72.31 L281 74.99 L275.5 79.55 L282.07 79.75 L284.75 77.07 L284.75 72.52 L281.21 69 Z', true],
-        ['M 317.75 140 C 309.05 140 309 140.65 309 149.75 C 304.51 153.68 308.19 156.29 312.75 153.25 C 312.42 150.17 312.08 147.08 311.75 144 C 314.48 142.48 317.75 143.72 317.75 140 Z', false],
-        ['M 325.75 40.25 C 317.12 35.58 316.85 35.48 314 44.75 C 311.86 46.89 313.33 45.92 309 46.5 C 307.83 51.17 309.71 52.9 314.5 52.5 C 316.77 48.97 316.27 44.48 319 41.75 C 325.78 42.6 324.36 44.41 325.75 40.25 Z', false],
+        { d: 'M98.13 139.26 L94.36 133.57 L83.87 134.83 L57.97 144.04 L50.49 150.28 L56.53 155.08 L70.16 152.22 L89.5 146.4 L95.69 143.19 Z', color: 'paper' },
+        { d: 'M81.67 39.72 L75.72 40.5 L65.75 47.32 L58.59 55.47 L54.81 66.03 L55.4 76.75 L62.84 86.18 L54.34 99.87 L52.66 110.38 L57.64 122.03 L69.29 128.38 L82.75 125.46 L90.32 120.12 L92.91 114.15 L87.59 108.66 L75.26 115.09 L68.22 115.12 L64.08 107.11 L71.46 93.91 L86.42 83.73 L90.29 79.37 L89.44 75.06 L84.95 71.22 L75.71 76 L69.37 76 L64.91 69.92 L69.62 58.51 L83.86 48.17 L85.11 42.97 Z', color: 'paper' },
+        { d: 'M122.71 41.96 L113.7 46.49 L101.76 59.31 L96.54 74.49 L99.07 85.33 L107.91 95.28 L122.51 103.02 L134.82 103.98 L147.01 100.8 L157.21 95.36 L164.77 84.68 L166.47 73.17 L163.7 61.42 L152.03 48.38 L134.3 41.93 Z M128.97 66.25 L124.71 52.6 L137.97 52.51 L149.61 63.6 L153 70.02 L140.09 73.52 L147.88 87.27 L136.21 92 L127.74 92 L118.03 89.05 L125.84 79.71 L108.49 69.4 Z', color: 'paper' },
+        { d: 'M121.58 117.67 L111.05 118.82 L103.73 128.37 L104.43 139.29 L111.57 146.26 L122.52 146.51 L131.11 137.52 L131.23 126.99 L128.02 120.73 Z M117 122.5 L118.75 141 L110.45 136.25 Z', color: 'weave' },
+        { d: 'M158.25 117.25 C140.34 123.52 143.76 141.46 161.25 144.5 C177.42 139.58 178.13 129.14 167.5 118 C164.42 117.75 161.33 117.5 152.77 119.61 Z M166.75 123.75 C166.81 123.97 156.81 144.47 154.09 136.25 C157.42 133.33 159.08 130.67 153.85 125.67 C165.41 123.34 163 123.75 168.18 133.97 Z', color: 'weave' },
+        { d: 'M207.36 84.49 L212.41 91.75 L310.42 91.75 L318.86 94.1 L312.16 83.24 L215.42 86.11 Z', color: 'paper' },
+        { d: 'M216.75 58.88 L220.77 63.48 L304.42 63.51 L308.34 59.32 L305.55 53.88 L220.29 53.74 Z', color: 'paper' },
+        { d: 'M229.44 110.37 L224.05 123.03 L223.97 137.75 L229.76 146.7 L239 153.24 L255.21 156.76 L271.36 156.73 L287.84 150.47 L295.24 142.42 L297.75 135.24 L297.75 118.41 L292.25 108.93 L283.74 102.66 L272.28 98.94 L249.78 98.89 L239.6 102.77 Z M237.25 133.32 L277.16 127.34 L287.57 133.92 L285.17 138.82 L274.78 142.5 L255.18 143.67 L240.75 141.97 Z M235.75 121.75 C240.25 104.88 263.82 106.88 276.4 107.66 C281.1 111.93 291.7 118.14 285.91 125.06 C268.42 121.92 252.08 121.83 235.75 121.75 Z', color: 'paper' },
+        { d: 'M244 69 C239.71 72.58 241.19 70.21 240.25 76.5 C249.05 87.94 258.79 69 246.91 75.42 Z', color: 'light' },
+        { d: 'M266.32 38.99 L261.9 37.85 L257 41.15 L257 47.07 L259.47 49.75 L263.96 49.75 L268.75 46.81 L268.75 41.97 Z', color: 'paper' },
+        { d: 'M277.31 69 L274 72.31 L281 74.99 L275.5 79.55 L282.07 79.75 L284.75 77.07 L284.75 72.52 L281.21 69 Z', color: 'light' },
+        { d: 'M 317.75 140 C 309.05 140 309 140.65 309 149.75 C 304.51 153.68 308.19 156.29 312.75 153.25 C 312.42 150.17 312.08 147.08 311.75 144 C 314.48 142.48 317.75 143.72 317.75 140 Z', color: 'paper' },
+        { d: 'M 325.75 40.25 C 317.12 35.58 316.85 35.48 314 44.75 C 311.86 46.89 313.33 45.92 309 46.5 C 307.83 51.17 309.71 52.9 314.5 52.5 C 316.77 48.97 316.27 44.48 319 41.75 C 325.78 42.6 324.36 44.41 325.75 40.25 Z', color: 'paper' },
     ]
     const WORDMARK_VIEW = { minX: 50.49, minY: 35.48, w: 275.29, h: 121.28 }
     /** 页面标题位的品牌字标：随主题变色，不依赖外部图片。 */
@@ -1601,8 +1613,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         role: 'img',
         'aria-label': '织音',
         style: { flex: '0 0 auto', display: 'block' },
-      }, WORDMARK_PATHS.map((entry, index) =>
-        h('path', { key: 'wm-' + index, d: entry[0], fill: entry[1] ? '#F26A1B' : 'currentColor', fillRule: 'evenodd' }),
+      }, WORDMARK_PATHS.map((path, index) =>
+        h('path', { key: 'wm-' + index, d: path.d, fill: WORDMARK_COLORS[path.color], fillRule: 'evenodd' }),
       ))
     }
     /**
@@ -1616,6 +1628,24 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       if (phase === 'done') return { ...base, color: '#4a9d6a', borderColor: 'rgba(74,157,106,0.5)' }
       if (phase === 'error') return { ...base, color: '#d05a4a', borderColor: 'rgba(208,90,74,0.5)' }
       return base
+    }
+    /** 收藏星标：卡片视图与列表视图共用同一实现，避免两处各写一遍判断。 */
+    function FavoriteButton({ skill, busy, say, onToggle }) {
+      const active = skill.favorite === true
+      const label = active ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶')
+      return h(
+        'button',
+        {
+          type: 'button',
+          style: css.favBtn(active),
+          title: label,
+          'aria-label': label,
+          'aria-pressed': active ? 'true' : 'false',
+          disabled: busy,
+          onClick: () => onToggle(skill.name, !active),
+        },
+        h(Icon, { name: 'star', size: 13, filled: active }),
+      )
     }
     function Page({ close, t, wide }) {
       // 界面语言：默认跟随宿主（t 返回的就是宿主当前语言），用户可在这里覆盖并记住。
@@ -1712,8 +1742,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketBusy, setMarketBusy] = React.useState(null)   // 正在安装的条目 id
       const [marketDone, setMarketDone] = React.useState({})     // 已装完的条目 id
       const [marketHover, setMarketHover] = React.useState(null) // 鼠标悬停的卡片 id
-      const [marketLimit, setMarketLimit] = React.useState(40)   // 每次加载条数；「加载更多」按 20 递增（宿主上限 60）
+      const [marketLimit, setMarketLimit] = React.useState(40)   // 每次加载条数；「加载更多」按 20 递增（上限与 MARKET_MAX 一致：200）
       const [marketMore, setMarketMore] = React.useState(false)  // 正在加载更多
+      const [marketRefreshing, setMarketRefreshing] = React.useState(false) // 刷新按钮自己的执行态
       /**
        * 搜索按钮的五相位（tuyi 编排层）：idle → burst（点到了）→ sync（在跑）
        * → done / error（结论色停留）→ idle。只有 burst 与 sync 会动；
@@ -2014,7 +2045,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           })
           .finally(() => setMarketLoading(false))
       }, [marketLimit])
-      // 加载更多：把 limit 加到宿主上限 60 后再取一次（skills.sh 单次最多返回 60 条）。
+      // 加载更多：按 +20 递增直到 MARKET_MAX（skills.sh 单次上限 200 条）。
       const loadMoreMarket = React.useCallback(() => {
         setMarketMore(true)
         const next = Math.min(MARKET_MAX, marketLimit + 20)
@@ -2978,7 +3009,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   value: marketQuery,
                   placeholder: say('marketSearchPlaceholder', '搜索 skills.sh 技能（至少 2 个字符；留空看热门）'),
                   onChange: (event) => setMarketQuery(event.target.value),
-                  onKeyDown: (event) => { if (event.key === 'Enter') loadMarket(marketQuery) },
+                  onKeyDown: (event) => {
+                    // 回车与点按钮走同一条相位链路，否则键盘提交没有 burst/sync/done/error。
+                    if (event.key !== 'Enter') return
+                    event.preventDefault()
+                    runSearchPhase(() => loadMarket(marketQuery)).catch(() => {})
+                  },
                 }),
                 h(
                   'button',
@@ -2994,7 +3030,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     : searchPhase === 'done'
                       ? h(Icon, { name: 'check', size: 14 })
                       : searchPhase === 'error'
-                        ? h(Icon, { name: 'info', size: 14 })
+                        ? h(Icon, { name: 'alert', size: 14 })
                         : h(Icon, { name: 'search', size: 14 }),
                   h('span', null,
                     searchPhase === 'done'
@@ -3011,11 +3047,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     style: css.iconBtn,
                     title: say('refresh', '刷新'),
                     'aria-label': say('refresh', '刷新'),
-                    'aria-busy': marketLoading ? 'true' : 'false',
-                    disabled: marketLoading,
-                    onClick: () => loadMarket(marketQuery),
+                    'aria-busy': marketRefreshing ? 'true' : 'false',
+                    disabled: marketRefreshing,
+                    onClick: () => {
+                      setMarketRefreshing(true)
+                      loadMarket(marketQuery)
+                        .catch(() => {})
+                        .finally(() => setMarketRefreshing(false))
+                    },
                   },
-                  h(Icon, { name: 'refresh', size: 15, spin: marketLoading }),
+                  h(Icon, { name: 'refresh', size: 15, spin: marketRefreshing }),
                 ),
               ),
               h(
@@ -3317,15 +3358,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       h(
                         'div',
                         { style: css.cardHead },
-                        h('button', {
-                          type: 'button',
-                          style: css.favBtn(skill.favorite === true),
-                          title: skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
-                          'aria-label': skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
-                          'aria-pressed': skill.favorite === true ? 'true' : 'false',
-                          disabled: busy,
-                          onClick: () => toggleFavorite(skill.name, skill.favorite !== true),
-                        }, h(Icon, { name: 'star', size: 13, filled: skill.favorite === true })),
+                        h(FavoriteButton, { skill, busy, say, onToggle: toggleFavorite }),
                         h('span', { style: css.cardName }, skill.name),
                         h('span', { style: { ...css.badge(on), flex: '0 0 auto' } }, sourceShort(skill)),
                         skill.linkTarget
@@ -3470,15 +3503,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         h(
                           'div',
                           { style: css.itemHead },
-                          h('button', {
-                            type: 'button',
-                            style: css.favBtn(skill.favorite === true),
-                            title: skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
-                            'aria-label': skill.favorite ? say('favoriteOff', '取消收藏') : say('favoriteOn', '收藏并置顶'),
-                            'aria-pressed': skill.favorite === true ? 'true' : 'false',
-                            disabled: busy,
-                            onClick: () => toggleFavorite(skill.name, skill.favorite !== true),
-                          }, h(Icon, { name: 'star', size: 13, filled: skill.favorite === true })),
+                          h(FavoriteButton, { skill, busy, say, onToggle: toggleFavorite }),
                           h('span', { style: css.name }, skill.name),
                         skill.readOnly
                           ? h('span', { style: { ...css.metaText, opacity: op.meta }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
@@ -4210,9 +4235,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         items.push({ key: 'statInternal', label: '不可直接调用', value: counts.internal, filter: 'internal', hint: '模型与 / 菜单两个入口都关了（disable-model-invocation: true 且 user-invocable: false），只能被别的技能引用' })
       }
       // 收藏筛选：排在最后（内置技能之后），且只在确实有收藏时出现，避免一张永远为 0 的空卡。
-      const favCount = Object.keys(data?.favorites ?? {}).length
+      // 按「此刻真实存在且已收藏」计数：卸载的技能在 state 里可能留着旧记录，
+      // 直接数 favorites 的键会让卡片数字大于列表实际条数。
+      const favCount = (data?.skills ?? []).filter((skill) => skill.favorite === true).length
       if (favCount > 0) {
-        items.push({ key: 'statFavorite', label: '收藏', value: favCount, filter: 'favorite', hint: '已收藏的技能，始终置顶；点一下只看收藏' })
+        items.push({
+          key: 'statFavorite',
+          label: say('statFavorite', '收藏'),
+          value: favCount,
+          filter: 'favorite',
+          hint: say('statFavoriteHint', '已收藏的技能，始终置顶；点一下只看收藏'),
+        })
       }
       return items.map((item) => {
         const active = filter === item.filter
