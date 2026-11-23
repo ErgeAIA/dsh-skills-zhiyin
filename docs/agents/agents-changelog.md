@@ -2,7 +2,7 @@
 title: AGENTS.md Changelog
 type: agents-changelog
 project: dsh-skills-zhiyin
-updated: 2026-11-22
+updated: 2026-11-24
 description: >
   AGENTS.md 的变更记录，AGENTS.md 每改动一次就追加一行，不随日常开发更新。
   只追加，不删除或改写历史。AI 在本文件新增或修改任何条目后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -19,6 +19,8 @@ description: >
 ---
 
 - 模式：半程合成；来源文件：无（项目根无 AGENTS.md、无 CLAUDE.md，故无迁移，无 CLAUDE.md 删除动作）
+- <Toolchain「@deepseek-ai/dsh-skill / dsh-tools / dsh-llm 锁定 0.2.2-rc.3 于 package.json」> → drop → 改为「DSH 0.2.2-rc.5（实测运行版本，engines.dsh 声明 >=0.2.2-rc.5）」+「运行时依赖：无」。原因：package.json 早已无任何依赖（dependencies/devDependencies/peerDependencies 全空），原三行指向不存在的锁定，属过期示例。
+- <Commands「安装插件包依赖 → npm install → package-lock.json」> → update → 「无依赖，不需要安装步骤（npm install 为空操作）」。原因：同上。
 - <无既有契约文件> → 半程合成 → 直建当前 AGENTS.md
 - <HANDOVER.md 红线「不改写/重命名/删除技能文件」> → keep → Permissions IMPORTANT 首行
 - <HANDOVER.md 禁区「不改预设/不换消费者/不退役 catalog（会注入无技能可用）」> → keep → Permissions 三条禁止
@@ -28,6 +30,7 @@ description: >
 - <HANDOVER.md 已废弃的预设级消费者方案细节> → drop（内容留 consumer.js 与 docs/adr/ZhiYin-M0-ADR.md，本文件不复述）
 - <IMPORTANT 首行「织音是 DSH 第三方插件原型，只读用户技能目录，禁止改写、重命名或删除任何 SKILL.md 与技能目录」> → update → 「织音是 DSH 的技能管理插件，管的是技能的安装、卸载、启停与技能包编组；安装只新建目录，卸载只移入归档目录」
 - <禁止把技能正文复制进插件，或让插件写技能目录> → update → 拆两条：「禁止卸载时直接删除技能目录，一律移入归档目录」「禁止把技能正文硬编码进插件包，或让插件在无用户动作时改写技能文件」
+- <Conventions「插件仍在开发阶段 → package.json 的 version 锁定 0.1.0，开发期不升版」> → update → 「版本与发布 → 已发布 npm 包 dsh-skills-zhiyin；version 按 SemVer 递增，发布后任何改动必须升版再发，不得覆盖已发布版本；本地未发布改动仍靠完全重启 DSH 加载」。原因：2026-11-24 首次 npm publish，锁版约定失效，继续锁定会导致无法再发布任何修复。
 - <Permissions 缺安装写盘前置约束> → update → 新增 YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/skills），同名冲突先问用户
 - <Conventions 无目录布局约束> → update → 新增「仓库目录布局固定」行（根目录只留四件 + docs/、prototype/）
 - <Conventions「插件仍在开发阶段：不升 version」> → update → 「version 锁定 0.1.0，开发期不升版」

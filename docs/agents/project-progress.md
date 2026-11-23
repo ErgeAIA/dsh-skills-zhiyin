@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 00:0x 发 npm 准备完成 + 市场 PR #18245 已开
+- **最后更新**：2026-11-24 00:1x 版本锁定约定改掉；待 npm publish
+  - AGENTS.md：Conventions「插件仍在开发阶段 / version 锁定 0.1.0」→「版本与发布：已发布 npm 包，version 按 SemVer 递增，发布后任何改动必须升版再发」。
+  - 顺带修正 AGENTS.md 两处过期：Toolchain 声称三个 @deepseek-ai 依赖锁定在 package.json（实际为空）→ 改为 DSH 实测版本 + 运行时依赖无；Commands 的 npm install 行注明为空操作。全部已在 agents-changelog.md 留记录。
+  - npm 登录已确认：账号 ergeaia（指定 registry.npmjs.org 时有效；本机默认 registry 是华为云镜像，靠 publishConfig 指向 npmjs）。
+  - 下一步：npm publish → 隔离环境验证 npm 安装 → 更新市场 PR（如需）。
+
+- 上一轮：2026-11-24 00:0x 发 npm 准备完成 + 市场 PR #18245 已开
   - package.json：移除 private、加 engines.dsh（>=0.2.2-rc.5，只写实测下限）、加 publishConfig 指向 registry.npmjs.org（本机 registry 是华为云镜像）。
   - 分发链路已实测：npm publish --dry-run 通过（22 文件 / 119.9 kB）；npm pack 的 tarball 在隔离 DSH_HOME 里 dsh plugin add 成功（74ms），dump-config 含 zhiyin。
   - 市场 PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/18245 —— 只改 data/plugins/ErgeAIA__dsh-skills-zhiyin.yml 一个文件，mergeable。CI 仍在跑。
