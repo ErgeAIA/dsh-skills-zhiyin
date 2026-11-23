@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 23:1x 市场去重刷新 + 搜索五相位 + 左栏图标选中变橙
+- **最后更新**：2026-11-23 23:2x GitHub 入口挪到副标题后 + 「Star 一下~」
+  - GitHub 图标从右上角工具条移到副标题后面，改成带文案的胶囊按钮「⌥ Star 一下~」——孤零零一个图标不构成行动理由，加一句邀请才有人点。
+  - 样式 starLink：与副标题同行、视觉重量轻一档（opacity 0.7），悬停才亮；中英文各一条词典（Star 一下~ / Star it~）。
+  - 验证：node --check 0；静态渲染确认与副标题同一行。
+  - 待验收：F5 后副标题右侧应有 GitHub 图标 +「Star 一下~」，点击打开仓库；右上角工具条不再有 GitHub 图标。
+
+- 上一轮：2026-11-23 23:1x 市场去重刷新 + 搜索五相位 + 左栏图标选中变橙
   - 市场页有两个刷新：标题行那个（只重载 state）在 market/archive 也渲染。已在两页隐藏，各页只留语义正确的那个。
   - 搜索按钮按 tuyi 编排层实现五相位：idle → burst(1px 轻推 150ms) → sync(Spinner+aria-busy+disabled) → done(绿/勾/已更新 1.5s) 或 error(红/失败 3s) → idle；卸载清定时器。
   - 左栏 NavIcon 选中态改品牌橙 #F26A1B，未选中跟随主题。
