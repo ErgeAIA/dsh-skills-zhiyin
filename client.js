@@ -3057,14 +3057,23 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     { style: css.loadMoreWrap },
                     h('button', {
                       type: 'button',
-                      style: marketMore ? { ...css.btn, opacity: 0.7, cursor: 'progress' } : css.btn,
+                      style: {
+                        ...css.btn,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        ...(marketMore ? { opacity: 0.7, cursor: 'progress' } : null),
+                      },
                       disabled: marketMore,
                       onClick: loadMoreMarket,
                     },
-                      marketMore ? h(Spinner, { size: 14 }) : h(Icon, { name: 'chevronDown', size: 14 }),
                       marketMore
-                        ? say('marketMoreLoading', '加载中…')
-                        : say('marketMore', '加载更多') + '（' + marketItems.length + ' / ' + MARKET_MAX + '）'),
+                        ? h(Spinner, { size: 14 })
+                        : h(Icon, { name: 'chevronDown', size: 14 }),
+                      h('span', null,
+                        marketMore
+                          ? say('marketMoreLoading', '加载中…')
+                          : say('marketMore', '加载更多') + '（' + marketItems.length + ' / ' + MARKET_MAX + '）')),
                   )
                 : null,
             )
@@ -4143,6 +4152,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       return h('div', { style: css.mainPage }, h(Page, { ...props, wide: true }))
     }
 
+    /**
+     * 左栏入口图标：三条股线交叉，与品牌标记同构。
+     * 用 16 单位坐标系重画 96 单位的三条路径（等比 1/6），线宽按比例放大到 1.5，
+     * 让它在 16px 下仍然是三条可分辨的线而不是一团墨。
+     */
     function NavIcon({ size = 16, active }) {
       return h(
         'svg',
@@ -4153,16 +4167,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           'aria-hidden': true,
           opacity: active ? 1 : 0.72,
         },
-        h('path', {
-          d: 'M6 12.2V4.4l5.2-1.6v7.4',
-          fill: 'none',
-          stroke: 'currentColor',
-          strokeWidth: 1.4,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-        }),
-        h('circle', { cx: 4.6, cy: 12.2, r: 1.6, fill: 'currentColor' }),
-        h('circle', { cx: 9.8, cy: 10.4, r: 1.6, fill: 'currentColor' }),
+        h(
+          'g',
+          {
+            fill: 'none',
+            stroke: 'currentColor',
+            strokeWidth: 1.5,
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          },
+          h('path', { d: 'M2.2 12.7C6.3 12.7 6.3 8 10.8 8H13.8' }),
+          h('path', { d: 'M2.2 3.3C6.3 3.3 6.3 12.7 10.8 12.7H13.8' }),
+          h('path', { d: 'M2.2 8C6.3 8 6.3 3.3 10.8 3.3H13.8' }),
+        ),
       )
     }
 
