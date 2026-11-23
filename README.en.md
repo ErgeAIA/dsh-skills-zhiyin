@@ -26,7 +26,19 @@ ZhiYin turns "which skills can the model see right now" into something you can o
 
 ## Install
 
-Install into a profile as a DSH bundle:
+Published on npm — this is the recommended route:
+
+```bash
+dsh plugin --profile <profile> add dsh-skills-zhiyin
+```
+
+Mirrors take a while to pick up a newly published package (you will see a 404). If that happens, pin the official registry:
+
+```bash
+dsh plugin --profile <profile> add dsh-skills-zhiyin --registry=https://registry.npmjs.org/
+```
+
+You can also install from source or a tarball:
 
 ```bash
 # from a local folder
@@ -39,7 +51,7 @@ dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
 
 After installing, **fully quit and reopen DSH** — the host half loads at process start, so reloading the page is not enough.
 
-Requirements: Node.js ≥ 24; host-shared packages `@deepseek-ai/dsh-llm`, `@deepseek-ai/dsh-skill`, `@deepseek-ai/dsh-tools`.
+Requirements: DSH ≥ `0.2.2-rc.5` (see `engines.dsh` in `package.json`). This package has **no runtime dependencies and no lifecycle scripts**, so installing runs no build and needs no build approval.
 
 ## Usage
 
@@ -180,13 +192,14 @@ Toggling and viewing **never** touch skill files. Installation and uninstallatio
 ## Development
 
 ```bash
-npm install          # install dependencies
-node --check index.js
-node --check client.js
-npm pack --dry-run   # inspect what would be published
+node --check index.js     # host-half syntax
+node --check client.js    # page-half syntax
+npm pack --dry-run        # inspect what would be published (no dependencies, so no npm install)
 ```
 
-Host-half changes need a DSH restart; page-half changes only need a page reload.
+Host-half changes need **a full DSH restart**; page-half changes only need a page reload.
+
+Releasing: publish a GitHub Release whose tag matches the `package.json` version, and `.github/workflows/publish.yml` publishes to npm via trusted publishing (OIDC, no tokens). A local `npm publish` also works.
 
 ## License
 
