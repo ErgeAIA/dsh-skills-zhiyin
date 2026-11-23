@@ -1977,17 +1977,14 @@ function locationOf(source, skillName, realPath) {
   return { root, logicalPath, linkTarget: linked ? realPath : null }
 }
 
-/** 最近一次 collectState 观测到的技能名集合；影子候选据此排除陈旧条目。 */
-let observedSkillNames = new Set()
 
 function shadowCandidates() {
   const state = readState()
   const out = []
-  // 只补「当前观测不到」的技能：known 是只增不减的观测历史，
-  // 里面可能有已从磁盘删除的旧条目，直接拿来当技能会让总数虚高。
-  const observed = observedSkillNames
+  // 重点：这里**不能**跳过「当前已观测到」的技能。被停用的技能一定在观测里，
+  // 跳过它们就等于什么都没挡住——模型目录仍会拿到原生候选（BUG-013）。
+  // 陈旧条目的清理改由 collectState 重建 known 负责：只保留本轮真实观测到的名字。
   for (const [skillName, meta] of Object.entries(state.known ?? {})) {
-    if (observed.has(skillName)) continue
     const reason = hiddenReason(state, skillName, meta?.source)
     if (!reason) continue
     const description =
@@ -2149,8 +2146,9 @@ async function collectState(ctx) {
     }
   }
 
-  observedSkillNames = new Set(byName.keys())
-  const nextKnown = { ...state.known, ...known }
+  // known 是本轮观测的快照，不再只增不减：磁盘上已删除的技能一旦不再出现，
+  // 它的名字就从 known 消失，shadowCandidates 也不会再为它补影子（消除总数抖动）。
+  const nextKnown = known
   if (JSON.stringify(nextKnown) !== JSON.stringify(state.known)) {
     saveState({ ...state, known: nextKnown })
   }
