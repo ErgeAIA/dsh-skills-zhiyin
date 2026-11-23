@@ -4206,13 +4206,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         { key: 'statDisabled', label: '已停用', value: counts.disabled, filter: 'disabled', hint: '被总开关、.agents 开关、技能包或单技能开关挡住的技能；文件仍在盘上，随时能打开' },
         { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随 DSH 内置的技能，已计入「可自动调用」，不额外相加' },
       ]
-      // 收藏筛选：只在确实有收藏时出现，避免一张永远为 0 的空卡。
-      const favCount = Object.keys(data?.favorites ?? {}).length
-      if (favCount > 0) {
-        items.unshift({ key: 'statFavorite', label: '收藏', value: favCount, filter: 'favorite', hint: '已收藏的技能，始终置顶；点一下只看收藏' })
-      }
       if ((counts.internal ?? 0) > 0) {
         items.push({ key: 'statInternal', label: '不可直接调用', value: counts.internal, filter: 'internal', hint: '模型与 / 菜单两个入口都关了（disable-model-invocation: true 且 user-invocable: false），只能被别的技能引用' })
+      }
+      // 收藏筛选：排在最后（内置技能之后），且只在确实有收藏时出现，避免一张永远为 0 的空卡。
+      const favCount = Object.keys(data?.favorites ?? {}).length
+      if (favCount > 0) {
+        items.push({ key: 'statFavorite', label: '收藏', value: favCount, filter: 'favorite', hint: '已收藏的技能，始终置顶；点一下只看收藏' })
       }
       return items.map((item) => {
         const active = filter === item.filter
