@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 19:2x 备注改 hover 呈现；描摹字标经试装判定不可用
+- **最后更新**：2026-11-23 20:0x 备注徽标修到卡片视图；字标接入（并更正上一轮误判）
+  - 备注：上一轮只改了列表视图，卡片视图仍在用旧 cardNote 整块样式——用户截图正是卡片。本轮两个视图统一为「备注」徽标，删除 cardNote 样式。
+  - 字标：上一轮判定「不可用」是我处理失误（清洗 style 时误删 display:none，多画一条冗余笔画）。已按原样重建：assets/wordmark.svg（深底）、wordmark-light.svg（原色），接入 logo 与中文 banner。
+  - 英文 banner 保持文字标题：该 SVG 只含「织音」两个汉字，没有 ZhiYin 拉丁字标。
+  - 验证：四份品牌 SVG 严格 XML 通过；c05 隐藏路径确认未混入；client.js exit 0。
+  - 待验收：F5 后卡片视图的备注应变成小徽标；logo 与中文 banner 标题为字标。
+
+- 上一轮：2026-11-23 19:2x 备注改 hover 呈现；描摹字标经试装判定不可用
   - 备注：技能卡不再整行展示备注正文，改为「备注」小徽标——有备注才出现，悬停看全文，点击打开完整备注弹窗；同时删掉技能名 hover 显示地址（与「打开目录」重复）。新增 note 图标与 noteChip 样式，noteLine 样式删除。
   - 描摹字标（用户提供的 raster2svg 产物）试装到 logo 与两版 banner 标题后判定**不可用**：渲染被读成「知音」、横版两字难以辨认、banner 主标题缩成小图形。原因：14 条路径承载两个汉字 + 拉丁字标，保真度不足；且源图分辨率有限。
   - 处置：banner/banner-en/logo 回滚到文字标题版（git checkout）；描摹稿存档 docs/assets/wordmark-traced-v1.svg（export-ignore，不对外）；等用户提供高保真源（设计工具直出 SVG 或 ≥1024px 位图）再重试。

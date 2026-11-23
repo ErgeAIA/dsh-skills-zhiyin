@@ -1129,18 +1129,6 @@ window.__ModuleLoader__.load({
         overflow: 'hidden',
         minHeight: 20,
       },
-      cardNote: {
-        fontSize: fs.hint,
-        lineHeight: 1.5,
-        padding: '6px 9px',
-        borderRadius: 8,
-        background: 'rgba(224,116,60,0.10)',
-        borderLeft: '2px solid var(--zhiyin-accent, #e0743c)',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        maxHeight: 84,
-        overflow: 'hidden',
-      },
       // 备注徽标：有备注才出现，悬停看全文，点击打开完整备注
       noteChip: {
         display: 'inline-flex',
@@ -3143,7 +3131,15 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       ),
                       h('div', { style: css.cardDesc }, skill.description ?? ''),
                       skill.note
-                        ? h('div', { style: { ...css.cardNote, cursor: 'pointer' }, title: say('noteView', '查看完整备注'), onClick: () => setNoteViewing(skill) }, skill.note)
+                        ? h('span', {
+                            style: css.noteChip,
+                            title: say('noteViewTitle', '技能备注') + '：' + skill.note,
+                            'aria-label': say('noteViewTitle', '技能备注'),
+                            onClick: () => setNoteViewing(skill),
+                          },
+                            h(Icon, { name: 'note', size: 12 }),
+                            say('noteChip', '备注'),
+                          )
                         : null,
                       h(
                         'div',
