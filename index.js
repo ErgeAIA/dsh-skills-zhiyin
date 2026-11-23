@@ -454,6 +454,21 @@ export function apply(ctx) {
     return { status: 200, body: { ok: true, name, note: text } }
   })
 
+  // 技能收藏：只存本地 state；收藏项在列表里默认置顶。
+  post(ctx, '/zhiyin/favorite', async (body) => {
+    const name = typeof body?.name === 'string' ? body.name.trim() : ''
+    if (!name) return { status: 400, body: { ok: false, error: 'name is required' } }
+    const on = body?.value === true
+    const state = readState()
+    const favorites = { ...(state.favorites ?? {}) }
+    if (on) favorites[name] = Date.now()
+    else delete favorites[name]
+    state.favorites = favorites
+    saveState(state)
+    note('skill-favorite', { name, on })
+    return { status: 200, body: { ok: true, name, favorite: on } }
+  })
+
   post(ctx, '/zhiyin/install', async (body) => {
     // 统一入口：一个输入框既收本地文件夹，也收 GitHub / npx skills add / 直链。
     if (typeof body?.text === 'string' && body.text.trim()) return installFromText(ctx, body)
@@ -2155,8 +2170,16 @@ async function collectState(ctx) {
 
   // 只读来源（FR-026）：不在织音管理的安装根里的技能，只能启停、不能卸载。
   const uninstallRoots = [installRoot(ctx, 'user'), installRoot(ctx, 'project')].filter(Boolean)
+  // 收藏置顶：收藏项按收藏时间倒序在前，其余按名称。
+  const favoriteOrder = state.favorites ?? {}
+  const isFavorite = (name) => Object.prototype.hasOwnProperty.call(favoriteOrder, name)
   const skills = [...byName.values()]
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) => {
+      const lf = isFavorite(left.name), rf = isFavorite(right.name)
+      if (lf !== rf) return lf ? -1 : 1
+      if (lf && rf) return (favoriteOrder[right.name] ?? 0) - (favoriteOrder[left.name] ?? 0)
+      return left.name.localeCompare(right.name)
+    })
     .map((skill) => {
       const current = readState()
       const meta = current.known?.[skill.name]
@@ -2184,6 +2207,7 @@ async function collectState(ctx) {
         refCount: refs.length,
         refs,
         note: typeof current.notes?.[skill.name] === 'string' ? current.notes[skill.name] : '',
+        favorite: isFavorite(skill.name),
         uninstallable: uninstallRoots.some((root) => existsSync(join(root, skill.name))),
         readOnly: !uninstallRoots.some((root) => existsSync(join(root, skill.name))),
         readOnlyReason:
@@ -2262,6 +2286,7 @@ async function collectState(ctx) {
 
     descriptionMaxLength: DESCRIPTION_MAX_LENGTH,
     catalogChars,
+    favorites: current.favorites ?? {},
     skills,
     agentsRoot: current.agentsRoot !== false,
     allOff: current.allOff === true,

@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 21:2x 备注改为卡片悬停显示，删除徽标
+- **最后更新**：2026-11-23 22:1x 技能收藏置顶 + 市场加载更多
+  - 收藏：state.favorites 存「名字→时间戳」；POST /zhiyin/favorite 切换；收藏项按收藏时间倒序置顶，其余按名称。卡片与列表行的名称前加星标（空心灰 → 点亮强调色）。
+  - 市场分页：limit 变状态（默认 40），「加载更多」+20 直到宿主上限 60，按钮显示「当前/60」。
+  - 顺手修：Icon 组件新增 filled 支持（星标点亮）；新增 chevronDown 图标与 favBtn / loadMoreWrap 样式；中英词典各补 5 条。
+  - 验证：真实路由端到端验证收藏置顶与取消；路由数 23；客户端 4 slot 正常；node --check 双半边 0。
+  - 待验收：F5 后点星标应收藏并置顶；市场底部出现「加载更多（40 / 60）」。
+
+- 上一轮：2026-11-23 21:2x 备注改为卡片悬停显示，删除徽标
   - 用户反馈徽标占一行很难看。改为：**有备注时悬停整张卡片**显示原生 tooltip（`技能备注：<内容>`），无备注则完全不渲染任何东西。
   - 两个视图（卡片 / 列表行）统一；删除 noteChip 样式、note 图标、noteChip 与 noteView 词典、以及已无触发入口的 noteViewing 完整备注弹窗（死代码）。
   - 编辑备注入口保留（卡片右上角编辑按钮）。
