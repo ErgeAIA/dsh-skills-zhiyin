@@ -2,7 +2,7 @@
 title: Debug Log
 type: debug-log
 project: dsh-skills-zhiyin
-updated: 2026-11-23
+updated: 2026-11-24
 description: >
   反复调试的 bug 追加记录，优先级与实现事实对齐。只追加，不删除或改写历史。
   AI 在本文件新增或修改任何条目后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -16,6 +16,15 @@ description: >
 
 ***
 
+## BUG-015 发布后凭 registry 404 误判失败；unpkg 返回空文件
+
+- **现象**：0.1.1 由 GitHub Actions 发布，工作流 `success` 且日志含 `+ dsh-skills-zhiyin@0.1.1` 与 provenance 签名，但随后多次查询 registry 均只有 0.0.0-stage / 0.1.0，于是判断「发布没生效」。约 10 分钟后同一查询返回了 0.1.1。
+- **根因**：npm registry 写入后到读侧可见有分钟级传播延迟（npm 日志原文已提示 "Your package is being processed and may take a few minutes to become available."）。我用「读不到」当成「没写成」。
+- **次生问题**：改用 `unpkg.com/<pkg>@<ver>/README.md` 验证包内容，返回 0 字节，进一步误判。unpkg 对新版本同步同样有延迟。
+- **预防规则**：
+  1. 发布结果以**工作流日志的 `+ <pkg>@<version>` 与 provenance 签名行**为准；registry 读不到先等 5–15 分钟再下结论，不要立刻判失败。
+  2. 验证已发布包内容，直接下 `https://registry.npmjs.org/<pkg>/-/<pkg>-<ver>.tgz` 解包比对，不要依赖 unpkg / jsdelivr 这类第三方 CDN。
+  3. npm 网页头部版本号可能有缓存，以 registry 的 `dist-tags.latest` 为准。
 ## BUG-014 清洗 SVG style 时误删 display:none，导致字标字形错乱
 
 - **现象**：把用户提供的描摹字标接进 logo/banner 后，渲染结果字形错乱（「织音」被读成「知音」），据此误判为「描摹质量不足、字标不可用」。
