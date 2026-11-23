@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 00:2x npm 发布被 2FA 拦下（E403），等用户授权方式
+- **最后更新**：2026-11-24 00:3x 按 npm 安全公告修正发布路径：否决 bypass-GAT，改 OTP 首发 + 可信发布
+  - 用户提供 GitHub Changelog（2026-07-08）：npm v12 安装期默认收紧（allowScripts 关、--allow-git 默认 none）；2FA-bypass GAT 已不能做账户管理（8/2026 生效）、2027/01 起失去直接发布能力。
+  - 据此否决上一轮的「路 B」（bypass-2FA 细粒度令牌），改为：首发用交互式 OTP；后续版本走 GitHub Actions + OIDC 可信发布（需新建 .github/workflows）。
+  - 关键判断：织音零依赖零脚本，npm v12 的 allowScripts/allow-git 收紧不影响 npm 安装；但市场条目的 github: 安装属 git 依赖，受 pnpm 是否跟进影响，属不可控边界。故 npm 分发价值上升。
+  - 待办：用户执行 npm publish 输入 OTP → 我验证 npm 安装 → 建可信发布工作流（0.1.1 起生效）。
+
+- 上一轮：2026-11-24 00:2x npm 发布被 2FA 拦下（E403），等用户授权方式
   - AGENTS.md 版本约定已改：锁 0.1.0 → 按 SemVer，发布后任何改动必须升版再发。顺带修正 Toolchain 三个不存在的依赖声明与 npm install 空操作，均已留 changelog。
   - npm 登录有效（ergeaia），但 npm publish 返回 E403：npmjs 要求发布动作具备 2FA 或带 2FA 绕过的细粒度令牌。npm profile 显示 two-factor disabled，属 npm 侧发布策略。
   - 包名仍未占用（404）；dry-run 与 tarball 安装均已通过。
