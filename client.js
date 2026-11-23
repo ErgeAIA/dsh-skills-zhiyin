@@ -158,9 +158,7 @@ window.__ModuleLoader__.load({
         batchClear: '清除选择',
         alertUnpacked: '有技能未加入技能包，当前不生效',
         noteEdit: '编辑备注',
-        noteView: '查看完整备注',
         noteViewTitle: '技能备注',
-        noteChip: '备注',
         noteHint: '备注只存在本地配置里，不会写进技能文件；导出配置时会一起带走。',
         notePlaceholder: '例如：做前端评审时先留着；下个项目再用',
         consistencySynced: '一致',
@@ -417,9 +415,7 @@ window.__ModuleLoader__.load({
         batchClear: 'Clear',
         alertUnpacked: 'Some skills are not in any pack and do not play',
         noteEdit: 'Edit note',
-        noteView: 'View full note',
         noteViewTitle: 'Skill note',
-        noteChip: 'Note',
         noteHint: 'Notes live in the local config only, never in skill files, and travel with config export.',
         notePlaceholder: 'e.g. keep for frontend reviews; revisit next project',
         consistencySynced: 'In sync',
@@ -1129,29 +1125,6 @@ window.__ModuleLoader__.load({
         overflow: 'hidden',
         minHeight: 20,
       },
-      // 备注徽标：有备注才出现，悬停看全文，点击打开完整备注
-      noteChip: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        marginTop: 6,
-        padding: '3px 8px',
-        borderRadius: 999,
-        fontSize: fs.hint,
-        cursor: 'pointer',
-        background: 'rgba(128,128,128,0.10)',
-        border: '1px solid rgba(128,128,128,0.16)',
-        opacity: 0.85,
-        maxWidth: '100%',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        boxSizing: 'border-box',
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-      },
       cardFoot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' },
       dot: (on) => ({
         width: 7,
@@ -1317,12 +1290,6 @@ window.__ModuleLoader__.load({
   ],
   folder: [
     ['path', 'M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2c.5 0 1 .22 1.33.6l1.1 1.2c.33.38.83.6 1.33.6h4.04A2.5 2.5 0 0 1 19 9.9v6.6A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5z'],
-  ],
-  note: [
-    ['path', 'M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z'],
-    ['path', 'M14 3v5h5'],
-    ['path', 'M8 12h8'],
-    ['path', 'M8 16h5'],
   ],
   github: [
     ['path', 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22'],
@@ -1647,7 +1614,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [selectedNames, setSelectedNames] = React.useState([])      // 批量提交选中的技能名
       const [noteEditing, setNoteEditing] = React.useState(null)       // 正在编辑备注的技能名；null 表示关闭
       const [noteDraft, setNoteDraft] = React.useState('')
-      const [noteViewing, setNoteViewing] = React.useState(null)     // 查看完整备注的技能；null 表示关闭
       const [backups, setBackups] = React.useState(null)               // 配置备份列表
       const [backupsOpen, setBackupsOpen] = React.useState(false)      // 备份列表弹窗
       // 技能市场（skills.sh）：热门默认、关键词搜索、一键安装到 SSOT。
@@ -3128,6 +3094,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       {
                         key: skill.name,
                         style: { ...css.skillCard(hovered), ...(on ? {} : css.itemOff) },
+                        // 备注只在悬停卡片时以原生 tooltip 出现；没有备注就什么都不加。
+                        ...(skill.note ? { title: say('noteViewTitle', '技能备注') + '：' + skill.note } : {}),
                         onMouseEnter: () => setSkillHover(skill.name),
                         onMouseLeave: () => setSkillHover((previous) => (previous === skill.name ? null : previous)),
                       },
@@ -3162,17 +3130,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           : null,
                       ),
                       h('div', { style: css.cardDesc }, skill.description ?? ''),
-                      skill.note
-                        ? h('span', {
-                            style: css.noteChip,
-                            title: say('noteViewTitle', '技能备注') + '：' + skill.note,
-                            'aria-label': say('noteViewTitle', '技能备注'),
-                            onClick: () => setNoteViewing(skill),
-                          },
-                            h(Icon, { name: 'note', size: 12 }),
-                            say('noteChip', '备注'),
-                          )
-                        : null,
                       h(
                         'div',
                         { style: css.marketCardFoot },
@@ -3254,6 +3211,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       {
                         key: skill.name,
                         style: skill.enabled === false ? { ...css.item, ...css.itemOff } : css.item,
+                        ...(skill.note ? { title: say('noteViewTitle', '技能备注') + '：' + skill.note } : {}),
                       },
                       h('input', {
                         type: 'checkbox',
@@ -3335,17 +3293,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       ),
                         skill.description
                           ? h('div', { style: css.desc }, skill.description)
-                          : null,
-                        skill.note
-                          ? h('span', {
-                              style: css.noteChip,
-                              title: say('noteViewTitle', '技能备注') + '：' + skill.note,
-                              'aria-label': say('noteViewTitle', '技能备注'),
-                              onClick: () => setNoteViewing(skill),
-                            },
-                              h(Icon, { name: 'note', size: 12 }),
-                              say('noteChip', '备注'),
-                            )
                           : null,
                       ),
 
@@ -3949,33 +3896,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         )
                     : h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, String(backups.error ?? '')))
                   : null,
-              ),
-            )
-          : null,
-
-        noteViewing
-          ? h(
-              'div',
-              { style: css.overlay, onClick: () => setNoteViewing(null) },
-              h(
-                'div',
-                { style: { ...css.modal, ...css.modalMd }, onClick: (event) => event.stopPropagation() },
-                h(
-                  'div',
-                  { style: css.modalHead },
-                  h('div', { style: css.modalTitle }, `${say('noteViewTitle', '技能备注')} · ${noteViewing.name}`),
-                  h('button', { type: 'button', style: css.iconBtn, title: say('close', '关闭'), 'aria-label': say('close', '关闭'), onClick: () => setNoteViewing(null) }, h(Icon, { name: 'close', size: 15 })),
-                ),
-                h(
-                  'div',
-                  { style: { ...css.previewList, maxHeight: '60vh', whiteSpace: 'pre-wrap', fontSize: fs.hint, lineHeight: 1.65 } },
-                  noteViewing.note,
-                ),
-                h(
-                  'div',
-                  { style: css.modalFoot },
-                  h('button', { type: 'button', style: css.primaryBtn, onClick: () => { const target = noteViewing; setNoteViewing(null); openNote(target) } }, say('noteEdit', '编辑备注')),
-                ),
               ),
             )
           : null,
