@@ -16,6 +16,21 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-039: OIDC 可信发布验证通过——0.1.1 无令牌发布，带 SLSA provenance
+
+- **日期**：2026-11-24
+- **Trusted Publisher**：用户登记后状态由「待验证」变为 **Valid**；权限 `npm publish` / `npm stage publish` / `npm dist-tag` 三项齐全；目标 `ErgeAIA/dsh-skills-zhiyin` + `publish.yml`。
+- **0.1.1 发布链路**：tag `v0.1.1` → GitHub Release → `Publish to npm` 工作流 `completed/success`，7 个步骤全绿（含「tag 与 package.json 版本一致」校验与 Preflight）。
+  - 发布过程中**没有任何令牌、OTP 或浏览器认证**；`setup-node` 只写了占位 `NODE_AUTH_TOKEN: XXXXX-…`，npm 自动检测到 OIDC 环境并优先使用。
+  - 日志证据：`Signed provenance statement with source and build information from GitHub Actions`、`Provenance statement published to transparency log … logIndex=4054713267`、`+ dsh-skills-zhiyin@0.1.1`。
+- **registry 实测**：`latest = 0.1.1`；`dist.attestations.provenance.predicateType = https://slsa.dev/provenance/v1`；`shasum = 0ad942d3a1eb795b0fa3196df6c98d91be2a02e1`（与工作流日志一致）；`engines.dsh = >=0.2.2-rc.5` 保留。
+- **从 npm 安装 0.1.1 验证**：隔离 DSH_HOME → `+ dsh-skills-zhiyin 0.1.1`，4.2s。
+- **包内 README 验证（从 registry tarball 解出的原文）**：npm 安装命令存在、`--registry` 说明存在、`dsh-llm` 假依赖已消失、`0.1.0` 旧版本字样已消失。npm 页面渲染的就是这份文件。
+- **两处排查教训（写入 debug-log）**：
+  1. **发布后 registry 不是立即可见**：工作流已输出 `+ pkg@version` 与 provenance 签名，但 registry 查询仍 404 约 10 分钟。不能凭「registry 查不到」判定发布失败，应先看工作流日志里的 `+ pkg@version`，再等传播。
+  2. **unpkg 不是可靠验证源**：`https://unpkg.com/<pkg>@<ver>/README.md` 返回 0 字节，据此判断会得出错误结论。权威做法是直接下 registry 的 tarball 解包比对。
+  3. 另：npm 页面头部可能仍显示旧版本号（缓存），以 registry 的 `dist-tags.latest` 为准。
+
 ## DEC-038: README 安装段改为 npm 优先；开发期继续用 link，不切 npm 安装
 
 - **日期**：2026-11-24

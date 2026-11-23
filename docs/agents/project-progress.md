@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 01:0x README 安装段改 npm 优先（并修正过期依赖声明）；开发期继续用 link
+- **最后更新**：2026-11-24 01:2x OIDC 可信发布验证通过——0.1.1 无令牌发布，带 SLSA provenance
+  - Trusted Publisher 状态 Valid，权限三项齐全；tag v0.1.1 → Release → Publish to npm 工作流全绿，全程无令牌/OTP/浏览器。
+  - registry：latest=0.1.1，provenance = slsa.dev/provenance/v1，shasum 与日志一致；隔离环境从 npm 装 0.1.1 成功。
+  - 包内 README 从 registry tarball 验证：npm 安装命令与 --registry 说明已进包，dsh-llm 假依赖与 0.1.0 旧版本字样已消失。
+  - 教训（BUG-015）：发布后 registry 有约 10 分钟传播延迟，不能凭 404 判失败；unpkg 返回 0 字节不可作验证源，要用 registry tarball。
+  - 待办：市场 PR #18245 等维护者评审；README 已修，无需再补 PR。
+
+- 上一轮：2026-11-24 01:0x README 安装段改 npm 优先（并修正过期依赖声明）；开发期继续用 link
   - README.md / README.en.md：安装段 npm 优先 + 镜像 404 时的 --registry 说明 + 本地/tarball 备选；修正「Node ≥24 + 三个宿主共享包」的过期声明（实际零依赖，engines.dsh >=0.2.2-rc.5）；开发段去掉空操作 npm install，补发版方式。双语互链与链接全部核对通过。
   - 命令验证：npm 安装（加 --registry）、本地目录安装（34ms）、tarball 安装（74ms）、node --check、npm pack --dry-run 均已实跑。
   - 开发期安装方式维持 link，不切 npm（切换会被钉在 0.1.0，改动需升版发布才能看到）。需要验证发布产物时用一次性 profile。
