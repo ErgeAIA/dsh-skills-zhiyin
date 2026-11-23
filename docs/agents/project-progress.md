@@ -2,7 +2,7 @@
 title: Project Progress
 type: project-progress
 project: dsh-skills-zhiyin
-updated: 2026-11-22
+updated: 2026-11-23
 description: >
   项目开发进度实时记录：阶段、分支、代码状态、最近进展。每次会话更新。
   AI 在本文件新增进展或修改当前状态后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -17,13 +17,20 @@ description: >
 
 ## 当前状态
 
-- **当前分支**：main（banner 重做 走 feat/banner-v3 → 提交（见 git log）→ 合并 main → 已推送 origin，分支已删）；上一轮标识：98f31f8 → d68c313
+- **当前分支**：main（BUG-013 修复走 fix/skill-catalog-shadow → 0c84ac0 → 47c6f6c；品牌名间距与市场布局修复见后文）；上一轮 banner：483b636 → 07579e7
 - **阶段**：原型期 P1 功能面补齐后按用户反馈收敛——界面为「技能列表 / 技能包 / 技能市场 / 归档」四页（市场走 skills.sh，归档可查看与恢复）；~/.dsh/skills 是 DSH 可见目录（AI Vault 的 96 条软链接都在），文件永不因技能包开关增删；技能包只决定生效面——托管来源（.dsh / .agents）必须挂在启用包上才生效，内置/自定义不受包约束；单技能开关仍是底线；组合/合奏、包冲突、排除/常驻从前端移除（后端路由保留）；已移植 AI Vault 的安装多选、包成员候选池与备注查看；UI 还待整体精修
 - **代码**：prototype/ 两半边（index.js：/zhiyin/state、/zhiyin/probe、/zhiyin/skill、/zhiyin/settings、/zhiyin/pack、/zhiyin/install、/zhiyin/uninstall、/zhiyin/archive、/zhiyin/restore、/zhiyin/market、/zhiyin/market/desc、/zhiyin/export、/zhiyin/import、/zhiyin/backups、/zhiyin/rollback、/zhiyin/note、/zhiyin/repair + 三注册表策略 provider；client.js：设置页含统计筛选卡、技能卡瀑布流/列表、备注、技能包、成员管理、导入/安装弹窗）
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 01:2x 名称写法统一为「织音·ZhiYin」
+- **最后更新**：2026-11-23 14:0x 修 BUG-013 + 名字间距 + 市场卡片布局
+  - **BUG-013（最严重）**：停用只在界面生效，模型目录仍加载全部技能。根因是 shadowCandidates 的 observed 自指门槛——稳态下影子数从 66 归零，原生候选胜出。已删门槛并把 state.known 改为本轮观测快照；实测真实状态 66/66 且全部双 false。待用户重启 DSH 验收新会话 skill-catalog。
+  - 名字写法改为「织音 · ZhiYin」（点左右各一个空格），覆盖 README/CHANGELOG/NOTICE/PRODUCT 与五个 SVG 的 title/aria-label。
+  - 市场卡片：columnWidth 280→360、技能卡 320→380；安装命令 code 改 display:block + maxWidth:100%，修长命令撑破卡片；骨架屏占位数量由窗口宽度计算，不再固定 6 个。
+  - 验证：node --check 双半边 0；影子候选真实状态 66/66；PNG/SVG 未受影响。
+  - 待验收：重启后 skill-catalog 不含被关技能；市场卡片与命令显示；骨架屏列数随窗口变化。
+
+- 上一轮：2026-11-23 01:2x 名称写法统一为「织音·ZhiYin」
   - 按用户要求，中文名与拼音一律用间隔号连接，不用括号：README 标题、README 商标条款、CHANGELOG 抬头、NOTICE、PRODUCT.md，以及 icon/icon-small/banner/banner-en/logo 五个 SVG 的 title 与 aria-label。
   - 英文 README 的商标条款简化为只用 "ZhiYin"（英文语境里斜杠并列两个名字读起来生硬）。
   - 未改：docs/agents 的历史记录（只追加不回溯）、已归档的 docs/assets/banner-threads.svg。
