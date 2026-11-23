@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 14:0x 修 BUG-013 + 名字间距 + 市场卡片布局
+- **最后更新**：2026-11-23 19:2x 备注改 hover 呈现；描摹字标经试装判定不可用
+  - 备注：技能卡不再整行展示备注正文，改为「备注」小徽标——有备注才出现，悬停看全文，点击打开完整备注弹窗；同时删掉技能名 hover 显示地址（与「打开目录」重复）。新增 note 图标与 noteChip 样式，noteLine 样式删除。
+  - 描摹字标（用户提供的 raster2svg 产物）试装到 logo 与两版 banner 标题后判定**不可用**：渲染被读成「知音」、横版两字难以辨认、banner 主标题缩成小图形。原因：14 条路径承载两个汉字 + 拉丁字标，保真度不足；且源图分辨率有限。
+  - 处置：banner/banner-en/logo 回滚到文字标题版（git checkout）；描摹稿存档 docs/assets/wordmark-traced-v1.svg（export-ignore，不对外）；等用户提供高保真源（设计工具直出 SVG 或 ≥1024px 位图）再重试。
+  - 验证：四份品牌 SVG 严格 XML 全通过；client.js exit 0。
+
+- 上一轮：2026-11-23 14:0x 修 BUG-013 + 名字间距 + 市场卡片布局
   - **BUG-013（最严重）**：停用只在界面生效，模型目录仍加载全部技能。根因是 shadowCandidates 的 observed 自指门槛——稳态下影子数从 66 归零，原生候选胜出。已删门槛并把 state.known 改为本轮观测快照；实测真实状态 66/66 且全部双 false。待用户重启 DSH 验收新会话 skill-catalog。
   - 名字写法改为「织音 · ZhiYin」（点左右各一个空格），覆盖 README/CHANGELOG/NOTICE/PRODUCT 与五个 SVG 的 title/aria-label。
   - 市场卡片：columnWidth 280→360、技能卡 320→380；安装命令 code 改 display:block + maxWidth:100%，修长命令撑破卡片；骨架屏占位数量由窗口宽度计算，不再固定 6 个。
