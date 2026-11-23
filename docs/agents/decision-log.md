@@ -16,6 +16,24 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-033: 发 npm（首次分发）+ 同步提交 awesome-dsh-plugin PR
+
+- **日期**：2026-11-23
+- **npm 准备**（本条只记录已落地的改动）：
+  1. 移除 `private: true`——npm 会直接拒发私有包；此前保留是因为开发期只做 junction 链接。
+  2. 加 `engines.dsh: ">=0.2.2-rc.5"`。**只写实测下限**，与 `dsh-trust-check` 的写法一致（它写 `>=0.1.0-rc.8`）；`dshmarket` 干脆不写 `engines`。我们只在 0.2.2-rc.5 上验证过，写下限比写空声明诚实，也不至于像带上界那样在 rc 迭代期把用户挡在门外。
+  3. 加 `publishConfig.registry: https://registry.npmjs.org/`。**本机 npm registry 指向华为云镜像**（`repo.huaweicloud.com`），不加这条会尝试往镜像发布。
+  4. 包名 `dsh-skills-zhiyin` 在 npmjs 上 404 → 可用（用 `dshmarket` 做了存在性对照，排除「查询本身失效」）。
+- **已实测的分发链路**（不需要发布即可验）：
+  - `npm publish --dry-run` → 22 文件 / 119.9 kB / 目标 `registry.npmjs.org`；
+  - `npm pack` 出 tarball → 隔离 `DSH_HOME` 里 `dsh plugin add <tgz>`，74ms 完成，`--dump-config` 含 `- id: zhiyin`。
+- **未完成**：真正 `npm publish` 需要 npmjs 登录，本机 `npm whoami` 返回 ENEEDAUTH 且 `.npmrc` 无 token。**凭据只能由用户自己登录**，我不接手、不代填。
+- **市场 PR**：
+  - `gh` 授权账号 `ErgeAIA`（scopes: repo / read:org / gist / workflow）→ fork `ErgeAIA/awesome-dsh-plugin`，新建分支 `add-zhiyin`，只加 `data/plugins/ErgeAIA__dsh-skills-zhiyin.yml` 一个文件，PR 已开：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/18245
+  - PR 描述按其 `pr-body.md` 的勾选清单写，并说明机制（策略 provider 只列被停用候选、启用项落回原生 provider、不复制不改写技能文件）与依赖/网络边界（无运行时依赖、仅市场页与 GitHub 安装联网）。
+  - `gh pr view` 确认 PR 只动 1 个文件、mergeable=MERGEABLE。
+- **用户已确认**：同时发 npm；engines 参考热门插件；PR 授权由我执行。
+
 ## DEC-032: 按 awesome-dsh-plugin 线上规范核对提交方式，并实测市场安装链路
 
 - **日期**：2026-11-23

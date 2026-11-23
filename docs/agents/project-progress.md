@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 23:4x 发布前双轴审查 + 修复 9 项；收藏卡置末
+- **最后更新**：2026-11-24 00:0x 发 npm 准备完成 + 市场 PR #18245 已开
+  - package.json：移除 private、加 engines.dsh（>=0.2.2-rc.5，只写实测下限）、加 publishConfig 指向 registry.npmjs.org（本机 registry 是华为云镜像）。
+  - 分发链路已实测：npm publish --dry-run 通过（22 文件 / 119.9 kB）；npm pack 的 tarball 在隔离 DSH_HOME 里 dsh plugin add 成功（74ms），dump-config 含 zhiyin。
+  - 市场 PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/18245 —— 只改 data/plugins/ErgeAIA__dsh-skills-zhiyin.yml 一个文件，mergeable。CI 仍在跑。
+  - 阻塞：npm publish 需要 npmjs 登录（本机未登录、无 token），凭据须用户自己输入。
+  - 下一步：用户执行 npm login 后我发布；CI 绿了之后等维护者评审。
+
+- 上一轮：2026-11-23 23:4x 发布前双轴审查 + 修复 9 项；收藏卡置末
   - 收藏统计卡从最前移到最末（内置技能之后）。
   - 双轴审查（基线 5759046，12 文件 / +532 行），两子代理并行。修掉：内联字标缺第三色、收藏未随导出导入迁移、回车绕过状态机、reduced-motion 规则打不中、收藏卡文案未走词典、收藏计数虚高、刷新按钮在搜索时也转、失败相位图标、前后端重复排序。
   - 清理：抽 FavoriteButton 组件、路由变量改名、两处过期注释、Star 注释如实化。
