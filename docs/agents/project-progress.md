@@ -23,7 +23,16 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 23:2x GitHub 入口挪到副标题后 + 「Star 一下~」
+- **最后更新**：2026-11-23 23:4x 发布前双轴审查 + 修复 9 项；收藏卡置末
+  - 收藏统计卡从最前移到最末（内置技能之后）。
+  - 双轴审查（基线 5759046，12 文件 / +532 行），两子代理并行。修掉：内联字标缺第三色、收藏未随导出导入迁移、回车绕过状态机、reduced-motion 规则打不中、收藏卡文案未走词典、收藏计数虚高、刷新按钮在搜索时也转、失败相位图标、前后端重复排序。
+  - 清理：抽 FavoriteButton 组件、路由变量改名、两处过期注释、Star 注释如实化。
+  - 文档：decision-log / debug-log 的 updated 同步到 2026-11-23；DEC-025 标注备注徽标已被取代；新增 DEC-031。
+  - 验证：node --check 双半边 0；端到端导出/导入 favorites 通过；客户端 4 slot 冒烟正常。
+  - 未验证：五相位运行时观感（需浏览器点击）。
+  - 下一步：awesome-dsh-plugin 提交 PR。
+
+- 上一轮：2026-11-23 23:2x GitHub 入口挪到副标题后 + 「Star 一下~」
   - GitHub 图标从右上角工具条移到副标题后面，改成带文案的胶囊按钮「⌥ Star 一下~」——孤零零一个图标不构成行动理由，加一句邀请才有人点。
   - 样式 starLink：与副标题同行、视觉重量轻一档（opacity 0.7），悬停才亮；中英文各一条词典（Star 一下~ / Star it~）。
   - 验证：node --check 0；静态渲染确认与副标题同一行。

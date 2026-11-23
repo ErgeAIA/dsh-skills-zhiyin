@@ -2,7 +2,7 @@
 title: Debug Log
 type: debug-log
 project: dsh-skills-zhiyin
-updated: 2026-11-22
+updated: 2026-11-23
 description: >
   反复调试的 bug 追加记录，优先级与实现事实对齐。只追加，不删除或改写历史。
   AI 在本文件新增或修改任何条目后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。

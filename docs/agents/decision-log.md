@@ -2,7 +2,7 @@
 title: Decision Log
 type: decision-log
 project: dsh-skills-zhiyin
-updated: 2026-11-22
+updated: 2026-11-23
 priority: higher-than-prd
 description: >
   开发过程决策日志，优先级高于 PRD；冲突时以本文件最新条目为准（PRD/ADR 由用户自行同步，本技能不代改）。
@@ -15,6 +15,28 @@ description: >
 > **优先级高于 PRD**：冲突时以本文件最新决策为准；PRD/ADR 由用户自行同步，本技能不代改。
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
+
+## DEC-031: 发布前双轴审查（Standards / Spec），修复 9 项真实缺陷
+
+- **日期**：2026-11-23
+- **基线**：`5759046`（本轮功能开发前的最后合并），范围 12 文件 / +532 行。两个子代理并行跑 Standards 与 Spec 两轴，互不污染上下文。
+- **修掉的真实缺陷**（其余为判断题，已记录取舍）：
+  1. **内联字标丢了一种颜色**：`WORDMARK_PATHS` 原用布尔标记橙色，导致 `#FF6A2B→#FF955C` 与 `#F2570F→#F26A1B` 被合并成同一个橙，页面上的字标实际只有两色。改为 `{ d, color }` 三值（paper/weave/light）+ 颜色表，与 logo.svg、交叉标记一致。
+  2. **收藏不随配置迁移**：`EMPTY_STATE`、`/zhiyin/export`、`/zhiyin/import` 都没有 `favorites`，导出再导入会丢收藏。三处补齐；导入侧只收时间戳为正的条目，防脏值打乱置顶顺序。
+  3. **回车绕过状态机**：输入框的 Enter 直接调 `loadMarket`，拿不到 burst/sync/done/error。改为与按钮同一条链路。
+  4. **reduced-motion 规则打不中**：旋转用内联 `animation`，但 `@media` 里写的是 `.zhiyin-spin` 类，SVG 从未挂这个类。`Icon` 增加 `className`。
+  5. **收藏统计卡英文界面仍显示中文**：label 与 hint 硬编码，`statFavorite` 词典键没被使用。改走 `say()`，并补 `statFavoriteHint`。
+  6. **收藏计数可能虚高**：原先数 `favorites` 的键，卸载后残留记录会让数字大于列表实际条数。改为数「当前存在且已收藏」的技能。
+  7. **刷新按钮在搜索时也转**：旋转绑在 `marketLoading` 上。改为自己的 `marketRefreshing`，动画只属于被点的那个按钮。
+  8. **失败相位用了 info 图标**：新增 `alert`（圆 + 感叹）并改用。
+  9. **同一份顺序前后端各算一次**（DEC-029 已记教训，实现未落地）：后端不再做收藏置顶，只按名称稳定输出；置顶由前端按 `favorites` 计算，顺序权威唯一。
+- **一并清理**：抽出 `FavoriteButton` 组件消除卡片/列表两处重复；收藏路由变量 `on → favorited`；两处「宿主上限 60」过期注释；Star 入口注释描述的 hover 效果实际不存在，改为如实描述。
+- **未采纳的判断题（明确取舍）**：
+  - `WORDMARK_PATHS` 与 `assets/wordmark.svg` 双份：内联换来主题自适应与零请求，代价是改版要同步两处，已在 DEC-027 说明，接受。
+  - 热门查询 5→10 组：不扩容则「加载更多」到不了 200（DEC-029），属于实现必需而非范围蔓延。
+  - 列表行也有星标：与卡片视图保持一致；两个视图本就同构。
+- **验证**：`node --check` 双半边 0；假 ctx 端到端验证导出含 favorites、导入后 favorites 与置顶标记恢复；客户端 4 个 slot 冒烟正常。
+- **未验证**：五相位的真实运行时观感仍为 `needs-review`，需在浏览器内实际点击。
 
 ## DEC-030: 搜索按钮走 tuyi 五相位；市场页去重复刷新；左栏图标选中变橙
 
@@ -83,7 +105,7 @@ description: >
 - **边界**：该 SVG 是「织音」**两个汉字**（glyph-01=织，glyph-02=音），不含 ZhiYin 拉丁字标。所以英文 banner 仍用文字 `ZhiYin`——硬套汉字会变成中英混排的错位。
 - **教训（写入 debug-log）**：清洗 SVG 属性时，`style` 里除工具注入的变量外可能还带**语义属性**（display/visibility/opacity）。只应剔除已知的注入项，不能整条删除；改完必须与原文件做像素级对照。
 
-## DEC-025: 描摹字标不可用作标题；备注改为 hover 呈现（字标部分已被 DEC-026 更正）
+## DEC-025: 描摹字标不可用作标题；备注改为 hover 呈现（字标部分已被 DEC-026 更正；备注徽标已被用户在 DEC-030 之后改为「悬停卡片显示备注」，徽标与查看弹窗已移除）
 
 - **日期**：2026-11-23
 - **描摹字标**：用户提供 raster2svg 产物（374×194，14 条路径）。试装结论：
