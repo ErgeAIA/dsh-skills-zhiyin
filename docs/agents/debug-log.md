@@ -16,6 +16,17 @@ description: >
 
 ***
 
+## BUG-013 停用只在界面生效、模型目录仍加载全部技能（影子候选自指）
+
+- **现象**：设置页显示技能数 113，但另一个会话的 `skill-catalog` 注入里能看到 `~/.agents/skills` 下全部技能（含被织音按 agents-root 关掉的 66 个）。
+- **根因（已实证）**：策略 provider 的 `shadowCandidates()` 为被停用技能生成 `modelInvocable/userInvocable=false` 的同名候选，靠 rank=0 压过原生候选（原生 rank 100–500）。但函数里有 `if (observed.has(skillName)) continue`，而 observed 来自 `collectState` 对**已合并快照**的观测——被停用的技能一定在快照里，于是稳态下这批技能全部被跳过。
+  - 决定性实验：冷启动（observed 为空）影子数 **66**；把 observed 设为当前全部已知名后影子数 **0**。策略应隐藏数始终是 66。
+  - `dsh-tool-skill` 在 agent/pre-step 用 `ctx.skills.snapshot({scope: agent})` 建目录，再 `filter(isModelInvocable)`；没有关闭态影子，原生候选胜出，全部技能进入 `<available_skills>`。
+- **为什么这行本来在那**：此前修「技能总数 111/112 抖动」时，`state.known` 只增不减，陈旧条目被补成影子造成计数虚高；加 observed 门槛压住了抖动，也把真正的停用一起关掉了。
+- **修复**：① 删掉自指的 observed 门槛；② `state.known` 从累积历史改为本轮观测快照，磁盘上消失的技能自然退出，从源头消除陈旧影子；③ 删掉不再使用的 `observedSkillNames`。
+- **验证**：合成状态验证 stale 清除且 alive 影子仍为 false；真实 profile 状态策略应隐藏 66 / 影子候选 66 / 全部双 false；`node --check index.js` exit 0。
+- **待用户验收**：完全重启 DSH 后，新会话的 `skill-catalog` 不应再含被关掉的技能。行为验证不能由本进程自证。
+- **预防规则**：任何「用自身输出作为自身输入门槛」的缓存/去重逻辑，必须做连续两轮的稳态实验，不能只看第一轮。
 ## BUG-012 英文版 banner 是非法 XML：属性值缺引号
 
 - **现象**：中文版 banner 正常，英文版用浏览器打开直接显示 XML 解析错误页（`error on line 10 at column 34: AttValue: " or ' expected`），页面只渲染到第一个错误之前。
