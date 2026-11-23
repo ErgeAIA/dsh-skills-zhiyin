@@ -16,7 +16,21 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
-## DEC-036: 路线 A 失败的真因——账户根本没有 2FA，npm 要求「先开 2FA」而不是「发布时输验证码」
+## DEC-037: npm 0.1.0 发布成功并验证可装；市场 PR CI 全绿；发版改为 OIDC 可信发布
+
+- **日期**：2026-11-24
+- **用户端完成**：账户 `ergeaia` 开启 2FA（安全密钥 / passkey，模式 authorization and publishing）→ `npm publish` 走浏览器认证 URL → `Authentication Successful` → `+ dsh-skills-zhiyin@0.1.0`。
+- **registry 实测**：
+  - `dist-tags.latest = 0.1.0`；`shasum = 6d3d15c327446655cf4865f4b2ce4ca24e5b271c`（与本地 dry-run 完全一致）；
+  - `engines.dsh = >=0.2.2-rc.5`、`dsh.bundle.patch`、`dsh.client` 均在 registry 元数据里可查；`license = Apache-2.0`。
+  - 版本列表出现 `0.0.0-stage`：这是 **npm 自己的暂存发布占位包**（description 原文 "Temporary package placeholder for staged publishing"，2 文件 / 339B），由浏览器认证流程自动创建，非我们发布；`latest` 指向 `0.1.0`，不影响用户。
+- **安装验证（关键）**：隔离 `DSH_HOME` 里 `dsh plugin --profile npm-test add dsh-skills-zhiyin` → `+ dsh-skills-zhiyin 0.1.0`，4.8s，22 文件，`--dump-config` 含 `- id: zhiyin`。
+- **发现的真实坑**：本机 pnpm 走**华为云镜像**（`repo.huaweicloud.com`），该镜像尚未同步本包（404），导致 `dsh plugin add dsh-skills-zhiyin` 直接失败；加 `--registry=https://registry.npmjs.org/` 才成功。**推论**：国内配置镜像源的用户，在镜像同步前会装不上；这是分发侧必须知道的边界，不是包的问题。`npm_config_registry` 环境变量对 pnpm 无效，只能传 `--registry`。
+- **市场 PR**：`#18245` CI 全绿（`Submission gate: pass` / `check: pass`），等维护者评审。条目无需补 npm 字段——市场生成器从仓库 `package.json` 的 name 自动派生。
+- **发版流程改造**：新增 `.github/workflows/publish.yml`，用 OIDC 可信发布（`id-token: write` + `npm publish --provenance`），不再持有令牌；含「tag 与 package.json 版本一致」校验与发布前语法/包内容自检。
+- **待用户做**：在 npmjs.com 包设置里登记 Trusted Publisher（仓库 + 工作流名 + 环境），否则工作流无权限发布。
+
+## DEC-036: 路线 A 失败的真因——账户根本没有 2FA
 
 - **日期**：2026-11-24
 - **用户实测**：`npm publish` 仍报同一个 E403，且**全程没有出现 OTP 输入提示**。

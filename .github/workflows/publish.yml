@@ -1,0 +1,58 @@
+name: Publish to npm
+
+# 可信发布（OIDC）：不再持有任何 npm 令牌。
+# 前置：在 npmjs.com 的包设置里把本仓库与本工作流登记为 Trusted Publisher。
+# 依据：npm 2FA-bypass GAT 将于 2027-01 失去直接发布能力，长期方案是 OIDC。
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: 'npm dist-tag（latest / next / beta）'
+        required: false
+        default: latest
+
+permissions:
+  contents: read
+  id-token: write # OIDC 换取短期发布凭据，必需
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # 可信发布需要较新的 npm（OIDC 支持）
+      - name: Ensure recent npm
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      # 版本一致性：tag 与 package.json 不一致就停下，避免发错版本
+      - name: Check version matches tag
+        if: github.event_name == 'release'
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${{ github.event.release.tag_name }}"
+          echo "package.json=$PKG release tag=$TAG"
+          if [ "v$PKG" != "$TAG" ] && [ "$PKG" != "$TAG" ]; then
+            echo "::error::package.json 版本 ($PKG) 与 release tag ($TAG) 不一致"
+            exit 1
+          fi
+
+      # 发布前自检：两个半边语法、包内容清单
+      - name: Preflight
+        run: |
+          node --check index.js
+          node --check client.js
+          npm pack --dry-run
+
+      - name: Publish
+        run: npm publish --provenance --access public --tag "${{ inputs.dist_tag || 'latest' }}"
