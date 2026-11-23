@@ -23,7 +23,16 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 20:0x 备注徽标修到卡片视图；字标接入（并更正上一轮误判）
+- **最后更新**：2026-11-23 20:5x 三色字标 + 去背景 logo + 插件页内联
+  - 字标改三色并与交叉标记同步：黑→#F7EDE4、#F2570F→#F26A1B、#FF6A2B→#FF955C。
+  - logo 去背景（删底板与描边），viewBox 收缩到内容 221×80；标记 68px + 字标 56px + 间距 22。
+  - 新增浅色主题版 logo-light.svg / wordmark-light.svg（笔画改 Ink #202022，橙保留）。
+  - 插件页：字标以 WORDMARK_PATHS 内联进 client.js，currentColor 跟随主题；英文界面用文字 ZhiYin。
+  - 中文 banner 标题同步换成三色字标。
+  - 验证：六份品牌 SVG 严格 XML 通过；深/浅底渲染目视通过；假 window 冒烟 4 个 slot 正常；client.js exit 0。
+  - 待验收：F5 后插件页标题位应显示三色字标，且随深浅主题变色。
+
+- 上一轮：2026-11-23 20:0x 备注徽标修到卡片视图；字标接入（并更正上一轮误判）
   - 备注：上一轮只改了列表视图，卡片视图仍在用旧 cardNote 整块样式——用户截图正是卡片。本轮两个视图统一为「备注」徽标，删除 cardNote 样式。
   - 字标：上一轮判定「不可用」是我处理失误（清洗 style 时误删 display:none，多画一条冗余笔画）。已按原样重建：assets/wordmark.svg（深底）、wordmark-light.svg（原色），接入 logo 与中文 banner。
   - 英文 banner 保持文字标题：该 SVG 只含「织音」两个汉字，没有 ZhiYin 拉丁字标。
