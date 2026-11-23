@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 20:5x 三色字标 + 去背景 logo + 插件页内联
+- **最后更新**：2026-11-23 21:2x 备注改为卡片悬停显示，删除徽标
+  - 用户反馈徽标占一行很难看。改为：**有备注时悬停整张卡片**显示原生 tooltip（`技能备注：<内容>`），无备注则完全不渲染任何东西。
+  - 两个视图（卡片 / 列表行）统一；删除 noteChip 样式、note 图标、noteChip 与 noteView 词典、以及已无触发入口的 noteViewing 完整备注弹窗（死代码）。
+  - 编辑备注入口保留（卡片右上角编辑按钮）。
+  - 验证：client.js exit 0；假 window 冒烟 4 slot 正常；noteChip/noteViewing 残留 0。
+  - 待验收：F5 后卡片上不再有备注行；鼠标悬停有备注的卡片应弹出备注 tooltip。
+
+- 上一轮：2026-11-23 20:5x 三色字标 + 去背景 logo + 插件页内联
   - 字标改三色并与交叉标记同步：黑→#F7EDE4、#F2570F→#F26A1B、#FF6A2B→#FF955C。
   - logo 去背景（删底板与描边），viewBox 收缩到内容 221×80；标记 68px + 字标 56px + 间距 22。
   - 新增浅色主题版 logo-light.svg / wordmark-light.svg（笔画改 Ink #202022，橙保留）。
