@@ -10,6 +10,8 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
     const NS = 'zhiyin'
+    // skills.sh 搜索接口实测上限 200 条（limit>200 会被截到 200）；offset 参数无效，一次取满即可。
+    const MARKET_MAX = 200
     // 仓库地址：源码仓库即插件仓库，设置页右上角的 GitHub 图标指向这里。
     const REPO_URL = 'https://github.com/' + 'ErgeAIA' + '/' + 'dsh-skills-zhiyin'
 
@@ -159,6 +161,7 @@ window.__ModuleLoader__.load({
         alertUnpacked: '有技能未加入技能包，当前不生效',
         noteEdit: '编辑备注',
         noteViewTitle: '技能备注',
+        statFavorite: '收藏',
         favoriteOn: '收藏并置顶',
         favoriteOff: '取消收藏',
         favoriteFailed: '收藏失败：',
@@ -421,6 +424,7 @@ window.__ModuleLoader__.load({
         alertUnpacked: 'Some skills are not in any pack and do not play',
         noteEdit: 'Edit note',
         noteViewTitle: 'Skill note',
+        statFavorite: 'Favourites',
         favoriteOn: 'Favourite and pin to top',
         favoriteOff: 'Remove from favourites',
         favoriteFailed: 'Could not update favourites: ',
@@ -1340,7 +1344,7 @@ window.__ModuleLoader__.load({
   ],
 }
 
-function Icon({ name, size = 15, filled = false }) {
+function Icon({ name, size = 15, filled = false, spin = false }) {
   const shapes = ICONS[name] ?? []
   return h(
     'svg',
@@ -1354,7 +1358,9 @@ function Icon({ name, size = 15, filled = false }) {
       strokeWidth: 1.7,
       strokeLinecap: 'round',
       strokeLinejoin: 'round',
-      style: { flex: '0 0 auto', display: 'block' },
+      style: spin
+        ? { flex: '0 0 auto', display: 'block', animation: 'zhiyin-spin 0.9s linear infinite' }
+        : { flex: '0 0 auto', display: 'block' },
       'aria-hidden': 'true',
     },
     shapes.map(([tag, spec], index) =>
@@ -1607,6 +1613,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         tag.id = id
         tag.textContent =
           '@keyframes zhiyin-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}' +
+          '@keyframes zhiyin-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}' +
+          '@media (prefers-reduced-motion: reduce){.zhiyin-spin{animation:none!important}}' +
           '@media (prefers-reduced-motion: reduce){.zhiyin-skeleton{animation:none!important}}'
         document.head.appendChild(tag)
         return undefined
@@ -1956,7 +1964,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       // 加载更多：把 limit 加到宿主上限 60 后再取一次（skills.sh 单次最多返回 60 条）。
       const loadMoreMarket = React.useCallback(() => {
         setMarketMore(true)
-        const next = Math.min(60, marketLimit + 20)
+        const next = Math.min(MARKET_MAX, marketLimit + 20)
         fetch('/zhiyin/market?q=' + encodeURIComponent(marketQuery || '') + '&limit=' + next, { headers: { accept: 'application/json' } })
           .then((response) => {
             if (!response.ok) throw new Error('HTTP ' + response.status)
@@ -2208,6 +2216,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           if (filter === 'disabled' && skill.enabled !== false) return false
       if (filter === 'internal' && (skill.enabled === false || skill.model || skill.user)) return false
           if (filter === 'bundled' && skill.source !== 'bundled') return false
+          if (filter === 'favorite' && !(skill.favorite === true)) return false
           if (needle === '') return true
           return (
             skill.name.toLowerCase().includes(needle) ||
@@ -2215,14 +2224,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           )
         })
         const chars = (skill) => Math.min((skill.description ?? '').length, 500)
+        const favorites = data?.favorites ?? {}
+        const isFav = (skill) => skill.favorite === true || Object.prototype.hasOwnProperty.call(favorites, skill.name)
         const sorted = filtered.slice().sort((a, b) => {
+          // 收藏永远在最前，且不受排序字段影响；收藏之间按收藏时间倒序。
+          const fa = isFav(a), fb = isFav(b)
+          if (fa !== fb) return fa ? -1 : 1
+          if (fa && fb) return (favorites[b.name] ?? 0) - (favorites[a.name] ?? 0) || a.name.localeCompare(b.name)
           if (sortField === 'source') return String(a.source).localeCompare(String(b.source)) || a.name.localeCompare(b.name)
           if (sortField === 'chars') return chars(b) - chars(a) || a.name.localeCompare(b.name)
           if (sortField === 'enabled') return Number(b.enabled !== false) - Number(a.enabled !== false) || a.name.localeCompare(b.name)
           return a.name.localeCompare(b.name)
         })
         return sorted
-      }, [scoped, query, filter, sortField])
+      }, [scoped, query, filter, sortField, data])
 
       const sourceLabel = (skill) => {
         const root = skill.root
@@ -2896,6 +2911,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   marketLoading ? h(Spinner, { size: 14 }) : h(Icon, { name: 'search', size: 14 }),
                   say('marketSearch', '搜索'),
                 ),
+                // 刷新：marketLoading 时图标持续旋转，让「点到了」这件事看得见。
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: css.iconBtn,
+                    title: say('refresh', '刷新'),
+                    'aria-label': say('refresh', '刷新'),
+                    'aria-busy': marketLoading ? 'true' : 'false',
+                    disabled: marketLoading,
+                    onClick: () => loadMarket(marketQuery),
+                  },
+                  h(Icon, { name: 'refresh', size: 15, spin: marketLoading }),
+                ),
               ),
               h(
                 'div',
@@ -3022,7 +3051,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   )
                 }),
               ),
-              marketItems.length > 0 && marketItems.length < 60
+              marketItems.length > 0 && marketItems.length < MARKET_MAX
                 ? h(
                     'div',
                     { style: css.loadMoreWrap },
@@ -3035,7 +3064,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       marketMore ? h(Spinner, { size: 14 }) : h(Icon, { name: 'chevronDown', size: 14 }),
                       marketMore
                         ? say('marketMoreLoading', '加载中…')
-                        : say('marketMore', '加载更多') + '（' + marketItems.length + ' / 60）'),
+                        : say('marketMore', '加载更多') + '（' + marketItems.length + ' / ' + MARKET_MAX + '）'),
                   )
                 : null,
             )
@@ -4076,6 +4105,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         { key: 'statDisabled', label: '已停用', value: counts.disabled, filter: 'disabled', hint: '被总开关、.agents 开关、技能包或单技能开关挡住的技能；文件仍在盘上，随时能打开' },
         { key: 'statBundled', label: '内置技能', value: counts.bundled, filter: 'bundled', hint: '随 DSH 内置的技能，已计入「可自动调用」，不额外相加' },
       ]
+      // 收藏筛选：只在确实有收藏时出现，避免一张永远为 0 的空卡。
+      const favCount = Object.keys(data?.favorites ?? {}).length
+      if (favCount > 0) {
+        items.unshift({ key: 'statFavorite', label: '收藏', value: favCount, filter: 'favorite', hint: '已收藏的技能，始终置顶；点一下只看收藏' })
+      }
       if ((counts.internal ?? 0) > 0) {
         items.push({ key: 'statInternal', label: '不可直接调用', value: counts.internal, filter: 'internal', hint: '模型与 / 菜单两个入口都关了（disable-model-invocation: true 且 user-invocable: false），只能被别的技能引用' })
       }

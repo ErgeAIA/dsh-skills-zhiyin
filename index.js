@@ -245,7 +245,8 @@ export function apply(ctx) {
         const url = new URL(String(request.url ?? '/'), 'http://localhost')
         const q = String(url.searchParams.get('q') ?? '').trim()
         const requested = Number(url.searchParams.get('limit') ?? 40)
-        const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 60) : 40
+        // skills.sh 实测单次最多返回 200 条（limit>200 截到 200），offset 参数无效。
+        const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 200) : 40
         const result = await marketSearch(q, limit)
         response.writeHead(result.status, { 'content-type': 'application/json; charset=utf-8' })
         response.end(JSON.stringify(result.body))
@@ -1228,7 +1229,7 @@ const marketCache = new Map()
 const marketDescCache = new Map()
 
 /** 热门近似：skills.sh 无 trending API；用几个覆盖面广的词各拉一批，合并后按 installs 降序。 */
-const TRENDING_QUERIES = ['find', 'agent', 'pdf', 'writing', 'design']
+const TRENDING_QUERIES = ['find', 'agent', 'pdf', 'writing', 'design', 'claude', 'code', 'data', 'test', 'doc']
 
 /** 单次 skills.sh 搜索；失败重试（其解析到多个 IP，个别会超时）。 */
 async function fetchSearchRaw(q, limit) {
@@ -1274,7 +1275,9 @@ async function marketSearch(query, limit) {
     if (one.error) return { status: 502, body: { ok: false, error: '连接 skills.sh 失败：' + one.error } }
     items = one.items.sort((a, b) => b.installs - a.installs)
   } else {
-    const settled = await Promise.all(TRENDING_QUERIES.map((q) => fetchSearchRaw(q, 20)))
+    // 热门：每组查询按目标条数拉取（原先固定 20，导致上限只有 100 左右）。
+    const perQuery = Math.max(20, Math.ceil(limit / TRENDING_QUERIES.length) + 5)
+    const settled = await Promise.all(TRENDING_QUERIES.map((q) => fetchSearchRaw(q, perQuery)))
     const byId = new Map()
     for (const result of settled) for (const item of result.items ?? []) if (!byId.has(item.id)) byId.set(item.id, item)
     if (byId.size === 0) return { status: 502, body: { ok: false, error: '连接 skills.sh 失败' } }

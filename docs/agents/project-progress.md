@@ -23,7 +23,15 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 22:1x 技能收藏置顶 + 市场加载更多
+- **最后更新**：2026-11-23 22:5x 修收藏置顶 + 收藏筛选 + 市场刷新态 + 上限改 200
+  - 收藏没置顶：前端 useMemo 又按 sortField 重排覆盖了后端顺序。已改为收藏恒置顶（组内按收藏时间倒序），再套排序字段。
+  - 新增「收藏」筛选卡（有收藏才显示）。
+  - 市场新增刷新按钮，Icon 支持 spin，加载时图标旋转；补 keyframes 并遵循 reduced-motion。
+  - 市场上限：实测 skills.sh 真实上限 200（limit>200 截断），offset 无效。宿主 60→200，客户端 MARKET_MAX=200，热门查询词 5→10 组。实测热门与搜索均可返回 200 条。
+  - 验证：node --check 双半边 0；端到端 limit=200 返回 200 条。
+  - 待验收：收藏后应立刻置顶；统计卡出现「收藏」；市场刷新按钮点击时图标旋转；加载更多可到 200。
+
+- 上一轮：2026-11-23 22:1x 技能收藏置顶 + 市场加载更多
   - 收藏：state.favorites 存「名字→时间戳」；POST /zhiyin/favorite 切换；收藏项按收藏时间倒序置顶，其余按名称。卡片与列表行的名称前加星标（空心灰 → 点亮强调色）。
   - 市场分页：limit 变状态（默认 40），「加载更多」+20 直到宿主上限 60，按钮显示「当前/60」。
   - 顺手修：Icon 组件新增 filled 支持（星标点亮）；新增 chevronDown 图标与 favBtn / loadMoreWrap 样式；中英词典各补 5 条。
