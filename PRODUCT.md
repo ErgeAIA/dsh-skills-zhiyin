@@ -51,7 +51,7 @@ web
 
 ## Brand Commitments
 
-- 名称「织音·ZhiYin」，中文界面、中文文档、代码为 JavaScript。
+- 名称「织音 · ZhiYin」，中文界面、中文文档、代码为 JavaScript。
 - 语气直白、工程化，不用营销词，不夸大能力。
 - 当前没有 logo、插画或品牌图片资产；界面沿用 DSH 宿主的深色主题与控件语言。
 
