@@ -23,7 +23,15 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 00:5x 2FA 已开启（安全密钥），发布进入浏览器认证流程，等用户在浏览器完成
+- **最后更新**：2026-11-24 01:1x npm 0.1.0 已发布并验证可装；市场 PR CI 全绿；新增 OIDC 发版工作流
+  - npm：registry latest=0.1.0，shasum 与本地一致；隔离 DSH_HOME 里 dsh plugin add dsh-skills-zhiyin 成功（22 文件，dump-config 含 zhiyin）。
+  - 镜像坑：本机 pnpm 走华为云镜像，尚未同步本包（404）→ 必须加 --registry=https://registry.npmjs.org/ 才能装；npm_config_registry 环境变量对 pnpm 无效。国内镜像用户同步前会装不上。
+  - 市场 PR #18245：Submission gate pass + check pass，等维护者评审。条目无需补 npm 字段（生成器从 package.json 派生）。
+  - 新增 .github/workflows/publish.yml：OIDC 可信发布 + tag/版本一致性校验 + 发布前语法与包内容自检。
+  - 待用户：在 npmjs.com 包设置登记 Trusted Publisher，工作流才有发布权限。
+  - 待定：README 是否补 npm 安装命令（按 AGENTS.md，README 属 shuxu 负责，我只报缺口）。
+
+- 上一轮：2026-11-24 00:5x 2FA 已开启（安全密钥），发布进入浏览器认证流程
   - 用户截图：Two-Factor Authentication 卡显示「Enabled for authorization and publishing」+「1 security key」。没看到 Authenticator app 是因为 npm 现在默认走安全密钥（passkey）流程，TOTP 是可选项。
   - 我这边实测 `npm publish`：错误从 E403 变为 **EOTP**——「This operation requires a one-time password. Open this URL in your browser to authenticate: https://www.npmjs.com/auth/cli/…」。即 CLI 本地收不了安全密钥，改为给你一个一次性 URL，在浏览器里用安全密钥认证后，CLI 自动继续完成发布。
   - 该 URL 是本次发布绑定的握手地址，只能由用户本人在浏览器打开认证（我这边代跑没有意义，认证动作需要用户的安全密钥）。
