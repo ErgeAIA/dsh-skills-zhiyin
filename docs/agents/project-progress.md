@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-23 22:5x 加载更多按钮单行；左栏图标换成三线交叉
+- **最后更新**：2026-11-23 23:1x 市场去重刷新 + 搜索五相位 + 左栏图标选中变橙
+  - 市场页有两个刷新：标题行那个（只重载 state）在 market/archive 也渲染。已在两页隐藏，各页只留语义正确的那个。
+  - 搜索按钮按 tuyi 编排层实现五相位：idle → burst(1px 轻推 150ms) → sync(Spinner+aria-busy+disabled) → done(绿/勾/已更新 1.5s) 或 error(红/失败 3s) → idle；卸载清定时器。
+  - 左栏 NavIcon 选中态改品牌橙 #F26A1B，未选中跟随主题。
+  - 验证：node --check 0；假 window 冒烟 4 slot 正常。相位观感标 needs-review（需浏览器内点击验证）。
+  - 待验收：市场只剩一个刷新；搜索按钮点击后先轻推、再转圈、成功后变绿显示「已更新」约 1.5 秒；左栏图标选中为橙色。
+
+- 上一轮：2026-11-23 22:5x 加载更多按钮单行；左栏图标换成三线交叉
   - 加载更多按钮：`css.btn` 只有 `whiteSpace: nowrap`，没有 flex 容器，spinner 与文字各占一行。已改为 `inline-flex + align-items:center + gap:7`，文字包一层 span。
   - 左栏图标：NavIcon 原为音符（两条竖线 + 两个圆点）。改为与品牌标记同构的三条交叉股线——把 96 单位路径等比缩到 16 单位坐标系，线宽按比例取 1.5，16px 下仍可分辨三条线。
   - 验证：node --check 0；静态渲染确认按钮单行、图标 16px 可辨。
