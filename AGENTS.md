@@ -27,9 +27,8 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | 工具 | 精确版本 | 锁定位置 |
 | ---- | -------- | -------- |
 | Node.js | v24.22.1 | node --version（实测） |
-| @deepseek-ai/dsh-skill | 0.2.2-rc.3 | package.json |
-| @deepseek-ai/dsh-tools | 0.2.2-rc.3 | package.json |
-| @deepseek-ai/dsh-llm | 0.2.2-rc.3 | package.json |
+| DSH | 0.2.2-rc.5 | 实测运行版本；package.json `engines.dsh` 声明 `>=0.2.2-rc.5` |
+| 运行时依赖 | **无** | package.json 的 dependencies / devDependencies / peerDependencies 均为空，故 `dsh plugin add` 不触发构建授权 |
 
 ## Commands
 
@@ -37,7 +36,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | ---- | -------- | ---- |
 | 校验宿主半边语法 | node --check index.js | 本次实测 |
 | 校验页面半边语法 | node --check client.js | 本次实测 |
-| 安装插件包依赖 | npm install（仓库根目录） | package-lock.json |
+| 安装插件包依赖 | 无依赖，不需要安装步骤（npm install 为空操作） | `npm install` 实测 removed 20 packages / audited 1 package |
 | 让宿主改动生效 | 完全退出并重开 DSH，不是刷新页面 | README.md |
 | 观测当前目录数据 | GET http://127.0.0.1:<port>/zhiyin/state | index.js |
 | 查看发布内容 | npm pack --dry-run（仓库根目录） | package.json 的 files |
@@ -57,7 +56,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | 经验库按领域分目录 | 可复用经验落 docs/agents/experience/<领域>/；正文可改写、历史靠 changelog.md，与 docs/agents 其余三份的「只追加」不同 |
 | AGENTS.md 杂音归宿 | 变更日志 → CHANGELOG.md（无则 decision-log.md）；人读说明 → README.md（无则不写）；决策叙事与踩坑 → decision-log.md 与 debug-log.md；执行流水 → init-report.md 与 project-progress.md |
 | 仓库文档归属 | README 生成或优化 → shuxu；CHANGELOG 建立、改结构、归档版本 → changelog-manager，日常只按既有格式追加 `[Unreleased]`；.gitignore 新增或修正 → git-manager；其他角色只报告缺口，不代写 |
-| 插件仍在开发阶段 | package.json 的 version 锁定 0.1.0，开发期不升版，改动靠重启 DSH 加载 |
+| 版本与发布 | 已发布 npm 包 `dsh-skills-zhiyin`；version 按 SemVer 递增，**发布后任何改动必须升版再发**，不得覆盖已发布版本；本地未发布的改动仍靠完全重启 DSH 加载，刷新页面不生效 |
 | 启停只写本地状态 | 写 <profile>/zhiyin-proto/state.json 与 events.ndjson；启停不改动技能文件 |
 | 安装卸载写盘边界 | 安装新建技能目录；卸载移入归档目录；两者都是用户显式动作，不得由启停或轮询触发 |
 | 停用机制唯一 | 按 Agent 注册策略 provider，modelInvocable 与 userInvocable 双置 false；启用项不列，落回原生 provider |
