@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 00:4x 路线 A 失败真因：账户未开 2FA（不是缺 OTP 提示）
+- **最后更新**：2026-11-24 00:5x 2FA 已开启（安全密钥），发布进入浏览器认证流程，等用户在浏览器完成
+  - 用户截图：Two-Factor Authentication 卡显示「Enabled for authorization and publishing」+「1 security key」。没看到 Authenticator app 是因为 npm 现在默认走安全密钥（passkey）流程，TOTP 是可选项。
+  - 我这边实测 `npm publish`：错误从 E403 变为 **EOTP**——「This operation requires a one-time password. Open this URL in your browser to authenticate: https://www.npmjs.com/auth/cli/…」。即 CLI 本地收不了安全密钥，改为给你一个一次性 URL，在浏览器里用安全密钥认证后，CLI 自动继续完成发布。
+  - 该 URL 是本次发布绑定的握手地址，只能由用户本人在浏览器打开认证（我这边代跑没有意义，认证动作需要用户的安全密钥）。
+  - 可选：用户可在 Modify 2FA 里再绑定一个 TOTP 验证器，以后 CLI 可直接输 6 位码，不必开浏览器。二选一即可，不阻塞本次发布。
+  - 待办：用户在自己终端重跑 npm publish → 开 URL → 安全密钥认证 → 发布完成；我随后验证 npm 安装并记录。
+
+- 上一轮：2026-11-24 00:4x 路线 A 失败真因：账户未开 2FA
   - npm profile：two-factor auth: disabled，账号 2026-11-23 新建。npm 要求账户级 2FA 才允许发布，登录 token 不能替代。
   - 给用户的步骤：npmjs.com 开 2FA（TOTP）→ 存恢复码 → 模式选 Authorization and Writes → 重跑 npm publish 输 OTP。
   - bypass-2FA 令牌路线维持否决（DEC-035）。
