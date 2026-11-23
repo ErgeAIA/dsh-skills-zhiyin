@@ -16,6 +16,38 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-032: 按 awesome-dsh-plugin 线上规范核对提交方式，并实测市场安装链路
+
+- **日期**：2026-11-23
+- **为什么重核**：此前的条目草稿来自本地调研（`docs/design/ZhiYin-发布渠道调研.md`），不是规范原文。对外承诺前必须核对线上仓库，避免把「我以为的规范」当规范。
+- **线上规范原文**（`awesome-dsh-plugin/awesome-dsh-plugin` 的 `contributing.md`，注意文件名是全小写，不是 CONTRIBUTING.md）：
+  - 提交物**只有一个文件**：`data/plugins/<owner>__<repo>.yml`；两个 README 由脚本从 `data/plugins/*.yml` 生成，**禁止手工编辑**，也不需跑命令。
+  - 字段：`url`（须与仓库完全一致）/ `name`（owner/repo）/ `category` / `description.en`（**唯一必填**，`zh` 可选）/ `icon`（可选，GitHub 托管位图）。
+  - `category` 允许值含 `skill`。
+  - **描述含「冒号 + 空格」必须加引号**，否则 YAML 解析成嵌套键。
+  - 硬性要求：`package.json` 声明 `dsh.bundle`（只声明 `dsh.client` 是最常见被拒原因）、真实可用代码、**仓库创建满 1 天**、带 `dsh-plugin` topic、持续维护、描述属实不带营销词。
+  - CI 只是前置条件，维护者会实际读仓库；**已有条目覆盖的会按「谁更好」判**。
+- **本仓库逐条核对结果（全部通过）**：
+  | 要求 | 实测 |
+  | --- | --- |
+  | `dsh.bundle.patch` | `./cordis.patch.yml`，文件存在（线上 HTTP 200，201B） |
+  | 真实可用代码 | index.js / client.js / paths.js 共约 200KB，非占位 |
+  | 仓库创建满 1 天 | 2026-11-17 创建，6 天 |
+  | `dsh-plugin` topic | 已有（另有 deepseek-harness / dsh / skill-manager） |
+  | category 合法 | `skill` ✅ |
+  | 描述冒号空格 | 无，无需引号 |
+  | icon 可访问 | `assets/icon-180.png` HTTP 200，image/png，3937B |
+  | 依赖/构建 | `dependencies`、`devDependencies`、`scripts` 全为空 → git 安装不触发构建授权 |
+- **实测安装链路**（此前从未验证，因为开发期一直用 junction 链接）：在隔离的 `DSH_HOME` 里跑市场用户的真实命令
+  `dsh plugin --profile pr-test add github:ErgeAIA/dsh-skills-zhiyin`
+  → 14s 安装完成，`+ dsh-skills-zhiyin 0.1.0`，**无构建授权提示**；`dsh --profile pr-test --dump-config` 输出含 `- id: zhiyin / name: dsh-skills-zhiyin`。测试目录已清理。
+- **重复条目风险（已核实）**：列表里已有 3 个 `dsh-skill-manager` 条目（AKS1st 文件浏览编辑、DaLongggggg 列表/回收站、HighToward 分类型卡片）+ 1 个 `dsh-skill-palette`（输入框选技能）。它们的共同点是「整理/浏览/选取」，**都不控制模型实际看得见哪些**——这正是织音的策略 provider + 技能包门控所做的事。故条目描述改为以「控制模型此刻真正看得见哪些」开头，而不是「把技能编成包」，让差异在第一条就成立。
+- **待用户决定（未擅自改）**：
+  1. `private: true` 仍在——只挡 npm publish，不挡 GitHub 安装（已实测）。保留即「仅 GitHub 分发」。
+  2. 无 `engines.dsh`——官方文档建议声明兼容范围，市场规范不强制；不加则装到任何版本都尝试加载。要给范围需先定准，不猜。
+  3. `version` 仍锁 0.1.0（AGENTS.md 开发期约定）；市场条目本身不带版本字段。
+- **结论**：提交方式符合规范，仓库无需改造即可提交；剩余是三项分发策略决策。
+
 ## DEC-031: 发布前双轴审查（Standards / Spec），修复 9 项真实缺陷
 
 - **日期**：2026-11-23
