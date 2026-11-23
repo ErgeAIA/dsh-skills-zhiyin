@@ -211,6 +211,8 @@ window.__ModuleLoader__.load({
         emptyHint: '换个关键词，或清空搜索框看看全部技能',
         marketSearchPlaceholder: '搜索 skills.sh 技能（至少 2 个字符；留空看热门）',
         marketSearch: '搜索',
+        searchDone: '已更新',
+        searchFailed: '失败',
         marketTrending: '热门技能（按安装量排序）',
         marketResult: '搜索结果',
         marketEmpty: '没有找到技能',
@@ -474,6 +476,8 @@ window.__ModuleLoader__.load({
         emptyHint: 'Try another keyword, or clear the search to see every skill',
         marketSearchPlaceholder: 'Search skills.sh (2+ characters; leave empty for trending)',
         marketSearch: 'Search',
+        searchDone: 'Updated',
+        searchFailed: 'Failed',
         marketTrending: 'Trending skills (by install count)',
         marketResult: 'Search results',
         marketEmpty: 'No skills found',
@@ -1580,6 +1584,18 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         h('path', { key: 'wm-' + index, d: entry[0], fill: entry[1] ? '#F26A1B' : 'currentColor', fillRule: 'evenodd' }),
       ))
     }
+    /**
+     * 搜索按钮的相位样式（tuyi 编排层）：
+     * burst 只做一次性 2px 轻推（「点到了」），sync 由内部 Spinner 承担旋转，
+     * done / error 用结论色静态停留，不抖动（抖动只留给输入校验）。
+     */
+    function searchBtnStyle(phase) {
+      const base = { display: 'inline-flex', alignItems: 'center', gap: 6 }
+      if (phase === 'burst') return { ...base, transform: 'translateY(1px)', transition: 'transform 120ms ease' }
+      if (phase === 'done') return { ...base, color: '#4a9d6a', borderColor: 'rgba(74,157,106,0.5)' }
+      if (phase === 'error') return { ...base, color: '#d05a4a', borderColor: 'rgba(208,90,74,0.5)' }
+      return base
+    }
     function Page({ close, t, wide }) {
       // 界面语言：默认跟随宿主（t 返回的就是宿主当前语言），用户可在这里覆盖并记住。
       const hostLang = typeof t === 'function' && t('guideLang') === 'en' ? 'en' : 'zh'
@@ -1677,6 +1693,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketHover, setMarketHover] = React.useState(null) // 鼠标悬停的卡片 id
       const [marketLimit, setMarketLimit] = React.useState(40)   // 每次加载条数；「加载更多」按 20 递增（宿主上限 60）
       const [marketMore, setMarketMore] = React.useState(false)  // 正在加载更多
+      /**
+       * 搜索按钮的五相位（tuyi 编排层）：idle → burst（点到了）→ sync（在跑）
+       * → done / error（结论色停留）→ idle。只有 burst 与 sync 会动；
+       * done / error 是「有结论」的相位，用静态色 + 驻留表达。
+       */
+      const [searchPhase, setSearchPhase] = React.useState('idle')
+      const searchTimers = React.useRef([])
+      const clearSearchTimers = React.useCallback(() => {
+        for (const timer of searchTimers.current) window.clearTimeout(timer)
+        searchTimers.current = []
+      }, [])
+      // 组件卸载清定时器，避免状态机在已卸载组件上回写。
+      React.useEffect(() => () => clearSearchTimers(), [clearSearchTimers])
       const [skillHover, setSkillHover] = React.useState(null)   // 鼠标悬停的技能卡 name
       const [marketDesc, setMarketDesc] = React.useState({})
       // 收藏：点一次切换，成功后重载 state 让置顶顺序生效。
@@ -1947,7 +1976,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setMarketLoaded(true)
         setMarketLoading(true)
         setMarketError('')
-        fetch('/zhiyin/market?q=' + encodeURIComponent(q || '') + '&limit=' + marketLimit, { headers: { accept: 'application/json' } })
+        return fetch('/zhiyin/market?q=' + encodeURIComponent(q || '') + '&limit=' + marketLimit, { headers: { accept: 'application/json' } })
           .then((response) => {
             if (!response.ok) throw new Error('HTTP ' + response.status)
             return response.json()
@@ -1958,7 +1987,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             setMarketDesc({})
             setMarketTrending(payload.trending !== false)
           })
-          .catch((error) => setMarketError(String(error?.message ?? error)))
+          .catch((error) => {
+            setMarketError(String(error?.message ?? error))
+            throw error
+          })
           .finally(() => setMarketLoading(false))
       }, [marketLimit])
       // 加载更多：把 limit 加到宿主上限 60 后再取一次（skills.sh 单次最多返回 60 条）。
@@ -1978,6 +2010,26 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .catch((error) => setMarketError(String(error?.message ?? error)))
           .finally(() => setMarketMore(false))
       }, [marketLimit, marketQuery])
+      /**
+       * 跑一次搜索相位。失败驻留比成功长（读原因 vs 看清结论），
+       * 参数取 tuyi proposal 锚点：成功 1.5s、失败 3s。
+       */
+      const runSearchPhase = React.useCallback((task) => {
+        clearSearchTimers()
+        setSearchPhase('burst')
+        searchTimers.current.push(window.setTimeout(() => setSearchPhase('sync'), 150))
+        return Promise.resolve(task()).then(
+          () => {
+            setSearchPhase('done')
+            searchTimers.current.push(window.setTimeout(() => setSearchPhase('idle'), 1500))
+          },
+          (error) => {
+            setSearchPhase('error')
+            searchTimers.current.push(window.setTimeout(() => setSearchPhase('idle'), 3000))
+            throw error
+          },
+        )
+      }, [clearSearchTimers])
       // 市场点安装：直接在卡片上安装（进行中转圈 + 完成标记），失败才回落到安装弹窗。
       const installFromMarket = (item, reinstall = false) => {
         if (!item?.source || item.installable === false) return
@@ -2695,14 +2747,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h('button', { type: 'button', style: view === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('list') }, say('viewList', '列表')),
                   )
                 : null,
-              h('button', {
-                type: 'button',
-                style: { ...css.iconBtn, marginLeft: tab === 'list' ? 0 : 'auto' },
-                title: say('refresh', '刷新'),
-                'aria-label': say('refresh', '刷新'),
-                onClick: load,
-                disabled: state.loading,
-              }, state.loading ? h(Spinner, { size: 15 }) : h(Icon, { name: 'refresh', size: 14 })),
+              // 标题行刷新只重载 /zhiyin/state；市场与归档页各有自己的刷新，避免出现两个刷新图标。
+              tab === 'market' || tab === 'archive'
+                ? null
+                : h('button', {
+                    type: 'button',
+                    style: { ...css.iconBtn, marginLeft: tab === 'list' ? 0 : 'auto' },
+                    title: say('refresh', '刷新'),
+                    'aria-label': say('refresh', '刷新'),
+                    onClick: load,
+                    disabled: state.loading,
+                  }, state.loading ? h(Spinner, { size: 15 }) : h(Icon, { name: 'refresh', size: 14 })),
             )
           : null,
 
@@ -2904,12 +2959,24 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   'button',
                   {
                     type: 'button',
-                    style: { ...css.btn, display: 'inline-flex', alignItems: 'center', gap: 6 },
-                    disabled: marketLoading,
-                    onClick: () => loadMarket(marketQuery),
+                    style: { ...css.btn, ...searchBtnStyle(searchPhase) },
+                    disabled: searchPhase === 'sync' || searchPhase === 'burst',
+                    'aria-busy': searchPhase === 'sync' ? 'true' : 'false',
+                    onClick: () => { runSearchPhase(() => loadMarket(marketQuery)).catch(() => {}) },
                   },
-                  marketLoading ? h(Spinner, { size: 14 }) : h(Icon, { name: 'search', size: 14 }),
-                  say('marketSearch', '搜索'),
+                  searchPhase === 'sync'
+                    ? h(Spinner, { size: 14 })
+                    : searchPhase === 'done'
+                      ? h(Icon, { name: 'check', size: 14 })
+                      : searchPhase === 'error'
+                        ? h(Icon, { name: 'info', size: 14 })
+                        : h(Icon, { name: 'search', size: 14 }),
+                  h('span', null,
+                    searchPhase === 'done'
+                      ? say('searchDone', '已更新')
+                      : searchPhase === 'error'
+                        ? say('searchFailed', '失败')
+                        : say('marketSearch', '搜索')),
                 ),
                 // 刷新：marketLoading 时图标持续旋转，让「点到了」这件事看得见。
                 h(
@@ -4165,6 +4232,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           height: size,
           viewBox: '0 0 16 16',
           'aria-hidden': true,
+          // 选中时用品牌橙，未选中跟随主题前景色；透明度只做次级区分。
+          style: { color: active ? '#F26A1B' : 'inherit', display: 'block' },
           opacity: active ? 1 : 0.72,
         },
         h(
