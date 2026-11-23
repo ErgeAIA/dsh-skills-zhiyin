@@ -16,6 +16,27 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-038: README 安装段改为 npm 优先；开发期继续用 link，不切 npm 安装
+
+- **日期**：2026-11-24
+- **README（shuxu 增量优化，双语平行）**：
+  - 安装段改为 **npm 优先**：`dsh plugin --profile <profile> add dsh-skills-zhiyin`；保留本地目录与 tarball 两种方式；
+  - 新增**镜像延迟说明**：国内镜像未同步新包时表现为 404，加 `--registry=https://registry.npmjs.org/` 即可（实测事实，非推测）；
+  - **修正一处过期声明**：原文写「运行要求：Node.js ≥ 24；宿主共享包 @deepseek-ai/dsh-llm / dsh-skill / dsh-tools」，而 `package.json` 现在**没有任何依赖**、`engines` 只有 `dsh`。改为「DSH ≥ 0.2.2-rc.5（见 engines.dsh）；本包无运行时依赖、无生命周期脚本，安装不触发构建也不需要构建授权」。
+  - **开发段**同步：去掉已成空操作的 `npm install`（原注释「安装依赖」已不成立），补发布方式（发 GitHub Release → OIDC 工作流发布，或本地 npm publish）。
+  - 双语互链与本地链接全部核对通过（README.md ↔ README.en.md、LICENSE、NOTICE、banner）。
+- **命令验证**（shuxu Step 5，全部无副作用）：
+  - `dsh plugin --profile <p> add dsh-skills-zhiyin` → **[已运行验证]**（隔离 DSH_HOME；本机因镜像 404 需加 --registry，已单列说明）；
+  - `dsh plugin --profile <p> add dsh-skills-zhiyin --registry=https://registry.npmjs.org/` → **[已运行验证]**；
+  - `dsh plugin --profile <p> add <本地目录>` → **[已运行验证]**（34ms，link 风格依赖）；
+  - `npm pack` + `dsh plugin add <tgz>` → **[已运行验证]**（74ms）；
+  - `node --check index.js` / `client.js`、`npm pack --dry-run` → **[已运行验证]**。
+- **开发期安装方式：不切换**。当前 profile 用 `link:D:\Workspace\Code\dsh-skills-zhiyin`，是开发态。若改为 npm 安装：
+  - 会被钉在已发布的 0.1.0，任何改动都要「升版 → 发布 → 重装」才能看到，迭代成本显著上升；
+  - 本地 link 下改完只需**完全重启 DSH** 即可生效，这正是 AGENTS.md 里保留的路径。
+- **建议的验证方式**：需要确认「发布出去的产物」时，另开一个一次性 profile（如 `dsh plugin --profile npm-check add dsh-skills-zhiyin --registry=...`），用完即弃；主 profile 继续用 link 开发。
+- **数据不会因删除插件而丢**：state 存在 `<profile>/zhiyin-proto/`（技能包 / 停用项 / 备注 / 收藏），与包安装位置无关；删包重装后数据仍在。
+
 ## DEC-037: npm 0.1.0 发布成功并验证可装；市场 PR CI 全绿；发版改为 OIDC 可信发布
 
 - **日期**：2026-11-24

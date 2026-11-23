@@ -26,7 +26,19 @@ DeepSeek Harness 的技能管理插件：安装技能、编成技能包、按需
 
 ## 安装
 
-作为 DSH 组合包安装到 profile：
+已发布到 npm，推荐直接装：
+
+```bash
+dsh plugin --profile <profile> add dsh-skills-zhiyin
+```
+
+国内镜像源同步新包有延迟（表现为 404）。如果装不上，指定官方源：
+
+```bash
+dsh plugin --profile <profile> add dsh-skills-zhiyin --registry=https://registry.npmjs.org/
+```
+
+也可以从源码或 tarball 装：
 
 ```bash
 # 从本地目录
@@ -39,7 +51,7 @@ dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
 
 安装后需**完全退出并重开 DSH**：宿主半边在进程启动时加载，刷新页面不生效。
 
-运行要求：Node.js ≥ 24；宿主共享包 `@deepseek-ai/dsh-llm`、`@deepseek-ai/dsh-skill`、`@deepseek-ai/dsh-tools`。
+运行要求：DSH ≥ `0.2.2-rc.5`（见 `package.json` 的 `engines.dsh`）。本包**无运行时依赖、无生命周期脚本**，安装不触发构建、也不需要额外的构建授权。
 
 ## 使用
 
@@ -182,13 +194,14 @@ dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.0.tgz
 ## 开发
 
 ```bash
-npm install          # 安装依赖
-node --check index.js
-node --check client.js
-npm pack --dry-run   # 查看发布内容
+node --check index.js     # 宿主半边语法
+node --check client.js    # 页面半边语法
+npm pack --dry-run        # 查看发布内容（本包无依赖，无需 npm install）
 ```
 
-宿主半边改动需要重启 DSH；页面半边改动刷新页面即可。
+宿主半边改动需要**完全退出并重开 DSH**；页面半边改动刷新页面即可。
+
+发布：在 GitHub 发 Release（tag 与 `package.json` 版本一致）即由 `.github/workflows/publish.yml` 走 npm 可信发布（OIDC，无需令牌）；也可本地 `npm publish`。
 
 ## 许可
 

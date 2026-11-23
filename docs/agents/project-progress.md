@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 01:1x npm 0.1.0 已发布并验证可装；市场 PR CI 全绿；新增 OIDC 发版工作流
+- **最后更新**：2026-11-24 01:0x README 安装段改 npm 优先（并修正过期依赖声明）；开发期继续用 link
+  - README.md / README.en.md：安装段 npm 优先 + 镜像 404 时的 --registry 说明 + 本地/tarball 备选；修正「Node ≥24 + 三个宿主共享包」的过期声明（实际零依赖，engines.dsh >=0.2.2-rc.5）；开发段去掉空操作 npm install，补发版方式。双语互链与链接全部核对通过。
+  - 命令验证：npm 安装（加 --registry）、本地目录安装（34ms）、tarball 安装（74ms）、node --check、npm pack --dry-run 均已实跑。
+  - 开发期安装方式维持 link，不切 npm（切换会被钉在 0.1.0，改动需升版发布才能看到）。需要验证发布产物时用一次性 profile。
+  - 数据说明：state 在 <profile>/zhiyin-proto/，删包重装不丢技能包/停用/备注/收藏。
+
+- 上一轮：2026-11-24 01:1x npm 0.1.0 已发布并验证可装；市场 PR CI 全绿；新增 OIDC 发版工作流
   - npm：registry latest=0.1.0，shasum 与本地一致；隔离 DSH_HOME 里 dsh plugin add dsh-skills-zhiyin 成功（22 文件，dump-config 含 zhiyin）。
   - 镜像坑：本机 pnpm 走华为云镜像，尚未同步本包（404）→ 必须加 --registry=https://registry.npmjs.org/ 才能装；npm_config_registry 环境变量对 pnpm 无效。国内镜像用户同步前会装不上。
   - 市场 PR #18245：Submission gate pass + check pass，等维护者评审。条目无需补 npm 字段（生成器从 package.json 派生）。
