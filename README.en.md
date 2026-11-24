@@ -46,7 +46,7 @@ dsh plugin --profile <profile> add /path/to/dsh-skills-zhiyin
 
 # from a tarball
 npm pack
-dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.3.tgz
+dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.4.tgz
 ```
 
 After installing, **fully quit and reopen DSH** — the host half loads at process start, so reloading the page is not enough.

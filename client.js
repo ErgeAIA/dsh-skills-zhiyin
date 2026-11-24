@@ -2863,36 +2863,32 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 h('button', { type: 'button', style: tab === 'archive' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('archive') }, `${say('tabArchive', '归档')} ${archiveEntries.length}`),
     
               ),
-              tab === 'list'
-                ? h(
-                    'div',
-                    { style: { ...css.seg, marginLeft: 'auto' } },
-                    h('button', { type: 'button', style: view === 'cards' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('cards') }, say('viewCards', '卡片')),
-                    h('button', { type: 'button', style: view === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('list') }, say('viewList', '列表')),
-                  )
-                : null,
-              // 标题行刷新只重载 /zhiyin/state；市场与归档页各有自己的刷新，避免出现两个刷新图标。
+              // 检查更新 / 卡片 / 列表 收进同一组，顺序固定；检查完成后 load() 本身就是刷新，不再单独留刷新图标。
               tab === 'market' || tab === 'archive'
                 ? null
-                : h('button', {
-                    type: 'button',
-                    style: { ...css.btn, marginLeft: 'auto', whiteSpace: 'nowrap' },
-                    title: say('checkUpdatesHint', '按上游仓库检查技能是否有新版本；每天启动后会自己检查一次'),
-                    disabled: updateBusy === 'check',
-                    onClick: checkUpdates,
-                  }, updateBusy === 'check'
-                    ? h(Spinner, { size: 14 })
-                    : updateCount > 0
-                      ? say('checkUpdatesFound', '有 {n} 个更新').replace('{n}', String(updateCount))
-                      : say('checkUpdates', '检查更新')),
-                h('button', {
-                    type: 'button',
-                    style: { ...css.iconBtn, marginLeft: tab === 'list' ? 0 : 'auto' },
-                    title: say('refresh', '刷新'),
-                    'aria-label': say('refresh', '刷新'),
-                    onClick: load,
-                    disabled: state.loading,
-                  }, state.loading ? h(Spinner, { size: 15 }) : h(Icon, { name: 'refresh', size: 14 })),
+                : h(
+                    'div',
+                    { style: { display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' } },
+                    h('button', {
+                      type: 'button',
+                      style: { ...css.btn, whiteSpace: 'nowrap' },
+                      title: say('checkUpdatesHint', '按上游仓库检查技能是否有新版本；检查完成后会刷新列表'),
+                      disabled: updateBusy === 'check',
+                      onClick: checkUpdates,
+                    }, updateBusy === 'check'
+                      ? h(Spinner, { size: 14 })
+                      : updateCount > 0
+                        ? say('checkUpdatesFound', '有 {n} 个更新').replace('{n}', String(updateCount))
+                        : say('checkUpdates', '检查更新')),
+                    tab === 'list'
+                      ? h(
+                          'div',
+                          { style: css.seg },
+                          h('button', { type: 'button', style: view === 'cards' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('cards') }, say('viewCards', '卡片')),
+                          h('button', { type: 'button', style: view === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setView('list') }, say('viewList', '列表')),
+                        )
+                      : null,
+                  ),
             )
           : null,
 
@@ -3834,29 +3830,27 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   'div',
                   { style: css.modalBody },
                   h('div', { style: css.costHead }, say('costWhatHead', '计算方式')),
-                  h('div', { style: css.costBullet }, '• ' + say('costWhat1', '每个可见技能取 min(描述长度, 500) 字符，全部相加后再加 200 字符框架开销。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costWhat2', '只计描述，不含技能名与 SKILL.md 正文，因此是本目录的成本下限。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costWhat3', '停用、未加入启用包、被上层开关挡住的技能不计入。')),
+                  h('div', { style: css.costBullet }, say('costWhat1', '每个可见技能取 min(描述长度, 500) 字符，全部相加后再加 200 字符框架开销。')),
+                  h('div', { style: css.costBullet }, say('costWhat2', '只计描述，不含技能名与 SKILL.md 正文，因此是本目录的成本下限。')),
+                  h('div', { style: css.costBullet }, say('costWhat3', '停用、未加入启用包、被上层开关挡住的技能不计入。')),
                   h('div', { style: css.costHead }, say('costWhyHead', '成本构成')),
-                  h('div', { style: css.costBullet }, '• ' + say('costWhy1', '描述是模型判断「何时调用该技能」的路由信号，随每次请求注入。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costWhy2', '目录变化会作为新条目追加进会话历史，一次请求承载多份目录。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costWhy3', '总量超过模型承受范围时，实现会按最近最少使用丢弃描述，被丢弃的技能不再参与路由。')),
+                  h('div', { style: css.costBullet }, say('costWhy1', '描述是模型判断「何时调用该技能」的路由信号，随每次请求注入。')),
+                  h('div', { style: css.costBullet }, say('costWhy2', '目录变化会作为新条目追加进会话历史，一次请求承载多份目录。')),
+                  h('div', { style: css.costBullet }, say('costWhy3', '总量超过模型承受范围时，实现会按最近最少使用丢弃描述，被丢弃的技能不再参与路由。')),
                   h('div', { style: css.costHead }, say('costLimitHead', '建议上限')),
-                  h('div', { style: css.costBullet }, '• ' + say('costLimit1', '目录总量：上下文窗口的 1%。200K 窗口折算为 2,000 token。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costLimit2', '按 token 折算字符：中文 1 字符 ≈ 1 token → 建议 ≤ 2,000 字符；英文 4 字符 ≈ 1 token → 建议 ≤ 8,000 字符。中英混排按实际比例折算。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costLimit3', '单条描述：目标 400–1,000 字符，硬上限 1,024 字符（API 拒绝超限）。')),
+                  h('div', { style: css.costBullet }, say('costLimit1', '目录总量：上下文窗口的 1%。200K 窗口折算为 2,000 token。')),
+                  h('div', { style: css.costBullet }, say('costLimit2', '按 token 折算字符：中文 1 字符 ≈ 1 token → 建议 ≤ 2,000 字符；英文 4 字符 ≈ 1 token → 建议 ≤ 8,000 字符。中英混排按实际比例折算。')),
+                  h('div', { style: css.costBullet }, say('costLimit3', '单条描述：目标 400–1,000 字符，硬上限 1,024 字符（API 拒绝超限）。')),
                   h('div', { style: css.costHead }, say('costDoHead', '优化方式')),
-                  h('div', { style: css.costBullet }, '• ' + say('costDo1', '描述只保留「做什么 + 何时用」，触发词放在开头，删去背景与套话。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costDo2', '长期不用的技能移出启用包或停用，成本直接归零。')),
-                  h('div', { style: css.costBullet }, '• ' + say('costDo3', '同领域技能合并，减少重复的路由信号。')),
+                  h('div', { style: css.costBullet }, say('costDo1', '描述只保留「做什么 + 何时用」，触发词放在开头，删去背景与套话。')),
+                  h('div', { style: css.costBullet }, say('costDo2', '长期不用的技能移出启用包或停用，成本直接归零。')),
+                  h('div', { style: css.costBullet }, say('costDo3', '同领域技能合并，减少重复的路由信号。')),
                   h('div', { style: css.costHead }, say('costSourceHead', '依据')),
                   h('div', { style: css.costBullet },
-                    '• ',
                     h('a', { href: 'https://platform.claude.com/docs/zh-CN/build-with-claude/skills-guide', target: '_blank', rel: 'noreferrer', style: css.costLink }, say('costSrc1', 'Anthropic 平台文档 · Agent Skills 请求限制')),
                     say('costSrc1Note', '：description 上限 1,024 字符，name 上限 64 字符。'),
                   ),
                   h('div', { style: css.costBullet },
-                    '• ',
                     h('a', { href: 'https://github.com/josiahsiegel/claude-plugin-marketplace/blob/main/plugins/plugin-master/skills/triggering-reliability/references/severity-and-limits.md', target: '_blank', rel: 'noreferrer', style: css.costLink }, say('costSrc2', 'Claude Code 描述长度分层（2026）')),
                     say('costSrc2Note', '：路由清单合并截断 1,536 字符；目录总量预算为上下文窗口的 1%，超限按 LRU 丢弃描述。'),
                   ),
