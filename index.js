@@ -197,7 +197,10 @@ export function apply(ctx) {
     ctx.webServer.register({
       kind: 'exact',
       path: '/zhiyin/state',
-      resource: async () => json(await collectState(ctx)),
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        sendJson(response, 200, await collectState(ctx))
+      },
     }),
   )
 
@@ -207,7 +210,10 @@ export function apply(ctx) {
     ctx.webServer.register({
       kind: 'exact',
       path: '/zhiyin/probe',
-      resource: async () => json(await uiProbe(ctx)),
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        sendJson(response, 200, await uiProbe(ctx))
+      },
     }),
   )
 
@@ -218,7 +224,8 @@ export function apply(ctx) {
     ctx.webServer.register({
       kind: 'exact',
       path: '/zhiyin/guide',
-      resource: async () => {
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
         const read = (name) => {
           try {
             return readFileSync(new URL('./' + name, import.meta.url), 'utf8')
@@ -232,7 +239,7 @@ export function apply(ctx) {
           if (start >= 0 && end > start) return text.slice(start + '<!-- guide:start -->'.length, end).trim()
           return text
         }
-        return json({ zh: pick(read('README.md')), en: pick(read('README.en.md')) })
+        sendJson(response, 200, { zh: pick(read('README.md')), en: pick(read('README.en.md')) })
       },
     }),
   )
@@ -555,7 +562,10 @@ export function apply(ctx) {
     ctx.webServer.register({
       kind: 'exact',
       path: '/zhiyin/archive',
-      resource: async () => json(listArchive()),
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        sendJson(response, 200, listArchive())
+      },
     }),
   )
   post(ctx, '/zhiyin/restore', async (body) => restoreArchive(ctx, body))
@@ -567,9 +577,10 @@ export function apply(ctx) {
     ctx.webServer.register({
       kind: 'exact',
       path: '/zhiyin/export',
-      resource: async () => {
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
         const state = readState()
-        return json({
+        sendJson(response, 200, {
           schemaVersion: 1,
           exportedAt: new Date().toISOString(),
           pluginVersion: PLUGIN_VERSION,
@@ -720,7 +731,10 @@ export function apply(ctx) {
     ctx.webServer.register({
       kind: 'exact',
       path: '/zhiyin/backups',
-      resource: async () => json({ backups: listBackups() }),
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        sendJson(response, 200, { backups: listBackups() })
+      },
     }),
   )
   post(ctx, '/zhiyin/rollback', async (body) => {
@@ -1530,6 +1544,8 @@ function post(ctx, path, run, limit = 65536) {
         kind: 'exact',
         path,
         handler: async (request, response) => {
+          // 先过宿主准入闸门，再做方法/同源校验：闸门是更强的检查，不能排在它后面。
+          if (refuseUnadmitted(ctx, request, response)) return
           if (request.method !== 'POST') {
             response.writeHead(405, { 'content-type': 'application/json; charset=utf-8' })
             response.end(JSON.stringify({ ok: false, error: 'method not allowed' }))
@@ -1602,14 +1618,38 @@ function readBody(request, limit = 65536) {
   })
 }
 
-function json(payload, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+/**
+ * DSH 准入闸门：未通过就当场拒绝并返回 true。
+ *
+ * 读宿主 Connection 服务的 requestRejection —— 它同时执行 Host/Origin 围栏与浏览器会话校验，
+ * 与 dshmarket、dsh-better-sidebar 用的是同一个入口。闸门抛错一律按 403 处理，绝不 fail-open；
+ * 宿主没有提供闸门时放行（没有可执行的检查，不等于我们主动放水）。
+ */
+function refuseUnadmitted(ctx, request, response) {
+  const connection = typeof ctx?.get === 'function' ? ctx.get('connection') : ctx?.connection
+  const check = connection?.requestRejection
+  if (typeof check !== 'function') return false
+  let status
+  try {
+    status = check.call(connection, request)
+  } catch {
+    status = 403
+  }
+  if (status === undefined) return false
+  sendJson(response, status, {
+    ok: false,
+    error:
+      status === 401
+        ? '需要先登录 DSH：请重新打开 dsh web 启动时打印的网址'
+        : '请求来源不受信任，已拒绝',
   })
+  return true
+}
+
+/** 以 Node handler 风格回一份 JSON（闸门与 handler 路由共用）。 */
+function sendJson(response, status, payload) {
+  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+  response.end(JSON.stringify(payload))
 }
 
 /* ------------------------------------------------------------------ state */

@@ -162,6 +162,8 @@ window.__ModuleLoader__.load({
         alertUnpacked: '有技能未加入技能包，当前不生效',
         noteEdit: '编辑备注',
         noteViewTitle: '技能备注',
+        needLogin: '需要先登录 DSH：请重新打开 dsh web 启动时打印的网址',
+        refusedOrigin: '请求来源不受信任，已拒绝',
         statFavorite: '收藏',
         statFavoriteHint: '已收藏的技能，始终置顶；点一下只看收藏',
         favoriteOn: '收藏并置顶',
@@ -429,6 +431,8 @@ window.__ModuleLoader__.load({
         alertUnpacked: 'Some skills are not in any pack and do not play',
         noteEdit: 'Edit note',
         noteViewTitle: 'Skill note',
+        needLogin: 'DSH login required: reopen the URL dsh web printed at startup',
+        refusedOrigin: 'This request came from an untrusted origin and was refused',
         statFavorite: 'Favourites',
         statFavoriteHint: 'Favourited skills stay pinned to the top; click to show only these',
         favoriteOn: 'Favourite and pin to top',
@@ -1814,8 +1818,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const load = React.useCallback(() => {
         setState((previous) => ({ ...previous, loading: true, error: null, exportError: null }))
         fetch('/zhiyin/state', { headers: { accept: 'application/json' } })
-          .then((response) => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          .then(async (response) => {
+            if (!response.ok) {
+              // 401/403 来自宿主的准入闸门：把原因说清楚，不要只留一个 HTTP 状态码。
+              if (response.status === 401 || response.status === 403) {
+                const payload = await response.json().catch(() => null)
+                throw new Error(payload?.error ?? (response.status === 401
+                  ? say('needLogin', '需要先登录 DSH：请重新打开 dsh web 启动时打印的网址')
+                  : say('refusedOrigin', '请求来源不受信任，已拒绝')))
+              }
+              throw new Error(`HTTP ${response.status}`)
+            }
             return response.json()
           })
           .then((data) => setState({ loading: false, data, error: null }))

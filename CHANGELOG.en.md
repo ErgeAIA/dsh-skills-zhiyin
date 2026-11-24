@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-24
+
+### Security
+
+- Every `/zhiyin/*` HTTP route now runs DSH's admission check (`connection.requestRejection`: the Host/Origin fence plus the browser session). Before this, only the write routes compared Origin/Host themselves; the read routes had no admission check at all, so any web page open in the browser could call them
+- A gate that throws is treated as 403; there is no fail-open. A host that provides no gate is admitted (there is no check to run, which is different from waving requests through)
+- Read routes moved to handler style, matching dshmarket and dsh-better-sidebar, and the now-unused `json()` helper was removed
+
+### Fixed
+
+- The UI shows the host's rejection reason on 401/403 instead of a bare `HTTP 403`
+
 ## [0.1.1] - 2026-11-24
 
 ### Fixed
