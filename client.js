@@ -47,7 +47,8 @@ window.__ModuleLoader__.load({
         updateBadge: '有更新',
         updateLocalOnly: '本地已改',
         updateApplyHint: '更新到上游当前版本；本地没改过才允许',
-        updateBlockedHint: '本地内容被改过：更新会覆盖你的修改，先备份',
+        updateBlockedHint: '本地内容被改过：点一下可先备份到归档再强制更新',
+        forceUpdateAsk: '本地内容被改过。先把当前版本整份备份到归档，再用上游版本覆盖？',
         tabList: '技能列表',
         tabPacks: '技能包',
         packNew: '+ 新建技能包',
@@ -323,7 +324,8 @@ window.__ModuleLoader__.load({
         updateBadge: 'Update',
         updateLocalOnly: 'Edited',
         updateApplyHint: 'Update to the current upstream version (only when the local copy is unedited)',
-        updateBlockedHint: 'Local files were edited; updating would overwrite them',
+        updateBlockedHint: 'Local files were edited; click to back up and force the update',
+        forceUpdateAsk: 'The local copy was edited. Back it up to the archive first, then overwrite with the upstream version?',
         tabList: 'Skills',
         tabPacks: 'Packs',
         packNew: 'New pack',
@@ -1873,13 +1875,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           .finally(() => setUpdateBusy(''))
       }, [updateBusy, load])
 
-      const applyUpdate = React.useCallback((name) => {
+      const applyUpdate = React.useCallback((name, force) => {
         if (updateBusy) return
         setUpdateBusy(name)
         fetch('/zhiyin/updates/apply', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name }),
+          body: JSON.stringify(force === true ? { name, force: true } : { name }),
         })
           .then((response) => response.json())
           .then((result) => {
@@ -2995,7 +2997,6 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       pack.all ? h('span', { style: { ...css.badge(true), opacity: 0.7 } }, say('packDefault', '默认')) : null,
                       (pack.all ? counts.allCost : pack.cost) > 0 ? h('span', { style: css.metaText }, `${pack.all ? counts.allCost : pack.cost} ${say('packCostUnit', '字符')}`) : null,
 
-                      h('span', { style: { ...packStatusStyle(status), marginLeft: 'auto' } }, packStatusLabel(status)),
                     ),
                     pack.all
                       ? h('div', { style: css.desc }, say('packAllHint', '包含当前能看到的全部技能，新技能自动加入；开它，具体技能包自动关闭'))
@@ -3010,6 +3011,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         )
                       : h('div', { style: css.desc }, say('packEmptyHint2', '还没有成员')),
                   ),
+                  h('span', { style: { ...packStatusStyle(status), flex: '0 0 auto', whiteSpace: 'nowrap' } }, packStatusLabel(status)),
                   pack.all ? null : h(
                     'button',
                     {
@@ -3458,12 +3460,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                                 whiteSpace: 'nowrap',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                ...(updatable ? { color: 'var(--zhiyin-accent, #e0743c)', cursor: 'pointer', fontWeight: 600 } : { opacity: 0.7 }),
+                                cursor: 'pointer',
+                                ...(updatable ? { color: 'var(--zhiyin-accent, #e0743c)', fontWeight: 600 } : { opacity: 0.7 }),
                               },
                               title: updatable
                                 ? say('updateApplyHint', '更新到上游当前版本；本地没改过才允许')
-                                : say('updateBlockedHint', '本地内容被改过：更新会覆盖你的修改，先备份'),
-                              onClick: updatable ? () => applyUpdate(skill.name) : undefined,
+                                : say('updateBlockedHint', '本地内容被改过：点一下可先备份到归档再强制更新'),
+                              onClick: updatable
+                                ? () => applyUpdate(skill.name)
+                                : () => {
+                                    if (window.confirm(say('forceUpdateAsk', '本地内容被改过。先把当前版本整份备份到归档，再用上游版本覆盖？'))) {
+                                      applyUpdate(skill.name, true)
+                                    }
+                                  },
                             }, updateBusy === skill.name
                               ? h(Spinner, { size: 12 })
                               : updatable ? say('updateBadge', '有更新') : say('updateLocalOnly', '本地已改'))
