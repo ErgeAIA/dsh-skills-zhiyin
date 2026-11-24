@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-24
+
+### Added
+
+- **Skill update detection**: each skill records its source repo, branch, subpath and content fingerprint (backfillable from the AI Vault database by matching the SKILL.md hash — never guessed by name), then compares that with upstream
+  - Six states: `up-to-date` / `update-available` / `locally-modified` / `both-changed` / `check-failed` / `unknown-source`
+  - The verdict uses the **skill subtree's content fingerprint**, not the repo HEAD — an upstream README-only commit is not reported
+  - `git ls-remote` reads the HEAD (no GitHub API quota); the subtree is fetched with a `blob:none` partial clone only when HEAD moved
+  - Cards show an `Update` badge; clicking updates to the upstream version by writing the directory the `~/.dsh/skills` link points at, so the link follows automatically
+- **Local-edit protection**: the local fingerprint is re-checked right before writing; an edited copy is refused (409)
+- **Back up and force**: the `Edited` badge is clickable — after confirmation the current version is copied into the archive first, then overwritten, so the edit can be recovered
+- One automatic check five minutes after startup (24-hour window, concurrency 2, fully async so the host is never blocked)
+- Manual entry: the "Check for updates" button and `POST /zhiyin/updates/check`
+
+### Fixed
+
+- Skill market cards: dropped the meaningless "installable" label; `✓ Installed` no longer wraps onto a second line
+- Pack management: the status label sat on a different centre line than the members / more / toggle buttons
+
 ## [0.1.2] - 2026-11-24
 
 ### Security

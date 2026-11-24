@@ -46,7 +46,7 @@ dsh plugin --profile <profile> add /path/to/dsh-skills-zhiyin
 
 # 从 tarball
 npm pack
-dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.2.tgz
+dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.3.tgz
 ```
 
 安装后需**完全退出并重开 DSH**：宿主半边在进程启动时加载，刷新页面不生效。

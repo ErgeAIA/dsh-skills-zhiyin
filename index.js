@@ -768,7 +768,7 @@ export function apply(ctx) {
     return { status: summary.ok ? 200 : 409, body: summary }
   })
 
-  post(ctx, '/zhiyin/updates/apply', async (body) => updateSkillFromUpstream(ctx, body?.name))
+  post(ctx, '/zhiyin/updates/apply', async (body) => updateSkillFromUpstream(ctx, body?.name, { force: body?.force === true }))
 
   post(ctx, '/zhiyin/provenance/backfill', async () => {
     const summary = await backfillProvenance(ctx)
@@ -2080,8 +2080,9 @@ async function backfillProvenance(ctx) {
  * 把某个技能更新到上游当前版本：检出到临时目录 → 复用 installDirectory 的原子替换。
  * 本地被改过（locally-modified / both-changed）一律拒绝，绝不静默覆盖用户的修改。
  */
-async function updateSkillFromUpstream(ctx, name) {
+async function updateSkillFromUpstream(ctx, name, options) {
   const wanted = typeof name === 'string' ? name.trim() : ''
+  const force = options?.force === true
   if (!wanted) return { status: 400, body: { ok: false, error: '缺少技能名' } }
   const state = readState()
   const record = state.provenance?.[wanted]
@@ -2089,7 +2090,7 @@ async function updateSkillFromUpstream(ctx, name) {
     return { status: 404, body: { ok: false, error: '这个技能没有来源记录，先做一次「检查更新」' } }
   }
   const current = state.updates?.results?.[wanted]?.status
-  if (current === 'locally-modified' || current === 'both-changed') {
+  if (!force && (current === 'locally-modified' || current === 'both-changed')) {
     return {
       status: 409,
       body: {
@@ -2111,7 +2112,7 @@ async function updateSkillFromUpstream(ctx, name) {
   // 上次检查的状态可能已经过期（用户刚改过文件）：落盘前再算一次本地指纹。
   const destRoot = installRoot(ctx, target)
   const liveLocal = localSkillDigest(join(destRoot, wanted))
-  if (liveLocal.ok && record.localDigest && liveLocal.digest !== record.localDigest) {
+  if (!force && liveLocal.ok && record.localDigest && liveLocal.digest !== record.localDigest) {
     return {
       status: 409,
       body: {
@@ -2119,6 +2120,21 @@ async function updateSkillFromUpstream(ctx, name) {
         skipped: 'locally-modified',
         error: '本地内容在上次检查后被改过：更新会覆盖你的修改，请先备份',
       },
+    }
+  }
+  // 强制更新：先把当前目录整份复制进归档，用户随时能退回去。
+  let backupKey = ''
+  if (force) {
+    const archiveRoot = archiveRootPath()
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    backupKey = stamp + '-' + wanted
+    try {
+      mkdirSync(archiveRoot, { recursive: true })
+      cpSync(join(destRoot, wanted), join(archiveRoot, backupKey), { recursive: true })
+      rememberArchiveOrigin(backupKey, target, join(destRoot, wanted))
+      note('skill-backup-before-update', { name: wanted, key: backupKey })
+    } catch (error) {
+      return { status: 500, body: { ok: false, error: '备份失败，已放弃更新：' + String(error?.message ?? error).slice(0, 160) } }
     }
   }
   const head = await upstreamRefSha(record.repo, record.branch || 'main')
@@ -2173,7 +2189,7 @@ async function updateSkillFromUpstream(ctx, name) {
     }
     saveState(next)
     note('skill-updated', { name: wanted, repo: record.repo, sha: head.sha })
-    return { status: 200, body: { ok: true, name: wanted, dest, upstreamSha: head.sha } }
+    return { status: 200, body: { ok: true, name: wanted, dest, upstreamSha: head.sha, ...(backupKey ? { backup: backupKey } : {}) } }
   } finally {
     try { rmSync(work, { recursive: true, force: true }) } catch { /* 临时目录清不掉不影响结果 */ }
   }
