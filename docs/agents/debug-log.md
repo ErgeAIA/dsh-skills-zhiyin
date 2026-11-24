@@ -160,3 +160,16 @@ description: >
 - **修复**：新增 `viewForAgent`，**从技能注册表自己的层表反查 scope key**（`skills.layers.scoped`，遍历所有 key 各读一次快照，取条目最多的那份）——不要自己 import `@deepseek-ai/dsh-scope` 求 key：第三方插件拿到的是另一份模块实例，模块私有 Symbol 不同，`scopeOf` 恒为 undefined（实测：宿主里 `scopedScopes` 一直是 0）。响应新增 `scopedScopes` 与 `scopeDebug`（每个 key 的条目数、各层 provider 名），`scopes > 0` 而 `scopedScopes === 0` 时写入 `scope-key-unavailable` 失败项便于现场定位。同时把列表里 `provider === 'zhiyin'` 的影子候选回填原始 `known` 元数据（来源、描述），并新增 `shadowed` 标记。
 - **验证限制**：用**真 `SkillRegistry` + 真 `createScope`** 复现：同一作用域里注册「原生 provider（user-dsh/user-agents）」+「织音影子 provider」后，`snapshot({scope})` 得到 `alpha[zhiyin model=false]`、`beta[skill-filesystem]`，而 `snapshot({})` 为空 —— 精确复现了宿主里「只读到 14 条内置、用户级全丢」的现象，并验证影子候选确实压住同名原生候选。层表反查在真注册表上取到正确 key（`discovered key === key`），且 `layers` 通过 cordis 的 traced service 代理可读。仍未在真实宿主里跑通：等下一次完全重启。
 - **教训**：分层注册表「注册在哪一层」和「读哪一层」必须是同一个 scope key；先前的「不带 scope 才拿得到原生结果」是错的——影子候选可以在拿到结果后按 provider 名回填。
+
+## BUG-016: css 对象自引用导致 web 环境 client 半边整体加载失败
+
+- **日期**：2026-11-24
+- **现象**：dsh --profile web 启动后，左侧栏没有「织音」入口；插件面板只有插件信息，看不到界面。
+- **误导线索**：host 半边正常（/zhiyin/updates 返回 200），client bundle 在 __DSH_BOOT__.entries 里、HTTP 200、213KB、content-type 正确、无 console 报错——看起来一切正常。
+- **真正的错误**：__dshSidebarModuleSystem__.importErrors 里有一条 ["dsh-skills-zhiyin", {}]，空对象把错误吞了；用 loadBundle("dsh-skills-zhiyin") 才拿到真实信息：ReferenceError: Cannot access css before initialization。
+- **根因**：给「检查周期」下拉加的 intervalBtn 样式写在 const css = { ... } 对象内部，却用了 ...css.btn 展开自己。对象初始化尚未完成时访问 css 就抛 ReferenceError，整个 client bundle 求值失败 → 所有 slot 都不注册 → 界面完全不出现。
+- **为什么只有 web 暴露**：desktop 的加载器对模块求值时机不同，容忍了这个自引用；web 的 __dshSidebarModuleSystem__ 立即求值，直接炸。
+- **修复**：intervalBtn 不再 ...css.btn，把按钮字段内联展开。
+- **教训**：
+  1. node --check 只能验语法，验不出运行时求值顺序错误。改 client.js 后必须在真实页面加载一次并检查 importErrors。
+  2. 排查 client 不显示时，查 __dshSidebarModuleSystem__.importErrors 比看 console 有效——错误对象可能是空 {}，要调 loadBundle 拿原文。
