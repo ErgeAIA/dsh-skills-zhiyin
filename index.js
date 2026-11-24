@@ -13,6 +13,7 @@
  */
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { promisify } from 'node:util'
 import { appendFileSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
@@ -756,7 +757,7 @@ export function apply(ctx) {
           },
           provenance: Object.keys(state.provenance ?? {}).length,
           running: updateCheckRunning !== null,
-          git: gitUsable(),
+          git: await gitUsable(),
         })
       },
     }),
@@ -766,6 +767,8 @@ export function apply(ctx) {
     const summary = await runUpdateCheck(ctx)
     return { status: summary.ok ? 200 : 409, body: summary }
   })
+
+  post(ctx, '/zhiyin/updates/apply', async (body) => updateSkillFromUpstream(ctx, body?.name))
 
   post(ctx, '/zhiyin/provenance/backfill', async () => {
     const summary = await backfillProvenance(ctx)
@@ -781,7 +784,7 @@ export function apply(ctx) {
       Promise.resolve()
         .then(() => runUpdateCheck(ctx))
         .catch((error) => note('update-check-failed', { error: String(error?.message ?? error).slice(0, 200) }))
-    }, 90000)
+    }, 5 * 60 * 1000)
     if (typeof timer.unref === 'function') timer.unref()
     return () => clearTimeout(timer)
   }, 'zhiyin: 每日更新检查')
@@ -1803,25 +1806,30 @@ function backupState() {
 /* ---------------------------------------------------- 技能更新检测（阶段 1+2） */
 
 const UPDATE_DAILY_MS = 24 * 60 * 60 * 1000
-const UPDATE_CONCURRENCY = 4
+const UPDATE_CONCURRENCY = 2
 const UPDATE_GIT_TIMEOUT = 45000
 const UPDATE_CLONE_TIMEOUT = 240000
 const UPDATE_SKIP_DIRS = new Set(['.git', 'node_modules'])
 
 // 同一时刻只允许一轮检查：手动点击和每日定时撞车时，后来的直接拿现有进度。
+const execFileAsync = promisify(execFile)
+
 let updateCheckRunning = null
 
-function gitRun(args, options) {
+/**
+ * 异步跑 git：网络与克隆可能几十秒到几分钟，用同步调用会把 DSH 主进程整个卡住。
+ */
+async function gitRun(args, options) {
   const opts = options ?? {}
   try {
-    const out = execFileSync('git', args, {
+    const { stdout } = await execFileAsync('git', args, {
       encoding: 'utf8',
       timeout: opts.timeout ?? UPDATE_GIT_TIMEOUT,
       maxBuffer: 64 * 1024 * 1024,
       windowsHide: true,
       ...(opts.cwd ? { cwd: opts.cwd } : {}),
     })
-    return { ok: true, out }
+    return { ok: true, out: stdout }
   } catch (error) {
     return {
       ok: false,
@@ -1839,22 +1847,26 @@ function sleepSync(ms) {
   }
 }
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /** 网络类失败重试：TLS 抖动、DNS、连接中断在真实网络里很常见，一次失败不该判成「检查失败」。 */
-function gitRetry(args, options) {
+async function gitRetry(args, options) {
   let last = null
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const result = gitRun(args, options)
+    const result = await gitRun(args, options)
     if (result.ok) return result
     last = result
     const retryable = /handshake|SSL|TLS|Could not resolve|timed out|Connection|fetch-pack|RPC failed|early EOF|reset by peer/i.test(result.error)
     if (!retryable) return result
-    if (attempt < 2) sleepSync(1200 * (attempt + 1))
+    if (attempt < 2) await sleep(1200 * (attempt + 1))
   }
   return last
 }
 
-function gitUsable() {
-  return gitRun(['--version'], { timeout: 8000 }).ok
+async function gitUsable() {
+  return (await gitRun(['--version'], { timeout: 8000 })).ok
 }
 
 // 与 git 同口径的 blob 指纹：sha1('blob <字节数>\0' + 内容)，这样本地文件能与 ls-tree 的 blob sha 直接比较。
@@ -1902,8 +1914,8 @@ function repoCacheDir(repo) {
 }
 
 /** 上游分支当前 HEAD。ls-remote 不消耗 GitHub API 配额。 */
-function upstreamRefSha(repo, branch) {
-  const result = gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'])
+async function upstreamRefSha(repo, branch) {
+  const result = await gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'])
   if (!result.ok) return { ok: false, error: result.error }
   const heads = new Map()
   for (const row of result.out.split('\n')) {
@@ -1920,22 +1932,22 @@ function upstreamRefSha(repo, branch) {
 }
 
 /** 上游技能子树的内容指纹：只取树对象（blob:none 部分克隆），不下载文件正文。 */
-function upstreamTreeDigest(repo, branch, subpath) {
+async function upstreamTreeDigest(repo, branch, subpath) {
   const dir = repoCacheDir(repo)
   mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
   if (!existsSync(join(dir, '.git'))) {
     rmSync(dir, { recursive: true, force: true })
-    const clone = gitRetry(
+    const clone = await gitRetry(
       ['clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--branch', branch || 'main', 'https://github.com/' + repo + '.git', dir],
       { timeout: UPDATE_CLONE_TIMEOUT },
     )
     if (!clone.ok) return { ok: false, error: clone.error }
   }
-  const fetch = gitRetry(['-C', dir, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
+  const fetch = await gitRetry(['-C', dir, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
   if (!fetch.ok) return { ok: false, error: fetch.error }
   const args = ['-C', dir, 'ls-tree', '-r', 'FETCH_HEAD']
   if (subpath) args.push('--', subpath)
-  const tree = gitRun(args)
+  const tree = await gitRun(args)
   if (!tree.ok) return { ok: false, error: tree.error }
   const prefix = subpath ? subpath.replace(/\/+$/, '') + '/' : ''
   const entries = []
@@ -1962,10 +1974,10 @@ function upstreamTreeDigest(repo, branch, subpath) {
  * 上游路径失效时，在同一棵已经拉下来的树里找同名技能目录。
  * 只作为提示写进原因，绝不自动改写来源——挪位置不等于同一个技能。
  */
-function suggestUpstreamPath(repo, skillName) {
+async function suggestUpstreamPath(repo, skillName) {
   const dir = repoCacheDir(repo)
   if (!existsSync(join(dir, '.git'))) return null
-  const tree = gitRun(['-C', dir, 'ls-tree', '-r', '--name-only', 'FETCH_HEAD'])
+  const tree = await gitRun(['-C', dir, 'ls-tree', '-r', '--name-only', 'FETCH_HEAD'])
   if (!tree.ok) return null
   const hits = tree.out
     .split('\n')
@@ -2064,12 +2076,114 @@ async function backfillProvenance(ctx) {
   return { ok: true, added, skippedLocal, unmatched, drifted, total: skills.length }
 }
 
+/**
+ * 把某个技能更新到上游当前版本：检出到临时目录 → 复用 installDirectory 的原子替换。
+ * 本地被改过（locally-modified / both-changed）一律拒绝，绝不静默覆盖用户的修改。
+ */
+async function updateSkillFromUpstream(ctx, name) {
+  const wanted = typeof name === 'string' ? name.trim() : ''
+  if (!wanted) return { status: 400, body: { ok: false, error: '缺少技能名' } }
+  const state = readState()
+  const record = state.provenance?.[wanted]
+  if (!record || !record.repo) {
+    return { status: 404, body: { ok: false, error: '这个技能没有来源记录，先做一次「检查更新」' } }
+  }
+  const current = state.updates?.results?.[wanted]?.status
+  if (current === 'locally-modified' || current === 'both-changed') {
+    return {
+      status: 409,
+      body: {
+        ok: false,
+        skipped: current,
+        error: current === 'both-changed'
+          ? '本地被改过，且上游也变了：自动更新会覆盖你的修改，请先手动备份'
+          : '本地被改过：自动更新会覆盖你的修改，请先手动备份',
+      },
+    }
+  }
+  // 找到技能现在住在哪个安装根：只写这一处，不新建目录。
+  let target = null
+  for (const candidate of ['agents', 'user', 'project']) {
+    const root = installRoot(ctx, candidate)
+    if (root && existsSync(join(root, wanted))) { target = candidate; break }
+  }
+  if (!target) return { status: 404, body: { ok: false, error: '找不到已安装的技能目录：' + wanted } }
+  // 上次检查的状态可能已经过期（用户刚改过文件）：落盘前再算一次本地指纹。
+  const destRoot = installRoot(ctx, target)
+  const liveLocal = localSkillDigest(join(destRoot, wanted))
+  if (liveLocal.ok && record.localDigest && liveLocal.digest !== record.localDigest) {
+    return {
+      status: 409,
+      body: {
+        ok: false,
+        skipped: 'locally-modified',
+        error: '本地内容在上次检查后被改过：更新会覆盖你的修改，请先备份',
+      },
+    }
+  }
+  const head = await upstreamRefSha(record.repo, record.branch || 'main')
+  if (!head.ok) return { status: 502, body: { ok: false, error: head.error } }
+  const cache = repoCacheDir(record.repo)
+  mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
+  if (!existsSync(join(cache, '.git'))) {
+    const clone = await gitRetry(
+      ['clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--branch', record.branch || 'main', 'https://github.com/' + record.repo + '.git', cache],
+      { timeout: UPDATE_CLONE_TIMEOUT },
+    )
+    if (!clone.ok) return { status: 502, body: { ok: false, error: clone.error } }
+  }
+  const fetch = await gitRetry(['-C', cache, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', head.branch || record.branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
+  if (!fetch.ok) return { status: 502, body: { ok: false, error: fetch.error } }
+  const work = mkdtempSync(join(tmpdir(), 'zhiyin-update-'))
+  try {
+    const args = ['-C', cache, '--work-tree', work, 'checkout', '-f', 'FETCH_HEAD']
+    if (record.subpath) args.push('--', record.subpath)
+    const checkout = await gitRun(args, { timeout: UPDATE_CLONE_TIMEOUT })
+    if (!checkout.ok) return { status: 502, body: { ok: false, error: '取上游内容失败：' + checkout.error } }
+    const source = record.subpath ? join(work, record.subpath) : work
+    if (!existsSync(join(source, 'SKILL.md'))) {
+      return { status: 502, body: { ok: false, error: '上游这个位置没有 SKILL.md，可能已经改结构' } }
+    }
+    const upstreamDigest = localSkillDigest(source)
+    const result = installDirectory(ctx, { target, overwrite: true }, source, wanted)
+    if (result.status !== 200) return result
+    const dest = join(installRoot(ctx, target), wanted)
+    const localAfter = localSkillDigest(dest)
+    const now = new Date().toISOString()
+    const next = {
+      ...readState(),
+    }
+    next.provenance = {
+      ...(next.provenance ?? {}),
+      [wanted]: {
+        ...record,
+        branch: head.branch || record.branch || 'main',
+        headSha: head.sha,
+        digest: upstreamDigest.ok ? upstreamDigest.digest : null,
+        localDigest: localAfter.ok ? localAfter.digest : null,
+        remoteSha: head.sha,
+        remoteDigest: upstreamDigest.ok ? upstreamDigest.digest : null,
+        verifiedAt: now,
+        updatedAt: now,
+      },
+    }
+    next.updates = {
+      ...(next.updates ?? {}),
+      results: { ...((next.updates ?? {}).results ?? {}), [wanted]: { status: 'up-to-date', checkedAt: now, upstreamSha: head.sha } },
+    }
+    saveState(next)
+    note('skill-updated', { name: wanted, repo: record.repo, sha: head.sha })
+    return { status: 200, body: { ok: true, name: wanted, dest, upstreamSha: head.sha } }
+  } finally {
+    try { rmSync(work, { recursive: true, force: true }) } catch { /* 临时目录清不掉不影响结果 */ }
+  }
+}
 /** 六态更新检测：up-to-date / update-available / locally-modified / both-changed / check-failed / unknown-source */
 async function runUpdateCheck(ctx) {
   if (updateCheckRunning) return { ok: false, running: true, error: '已有一轮检查在进行' }
   updateCheckRunning = (async () => {
     const started = Date.now()
-    if (!gitUsable()) return { ok: false, error: '找不到 git：更新检查需要本机安装 git' }
+    if (!(await gitUsable())) return { ok: false, error: '找不到 git：更新检查需要本机安装 git' }
     const state = readState()
     const observed = await collectState(ctx)
     const skills = (observed.skills ?? []).filter((skill) => typeof skill.path === 'string')
@@ -2094,7 +2208,7 @@ async function runUpdateCheck(ctx) {
       while (cursor < queue.length) {
         const group = queue[cursor++]
         requests += 1
-        const head = upstreamRefSha(group.repo, group.branch)
+        const head = await upstreamRefSha(group.repo, group.branch)
         // 子树指纹必须按「技能子路径」算，不能按仓库算——同一仓库的多个技能子目录不同。
         const digestCache = new Map()
         for (const item of group.items) {
@@ -2127,14 +2241,14 @@ async function runUpdateCheck(ctx) {
           } else if (digestCache.has(subpathKey)) {
             upstream = digestCache.get(subpathKey)
           } else {
-            upstream = upstreamTreeDigest(group.repo, resolvedBranch, record.subpath)
+            upstream = await upstreamTreeDigest(group.repo, resolvedBranch, record.subpath)
             requests += 1
             digestCache.set(subpathKey, upstream)
           }
           if (!upstream.ok) {
             // 上游路径没了：给一个「可能在哪儿」的提示，用户才知道下一步做什么。
             const moved = upstream.error.includes('上游已经没有这个路径')
-              ? suggestUpstreamPath(group.repo, name)
+              ? await suggestUpstreamPath(group.repo, name)
               : null
             results[name] = {
               status: 'check-failed',
@@ -2508,7 +2622,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream }
 
 function invalidateAll() {
   for (const entry of registrations) {
