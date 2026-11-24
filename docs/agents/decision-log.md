@@ -16,6 +16,26 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-046: 阶段 1+2 落地——来源回填 162 条、六态检测、真实数据验证通过
+
+- **日期**：2026-11-24
+- **实现（index.js，零依赖）**：
+  - `provenance`：每个技能记 repo / branch / subpath / headSha（已装基线）/ digest（基线子树指纹）/ localDigest / remoteSha+remoteDigest（上次见到的上游）/ method / recordedAt。
+  - `backfillProvenance()`：读 `~/.aivault/aivault.db`（先复制快照再只读打开，避开运行中的 AI Vault 锁），同名 + **SKILL.md sha256 一致**才认，绝不按名字猜。
+  - `runUpdateCheck()`：仓库级 `git ls-remote --heads`（零 API 配额）+ 子树级 `blob:none` 部分克隆 + `ls-tree -r`，两侧都用 git blob sha1 口径算指纹。
+  - 六态：`up-to-date / update-available / locally-modified / both-changed / check-failed / unknown-source`。
+  - 路由：`GET /zhiyin/updates`、`POST /zhiyin/updates/check`、`POST /zhiyin/provenance/backfill`；启动 90 秒后跑一次，24 小时内不重复。
+- **实测（171 个技能 / 50 仓库）**：
+  - 回填：`added 162, skippedLocal 9, unmatched 0, drifted 0`（513ms）。
+  - 首轮检测：51 仓库、101 请求、216 秒 → 因每条都要拉子树。
+  - 修完后的热轮：**50 仓库、59 请求、118 秒**；`up-to-date 134 / update-available 19 / check-failed 9 / unknown-source 9`。
+- **修掉的三个真 bug（都是自己写出来的，靠真实数据才发现）**：
+  1. **子树指纹按仓库算而不是按技能算**：同仓库 26 个技能共用了第一个技能的指纹 → 120 个假「有更新」。改为按 subpath 计算并缓存。
+  2. **并发启动被替换掉**：一次代码替换把 `width`/`Promise.all` 吞了，导致 0 请求、86ms「成功」。假成功比失败更危险。
+  3. **上游路径失效被当成有更新**：`ls-tree` 取不到文件时返回空指纹，与本地不等 → 误报。改为返回「查不到」+ `suggestUpstreamPath()` 给候选路径。
+- **外部验证（不靠自证）**：逐文件比 blob sha1 —— anysearch 22 文件里 3 个改（SHA256SUMS/cli.py/test_cli.py）、systematic-debugging 上游删了 5 个、brainstorming 2 个改（含 SKILL.md）→ 三条「有更新」全部为真。
+- **已知边界**：9 个 check-failed 是上游真的搬了（defuddle → `plugins/obsidian/skills/defuddle`）；hyperframes 系列无唯一候选，只报「找不到」。9 个 local 来源永远 `unknown-source`，不出徽标。
+
 ## DEC-045: 阶段 0 测量——162/171 技能可验证来源，覆盖 51 个仓库；参照 AI Vault 的两段式检测
 
 - **日期**：2026-11-24
