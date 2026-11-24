@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-24
+
+### Fixed
+
+- Header: grouped "Check for updates / Cards / List" in that order and removed the separate refresh icon (checking now refreshes the list)
+- Catalog-character-cost dialog: removed the leading bullet on every line
+
 ## [0.1.3] - 2026-11-24
 
 ### Added
