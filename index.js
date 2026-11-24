@@ -2261,7 +2261,17 @@ async function runUpdateCheck(ctx) {
   updateCheckRunning = (async () => {
     const started = Date.now()
     if (!(await gitUsable())) return { ok: false, error: '找不到 git：更新检查需要本机安装 git' }
-    const state = readState()
+    // 新装用户第一次检查时没有任何来源记录：会自动从 AI Vault 库回填一次。
+    // 不回填就会出现「检查 85ms、171 个全 unknown-source」这种假成功。
+    let state = readState()
+    if (Object.keys(state.provenance ?? {}).length === 0) {
+      const backfilled = await backfillProvenance(ctx)
+      if (!backfilled.ok) {
+        return { ok: false, error: '还没有任何技能来源记录，且自动回填失败：' + backfilled.error }
+      }
+      state = readState()
+      note('update-check-auto-backfill', { added: backfilled.added })
+    }
     const observed = await collectState(ctx)
     const skills = (observed.skills ?? []).filter((skill) => typeof skill.path === 'string')
     const provenance = { ...(state.provenance ?? {}) }
