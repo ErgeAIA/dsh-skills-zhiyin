@@ -16,6 +16,20 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-040: 市场 PR 已合并；「搜不到」的真因是条目里没有中文名
+
+- **日期**：2026-11-24
+- **PR #18245 已合并**（2026-11-23T16:49:39Z，维护者 fkysly）。维护者在 main 上给描述追加了一句：
+  > its HTTP routes have no DSH access check (no ctx.connection.requestRejection), so a web page open in the user's browser could call them.
+  - 这是**真实的安全缺口**：我们的 `/zhiyin/*` 路由只在 POST 上做了 Origin/Host 同源校验，GET 类 `resource` 路由没有任何准入检查。DSH 提供的正是 `ctx.get('connection').requestRejection(request)`；dshmarket 用 `refuseUnadmitted()` 把**所有**路由统一包起来。我们应当照做，修完后请维护者把该句去掉。
+- **市场数据侧实测**：`plugins.json` 已含我们（12,960 条），条目详情页 HTTP 200，`data/plugins/ErgeAIA__dsh-skills-zhiyin.yml` 在 main 上存在。
+- **搜不到的真因**：整个索引里「织音」出现 **0 次**。条目只有 `name: dsh-skills-zhiyin` 与描述，中英描述都不含「织音」二字。市场搜索匹配 name/description，所以搜中文品牌名必然为空。
+  - 立即可用的搜索词：`zhiyin`、`技能`、`skill`（zh 描述含「技能」）。
+  - 已提交 PR #18428 把 `织音（ZhiYin）` 写进中英描述，使中文搜索可命中；维护者那句访问检查的说明保留原文。
+- **安装途径的硬约束**：`dsh plugin --profile desktop ...` 被拒绝——`desktop` profile 由 Electron 应用独占管理（`profile "desktop" is managed exclusively by the Electron application`）。所以桌面端只能通过应用内「插件市场」安装；命令行只能操作非 desktop profile。
+- **切换安装方式的数据安全性**：state 在 `<profile>/zhiyin-proto/`，与包安装位置无关；从 `link:` 换成 npm 安装后，技能包/停用项/备注/收藏都还在。
+- **条目字段缺口**：我们的索引条目没有 `install` 与 `npm` 字段（其它条目有，如 `dsh plugin --profile web add dsh-pixiv-skill`）。市场解析回退为 `npm ?? name`，即用包名兜底，仍可安装；生成器下一次富化后应补上。
+
 ## DEC-039: OIDC 可信发布验证通过——0.1.1 无令牌发布，带 SLSA provenance
 
 - **日期**：2026-11-24

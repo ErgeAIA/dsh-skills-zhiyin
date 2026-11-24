@@ -23,7 +23,14 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 01:2x OIDC 可信发布验证通过——0.1.1 无令牌发布，带 SLSA provenance
+- **最后更新**：2026-11-24 15:2x 市场 PR 已合并；查明「搜不到」真因是条目缺中文名（已提 PR #18428）
+  - PR #18245 于 2026-11-23T16:49Z 合并，维护者追加了一句安全说明：我们的 HTTP 路由没有 DSH 访问检查（ctx.connection.requestRejection）。这是真实缺口，待修。
+  - 市场索引已含我们，详情页 200；但索引里「织音」出现 0 次 → 中文搜索必然为空。可先用 zhiyin / 技能 / skill 搜到。
+  - 已提 PR #18428：把「织音（ZhiYin）」写进中英描述，保留维护者那句说明。
+  - 桌面 profile 由 Electron 应用独占，命令行无法 dsh plugin add；必须走应用内插件市场安装。state 与安装位置无关，切换不丢数据。
+  - 下一步：实现 requestRejection 准入检查 → 发 0.1.2 → 请维护者移除描述里的安全提示。
+
+- 上一轮：2026-11-24 01:2x OIDC 可信发布验证通过——0.1.1 无令牌发布，带 SLSA provenance
   - Trusted Publisher 状态 Valid，权限三项齐全；tag v0.1.1 → Release → Publish to npm 工作流全绿，全程无令牌/OTP/浏览器。
   - registry：latest=0.1.1，provenance = slsa.dev/provenance/v1，shasum 与日志一致；隔离环境从 npm 装 0.1.1 成功。
   - 包内 README 从 registry tarball 验证：npm 安装命令与 --registry 说明已进包，dsh-llm 假依赖与 0.1.0 旧版本字样已消失。
