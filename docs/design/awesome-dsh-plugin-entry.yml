@@ -1,22 +1,7 @@
-# awesome-dsh-plugin 收录条目
-# 依据：目标仓库 contributing.md（2026-11-23 读取线上原文核对）
-# 提交方式：向 awesome-dsh-plugin/awesome-dsh-plugin 提 PR，只加这一个文件：
-#   data/plugins/ErgeAIA__dsh-skills-zhiyin.yml
-# 两个 README 由该仓库脚本从 data/plugins/*.yml 生成，不要手工编辑。
-#
-# 已核对的硬性要求：
-#   - package.json 声明 dsh.bundle.patch → ./cordis.patch.yml（存在）
-#   - 仓库有真实可用代码（非占位/纯 README）
-#   - 仓库创建满 1 天（2026-11-17 创建）
-#   - 仓库带 dsh-plugin topic
-#   - category 取值在允许集合内
-#   - 描述不含 ": "（冒号加空格），无需加引号；如后续加入必须加引号
-#   - icon 指向 GitHub 托管的位图 PNG（HTTP 200）
-
 url: https://github.com/ErgeAIA/dsh-skills-zhiyin
 name: ErgeAIA/dsh-skills-zhiyin
 category: skill
 description:
-  en: Controls which installed DSH skills the model actually sees. Group them into packs, toggle each skill, and check the catalog character cost; also installs, archives and restores skills.
-  zh: 控制模型此刻真正看得见哪些已安装技能。把技能编成包、逐个启停，并算出目录占用的字符成本；同时支持安装、归档与恢复。
+  en: 'ZhiYin (织音) toggles skills on and off per task: enable only what the current job needs and save the context the skill catalog would otherwise spend. Group skills into packs for one-click switching, and install, uninstall, archive or restore them.'
+  zh: '织音（ZhiYin）按任务启停技能：只开当前真正要用的，省下技能目录占用的上下文。技能可编成包一键切换，也支持安装、卸载、归档与恢复。'
 icon: https://raw.githubusercontent.com/ErgeAIA/dsh-skills-zhiyin/main/assets/icon-180.png
