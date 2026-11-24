@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-24
+
+### Added
+
+- Automatic skill update checks: toggle plus interval (6h / 12h / daily / 3d / 7d) in settings; first run five minutes after startup, then on the chosen interval in the background without blocking the interface
+- The "last full check" time and results **refresh automatically** when a check finishes; no manual reload needed
+- The button shows progress while a check runs, and repeated clicks do not stack
+
+### Fixed
+
+- **The whole interface failed to render on the web host** (BUG-016): the interval-dropdown style used `...css.btn` inside the `css` object itself, so evaluating `css` threw `ReferenceError`, the entire client bundle failed to evaluate and no entry was registered. The desktop loader tolerated the self-reference; now the fields are inlined.
+- The first check for a fresh install backfills provenance from the AI Vault database (verified by SKILL.md hash) instead of reporting a fake 85ms success with zero sources
+- The interval dropdown is a custom dark menu; the native `select` was white-on-white in dark themes
+- The status/settings area is a single collapsible row with catalog characters and last-check time on the right, instead of four rows with a large empty area
+
 ## [0.1.4] - 2026-11-24
 
 ### Fixed

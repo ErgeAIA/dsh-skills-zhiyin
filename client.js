@@ -1937,21 +1937,55 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [updateBusy, setUpdateBusy] = React.useState('')
       const [intervalOpen, setIntervalOpen] = React.useState(false)
       const [openInfo, setOpenInfo] = React.useState('')
+      // 检查一轮要一两分钟：发起后不阻塞界面，改用轮询读取进度，跑完自动刷新。
+      const [polling, setPolling] = React.useState(false)
       const checkUpdates = React.useCallback(() => {
-        if (updateBusy) return
+        if (updateBusy === 'check') return
         setUpdateBusy('check')
+        setPolling(true)
+        // 只负责发起，不等结果；进度由下面的轮询 effect 读 /zhiyin/updates 的 running。
         fetch('/zhiyin/updates/check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
           .then((response) => response.json())
           .then((result) => {
-            // 服务端已有一轮在跑不是错误：它是并发保护，静默等它跑完再刷新。
-            if (result && result.running === true) return null
-            if (!result || result.ok !== true) throw new Error(result?.error ?? '检查失败')
+            if (result && result.ok === false && result.running !== true) {
+              throw new Error(result?.error ?? '检查失败')
+            }
             return null
           })
-          .then(() => load())
-          .catch((error) => setState((previous) => ({ ...previous, error: String(error?.message ?? error) })))
-          .finally(() => setUpdateBusy(''))
-      }, [updateBusy, load])
+          .catch((error) => { setPolling(false); setUpdateBusy(''); setState((previous) => ({ ...previous, error: String(error?.message ?? error) })) })
+      }, [updateBusy])
+
+      // 轮询：只要有一轮在跑，每 2.5 秒读一次；跑完自动 load()，最近检查时间随之更新。
+      React.useEffect(() => {
+        if (!polling) return undefined
+        let stopped = false
+        const tick = async () => {
+          if (stopped) return
+          try {
+            const response = await fetch('/zhiyin/updates', { headers: { accept: 'application/json' } })
+            const payload = await response.json()
+            if (stopped) return
+            setState((previous) => ({ ...previous, updates: payload }))
+            if (payload && payload.running === true) {
+              setTimeout(tick, 2500)
+              return
+            }
+            // 服务端已经不在跑了：结束轮询并整页刷新一次，拿到新的最近检查时间。
+            setPolling(false)
+            setUpdateBusy('')
+            load()
+          } catch {
+            setTimeout(tick, 3000)
+          }
+        }
+        const timer = setTimeout(tick, 1200)
+        return () => { stopped = true; clearTimeout(timer) }
+      }, [polling, load])
+
+      // 打开页面时若后台已有一轮在跑（如启动 5 分钟后的自动检查），也接上轮询。
+      React.useEffect(() => {
+        if (state.updates?.running === true && polling === false) setPolling(true)
+      }, [state.updates?.running, polling])
 
       const applyUpdate = React.useCallback((name, force) => {
         if (updateBusy) return
@@ -2971,9 +3005,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                           h('button', {
                             type: 'button',
                             style: { ...css.btn, flex: '0 0 auto', whiteSpace: 'nowrap' },
-                            disabled: updateBusy === 'check',
+                            disabled: updateBusy === 'check' || state.updates?.running === true,
                             onClick: checkUpdates,
-                          }, updateBusy === 'check' ? h(Spinner, { size: 14 }) : say('checkNow', '立即检查')),
+                          }, (updateBusy === 'check' || state.updates?.running === true) ? h(Spinner, { size: 14 }) : say('checkNow', '立即检查')),
                         ),
                       ),
                       h('div', { style: css.infoSection },
