@@ -42,6 +42,12 @@ window.__ModuleLoader__.load({
         filterHint: '点一下只列这一类，再点一下回到全部',
         linkBadge: '软链',
         checkUpdates: '检查更新',
+        autoCheck: '自动检查技能更新',
+        autoCheckHint: '开启后按所选周期在后台检查，不会卡住界面',
+        checkInterval: '检查周期',
+        lastChecked: '最近完整检查：',
+        neverChecked: '还没检查过',
+        checkNow: '立即检查',
         checkUpdatesHint: '按上游仓库检查技能是否有新版本；每天启动后会自动检查一次',
         checkUpdatesFound: '有 {n} 个更新',
         updateBadge: '有更新',
@@ -319,6 +325,12 @@ window.__ModuleLoader__.load({
         filterHint: 'Click a card to list that group; click again for all',
         linkBadge: 'link',
         checkUpdates: 'Check for updates',
+        autoCheck: 'Automatic skill update check',
+        autoCheckHint: 'Checks in the background at the chosen interval without blocking the interface',
+        checkInterval: 'Interval',
+        lastChecked: 'Last full check: ',
+        neverChecked: 'Never checked',
+        checkNow: 'Check now',
         checkUpdatesHint: 'Check each upstream repo for a newer version; also runs once a day after startup',
         checkUpdatesFound: '{n} updates',
         updateBadge: 'Update',
@@ -2308,6 +2320,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       }, [menuOpen])
 
       const data = state.data
+      // 最近检查时间：本地时区，和界面其它时间显示保持一致。
+      const fmtTime = (value) => {
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return String(value)
+        const pad = (n) => String(n).padStart(2, '0')
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+      }
       // 更新徽标只认六态里的两种：有新版可点、本地改过只提示。
       const updateResults = state.updates?.results ?? {}
       const updateCount = Object.keys(updateResults).filter((name) => updateResults[name]?.status === 'update-available').length
@@ -2845,6 +2864,43 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                   h('div', { style: css.groupDesc },
                     data.complete ? say('complete', '已完整读取') : say('incomplete', '读取不完整')),
                 ),
+              ),
+              h(
+                'div',
+                { style: css.groupRow },
+                h(
+                  'div',
+                  { style: css.groupMain },
+                  h('div', { style: css.groupTitle }, say('autoCheck', '自动检查技能更新')),
+                  h('div', { style: css.groupDesc }, say('autoCheckHint', '开启后按所选周期在后台检查，不会卡住界面')),
+                ),
+                h(Toggle, {
+                  checked: (state.updates?.settings?.enabled ?? true) !== false,
+                  disabled: busy,
+                  title: say('autoCheck', '自动检查技能更新'),
+                  onChange: () => write('/zhiyin/settings', { updateCheck: { enabled: (state.updates?.settings?.enabled ?? true) === false } }),
+                }),
+              ),
+              h(
+                'div',
+                { style: css.groupRowLast },
+                h('span', { style: css.groupTitle }, say('checkInterval', '检查周期')),
+                h('select', {
+                  value: String(state.updates?.settings?.intervalMs ?? 86400000),
+                  disabled: busy || (state.updates?.settings?.enabled ?? true) === false,
+                  onChange: (event) => write('/zhiyin/settings', { updateCheck: { intervalMs: Number(event.target.value) } }),
+                  style: { ...css.btn, padding: '6px 10px', minWidth: 110, flex: '0 0 auto' },
+                }, (state.updates?.intervals ?? []).map((item) => h('option', { key: item.ms, value: String(item.ms) }, item.label))),
+                h('span', { style: { ...css.hint, flex: '1 1 auto', textAlign: 'right' } },
+                  state.updates?.checkedAt
+                    ? say('lastChecked', '最近完整检查：') + fmtTime(state.updates.checkedAt)
+                    : say('neverChecked', '还没检查过')),
+                h('button', {
+                  type: 'button',
+                  style: { ...css.btn, flex: '0 0 auto', whiteSpace: 'nowrap' },
+                  disabled: updateBusy === 'check',
+                  onClick: checkUpdates,
+                }, updateBusy === 'check' ? h(Spinner, { size: 14 }) : say('checkNow', '立即检查')),
               ),
             )
           : null,
