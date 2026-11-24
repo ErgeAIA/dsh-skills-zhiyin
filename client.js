@@ -1307,7 +1307,14 @@ window.__ModuleLoader__.load({
         color: 'var(--zhiyin-accent, #e0743c)',
       },
       intervalBtn: {
-        ...css.btn,
+        // 不用 ...css.btn：本对象就是 css 自身，初始化时引用会抛 Cannot access 'css' before initialization。
+        borderRadius: 10,
+        border: '1px solid rgba(128,128,128,0.16)',
+        background: 'transparent',
+        color: 'inherit',
+        fontSize: fs.body,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
         padding: '6px 10px',
         minWidth: 110,
         flex: '0 0 auto',
