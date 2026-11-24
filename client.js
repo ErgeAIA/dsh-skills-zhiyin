@@ -41,6 +41,13 @@ window.__ModuleLoader__.load({
         search: '按名称或描述搜索',
         filterHint: '点一下只列这一类，再点一下回到全部',
         linkBadge: '软链',
+        checkUpdates: '检查更新',
+        checkUpdatesHint: '按上游仓库检查技能是否有新版本；每天启动后会自动检查一次',
+        checkUpdatesFound: '有 {n} 个更新',
+        updateBadge: '有更新',
+        updateLocalOnly: '本地已改',
+        updateApplyHint: '更新到上游当前版本；本地没改过才允许',
+        updateBlockedHint: '本地内容被改过：更新会覆盖你的修改，先备份',
         tabList: '技能列表',
         tabPacks: '技能包',
         packNew: '+ 新建技能包',
@@ -310,6 +317,13 @@ window.__ModuleLoader__.load({
         search: 'Search name or description',
         filterHint: 'Click a card to list that group; click again for all',
         linkBadge: 'link',
+        checkUpdates: 'Check for updates',
+        checkUpdatesHint: 'Check each upstream repo for a newer version; also runs once a day after startup',
+        checkUpdatesFound: '{n} updates',
+        updateBadge: 'Update',
+        updateLocalOnly: 'Edited',
+        updateApplyHint: 'Update to the current upstream version (only when the local copy is unedited)',
+        updateBlockedHint: 'Local files were edited; updating would overwrite them',
         tabList: 'Skills',
         tabPacks: 'Packs',
         packNew: 'New pack',
@@ -1817,7 +1831,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       const load = React.useCallback(() => {
         setState((previous) => ({ ...previous, loading: true, error: null, exportError: null }))
-        fetch('/zhiyin/state', { headers: { accept: 'application/json' } })
+        // 更新状态与技能列表一起取：徽标要和卡片同时出现，不能先没徽标再跳一下。
+        const readJson = (url) => fetch(url, { headers: { accept: 'application/json' } })
           .then(async (response) => {
             if (!response.ok) {
               // 401/403 来自宿主的准入闸门：把原因说清楚，不要只留一个 HTTP 状态码。
@@ -1831,7 +1846,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             }
             return response.json()
           })
-          .then((data) => setState({ loading: false, data, error: null }))
+        Promise.all([readJson('/zhiyin/state'), readJson('/zhiyin/updates').catch(() => null)])
+          .then(([data, updates]) => setState({ loading: false, data, error: null, exportError: null, updates }))
           .catch((error) =>
             setState((previous) => ({
               loading: false,
@@ -1840,6 +1856,40 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             })),
           )
       }, [])
+
+      // 更新动作独立于全局 busy：检查一轮要一两分钟，不该把整页按钮都锁死。
+      const [updateBusy, setUpdateBusy] = React.useState('')
+      const checkUpdates = React.useCallback(() => {
+        if (updateBusy) return
+        setUpdateBusy('check')
+        fetch('/zhiyin/updates/check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? '检查失败')
+            return null
+          })
+          .then(() => load())
+          .catch((error) => setState((previous) => ({ ...previous, error: String(error?.message ?? error) })))
+          .finally(() => setUpdateBusy(''))
+      }, [updateBusy, load])
+
+      const applyUpdate = React.useCallback((name) => {
+        if (updateBusy) return
+        setUpdateBusy(name)
+        fetch('/zhiyin/updates/apply', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result || result.ok !== true) throw new Error(result?.error ?? '更新失败')
+            return null
+          })
+          .then(() => load())
+          .catch((error) => setState((previous) => ({ ...previous, error: String(error?.message ?? error) })))
+          .finally(() => setUpdateBusy(''))
+      }, [updateBusy, load])
 
       const loadArchive = React.useCallback(() => {
         setArchiveLoading(true)
@@ -2256,6 +2306,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       }, [menuOpen])
 
       const data = state.data
+      // 更新徽标只认六态里的两种：有新版可点、本地改过只提示。
+      const updateResults = state.updates?.results ?? {}
+      const updateCount = Object.keys(updateResults).filter((name) => updateResults[name]?.status === 'update-available').length
 
       // 一致性修复：只剪掉指向已消失技能的引用，不猜技能去哪了；后端先备份。
       const repairDrift = React.useCallback(() => {
@@ -2821,6 +2874,17 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 ? null
                 : h('button', {
                     type: 'button',
+                    style: { ...css.btn, marginLeft: 'auto', whiteSpace: 'nowrap' },
+                    title: say('checkUpdatesHint', '按上游仓库检查技能是否有新版本；每天启动后会自己检查一次'),
+                    disabled: updateBusy === 'check',
+                    onClick: checkUpdates,
+                  }, updateBusy === 'check'
+                    ? h(Spinner, { size: 14 })
+                    : updateCount > 0
+                      ? say('checkUpdatesFound', '有 {n} 个更新').replace('{n}', String(updateCount))
+                      : say('checkUpdates', '检查更新')),
+                h('button', {
+                    type: 'button',
                     style: { ...css.iconBtn, marginLeft: tab === 'list' ? 0 : 'auto' },
                     title: say('refresh', '刷新'),
                     'aria-label': say('refresh', '刷新'),
@@ -3160,13 +3224,14 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h(
                       'div',
                       { style: css.marketCardFoot },
-                      h('span', { style: { ...css.hint, flex: '0 0 auto' } },
-                        item.installable === false ? say('marketHostedBadge', '托管') : say('marketInstallable', '可安装')),
+                      item.installable === false
+                        ? h('span', { style: { ...css.hint, flex: '0 0 auto' } }, say('marketHostedBadge', '托管'))
+                        : null,
                       h('span', { style: { flex: '1 1 auto' } }),
                       done || installed
-                        ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto' } },
-                            h('span', { style: { ...css.metaText, color: '#4a9d6a' }, title: say('marketInstalled', '已安装') },
-                              h(Icon, { name: 'check', size: 13 }), ' ' + say('marketInstalled', '已安装')),
+                        ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto', whiteSpace: 'nowrap' } },
+                            h('span', { style: { ...css.metaText, color: '#4a9d6a', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }, title: say('marketInstalled', '已安装') },
+                              h(Icon, { name: 'check', size: 13 }), say('marketInstalled', '已安装')),
                             h('button', {
                               type: 'button',
                               style: css.iconBtn,
@@ -3358,6 +3423,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 : skills.map((skill) => {
                     const on = skill.enabled !== false
                     const hovered = skillHover === skill.name
+                    const updateState = updateResults[skill.name]?.status
+                    const updatable = updateState === 'update-available'
+                    const updateBlocked = updateState === 'locally-modified' || updateState === 'both-changed'
                     return h(
                       'div',
                       {
@@ -3380,6 +3448,25 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                               title: `${say('linkBadgeTitle', '符号链接，实体在')}${skill.linkTarget}`,
                               onClick: () => revealSkill(skill),
                             }, say('linkBadge', '软链'))
+                          : null,
+                        // 更新徽标：只放一个词，不加图标；可更新的才可点。
+                        updatable || updateBlocked
+                          ? h('span', {
+                              style: {
+                                ...css.metaText,
+                                flex: '0 0 auto',
+                                whiteSpace: 'nowrap',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                ...(updatable ? { color: 'var(--zhiyin-accent, #e0743c)', cursor: 'pointer', fontWeight: 600 } : { opacity: 0.7 }),
+                              },
+                              title: updatable
+                                ? say('updateApplyHint', '更新到上游当前版本；本地没改过才允许')
+                                : say('updateBlockedHint', '本地内容被改过：更新会覆盖你的修改，先备份'),
+                              onClick: updatable ? () => applyUpdate(skill.name) : undefined,
+                            }, updateBusy === skill.name
+                              ? h(Spinner, { size: 12 })
+                              : updatable ? say('updateBadge', '有更新') : say('updateLocalOnly', '本地已改'))
                           : null,
                         skill.readOnly
                           ? h('span', { style: { ...css.metaText, flex: '0 0 auto' }, title: readOnlyHint(skill) }, say('readOnlyBadge', '只读'))
