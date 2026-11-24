@@ -1271,6 +1271,21 @@ window.__ModuleLoader__.load({
         fontSize: fs.hint,
         cursor: 'pointer',
       },
+      menuItemOn: {
+        background: 'rgba(128,128,128,0.14)',
+        color: 'var(--zhiyin-accent, #e0743c)',
+      },
+      intervalBtn: {
+        ...css.btn,
+        padding: '6px 10px',
+        minWidth: 110,
+        flex: '0 0 auto',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        textAlign: 'left',
+      },
     }
 
     const ICONS = {
@@ -1873,6 +1888,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       // 更新动作独立于全局 busy：检查一轮要一两分钟，不该把整页按钮都锁死。
       const [updateBusy, setUpdateBusy] = React.useState('')
+      const [intervalOpen, setIntervalOpen] = React.useState(false)
       const checkUpdates = React.useCallback(() => {
         if (updateBusy) return
         setUpdateBusy('check')
@@ -2885,12 +2901,31 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 'div',
                 { style: css.groupRowLast },
                 h('span', { style: css.groupTitle }, say('checkInterval', '检查周期')),
-                h('select', {
-                  value: String(state.updates?.settings?.intervalMs ?? 86400000),
-                  disabled: busy || (state.updates?.settings?.enabled ?? true) === false,
-                  onChange: (event) => write('/zhiyin/settings', { updateCheck: { intervalMs: Number(event.target.value) } }),
-                  style: { ...css.btn, padding: '6px 10px', minWidth: 110, flex: '0 0 auto' },
-                }, (state.updates?.intervals ?? []).map((item) => h('option', { key: item.ms, value: String(item.ms) }, item.label))),
+                h(
+                  'div',
+                  { style: css.menuWrap },
+                  h('button', {
+                    type: 'button',
+                    style: css.intervalBtn,
+                    disabled: busy || (state.updates?.settings?.enabled ?? true) === false,
+                    onClick: () => setIntervalOpen((open) => !open),
+                    'aria-haspopup': 'listbox',
+                    'aria-expanded': intervalOpen,
+                  }, h('span', null, (state.updates?.intervals ?? []).find((item) => item.ms === (state.updates?.settings?.intervalMs ?? 86400000))?.label ?? say('everyDay', '每天')), h(Icon, { name: 'chevronDown', size: 12 })),
+                  intervalOpen
+                    ? h('div', { style: css.menu, role: 'listbox' }, (state.updates?.intervals ?? []).map((item) => h('button', {
+                        type: 'button',
+                        key: item.ms,
+                        role: 'option',
+                        'aria-selected': item.ms === (state.updates?.settings?.intervalMs ?? 86400000),
+                        style: { ...css.menuItem, ...(item.ms === (state.updates?.settings?.intervalMs ?? 86400000) ? css.menuItemOn : {}) },
+                        onClick: () => {
+                          setIntervalOpen(false)
+                          write('/zhiyin/settings', { updateCheck: { intervalMs: item.ms } })
+                        },
+                      }, item.label)))
+                    : null,
+                ),
                 h('span', { style: { ...css.hint, flex: '1 1 auto', textAlign: 'right' } },
                   state.updates?.checkedAt
                     ? say('lastChecked', '最近完整检查：') + fmtTime(state.updates.checkedAt)
