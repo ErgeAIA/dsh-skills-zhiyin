@@ -23,7 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 15:5x 澄清市场更新机制：版本号运行时查 npm，不需批准；只有 YAML 内容需合并
+- **最后更新**：2026-11-24 16:3x 更正市场版本机制：卡片版本读 updates.json（每日 02:23 UTC 刷新），非 npm 实时查询
+  - 线上 updates.json 里我们的记录仍是 release v0.1.1、checkedAt 2026-11-24；今天的 02:23 UTC 探测早于 0.1.2 的 08:12 UTC 发布。
+  - plugins.json 无 version 字段；updates.json 承载 release 记录，卡片与安装弹窗读的是它；刷新 catalog 不重建 updates.json。
+  - 重要状态：织音当前未装在 desktop profile（dependencies / bundles / node_modules 均无）。
+  - 0.1.2 预计明天 02:23 UTC（北京 10:23）探测后才出现在市场。
+
+- 上一轮：2026-11-24 15:5x 澄清市场更新机制（结论有误，本轮已更正）
   - 版本号来源：dshmarket 直接请求 <registry>/<pkg>/latest，与索引无关；华为云镜像与 npmjs 均为 0.1.2，与市场显示一致。
   - YAML（描述/分类/图标）需 PR + 维护者合并 → #18428 仍待合并。
   - 索引富化字段每日 02:23 UTC 探针补充；我们条目暂无（不影响安装与版本显示，只影响站点星数/下载量）。

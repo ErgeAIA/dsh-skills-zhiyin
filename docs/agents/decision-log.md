@@ -16,7 +16,21 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
-## DEC-042: 市场里的版本号不走索引，是运行时直接查 npm；只有 YAML 内容需要维护者合并
+## DEC-043: 更正 DEC-042——市场卡片版本来自 updates.json 的 release 记录，不是 npm 实时查询
+
+- **日期**：2026-11-24
+- **用户证据**：市场卡片与安装弹窗都显示 v0.1.1（日期 2026-11-23），而我们已发布 0.1.2。
+- **DEC-042 的错误**：我依据 dshmarket 源码里 catalogFromPackage 调 <registry>/<pkg>/latest 就断定卡片版本是运行时现查 npm。那是**目录包**（plugins.json 自身作为 npm 包分发）的取法，不是条目版本的来源。
+- **真实机制（对照线上 updates.json 确认）**：
+  1. plugins.json（目录）只有 name / owner / url / category / description / icon，**没有 version 字段**。
+  2. updates.json（旁边的 17 MB 文件）每个仓库一条，含 release（tag / name / publishedAt / body / url）与 checkedAt。我们的记录是 release tag v0.1.1、publishedAt 2026-11-23T17:03:47Z、checkedAt 2026-11-24。
+  3. 市场卡片与安装弹窗的 v0.1.1 就来自这份 updates.json。
+- **0.1.2 何时出现**：等站点下一次刷新 updates.json。build-site.yml 的 schedule 是**每天 02:23 UTC（北京 10:23）**；今天的探测在 02:23 UTC 跑完，而 0.1.2 的 Release 是 08:12 UTC 才发 —— 探测早于发布，所以停在 0.1.1。**不是维护者卡着，是每日流水线还没轮到。**
+- **强制刷新的限度**：市场自身的 refreshCatalog 只重取 plugins.json，不重建 updates.json（那份在站点侧生成），所以点刷新不会变。desktop profile 由 Electron 独占，只能用市场 UI，而 UI 会把版本钉成 updates.json 里的那个。
+- **另一处必须说明的状态**：查磁盘发现**织音当前根本没有装在 desktop profile**——dependencies 与 dsh.profile.bundles 里都没有它，node_modules/dsh-skills-zhiyin 也不存在。所以用户看到的是「未安装、可安装 v0.1.1」的卡片，不是「已装 0.1.1、可升 0.1.2」。
+- **教训**：读源码得出机制前，必须用线上数据反证一次。DEC-042 只看代码没对数据，结论差了整整一层。
+
+## DEC-042: 市场里的版本号不走索引，是运行时直接查 npm（已由 DEC-043 更正）
 
 - **日期**：2026-11-24
 - **用户疑问**：市场显示 0.1.2，这个更新是否也要等维护者批准。
