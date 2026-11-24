@@ -1934,6 +1934,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         fetch('/zhiyin/updates/check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
           .then((response) => response.json())
           .then((result) => {
+            // 服务端已有一轮在跑不是错误：它是并发保护，静默等它跑完再刷新。
+            if (result && result.running === true) return null
             if (!result || result.ok !== true) throw new Error(result?.error ?? '检查失败')
             return null
           })
