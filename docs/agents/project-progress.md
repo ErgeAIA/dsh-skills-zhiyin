@@ -23,6 +23,11 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
+- **最后更新**：2026-11-24 16:4x 用户确认系自行卸载织音；数据完好；等 updates.json 刷新后安装 0.1.2
+  - 用户明确「是被我卸载了，需要等更新」。
+  - 卸载后数据完好（实测 <profile>/zhiyin-proto：4 个技能包、0 停用、1 备注、1 收藏、1 份归档），重装即恢复。
+  - 等待窗口：站点每天 02:23 UTC（北京 10:23）刷新 updates.json；预计明早出现 v0.1.2 后，市场卡片与安装弹窗才会给出 0.1.2。
+  - 安装时市场会把版本钉成 updates.json 里的那个，所以必须等它刷新，不能用「刷新目录」绕过。
 - **最后更新**：2026-11-24 16:3x 更正市场版本机制：卡片版本读 updates.json（每日 02:23 UTC 刷新），非 npm 实时查询
   - 线上 updates.json 里我们的记录仍是 release v0.1.1、checkedAt 2026-11-24；今天的 02:23 UTC 探测早于 0.1.2 的 08:12 UTC 发布。
   - plugins.json 无 version 字段；updates.json 承载 release 记录，卡片与安装弹窗读的是它；刷新 catalog 不重建 updates.json。
