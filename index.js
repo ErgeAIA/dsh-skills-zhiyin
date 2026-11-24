@@ -49,8 +49,19 @@ const EMPTY_INTENT = {
   updatedAt: null,
 }
 
+// 自动更新检查的可选周期：界面下拉与配置校验共用同一份，避免两处漂移。
+const UPDATE_INTERVALS = [
+  { ms: 6 * 60 * 60 * 1000, label: '每6小时' },
+  { ms: 12 * 60 * 60 * 1000, label: '每12小时' },
+  { ms: 24 * 60 * 60 * 1000, label: '每天' },
+  { ms: 72 * 60 * 60 * 1000, label: '每3天' },
+  { ms: 168 * 60 * 60 * 1000, label: '每7天' },
+]
+const DEFAULT_UPDATE_INTERVAL = 24 * 60 * 60 * 1000
+
 const EMPTY_STATE = {
   v: 1,
+  updateCheck: { enabled: true, intervalMs: DEFAULT_UPDATE_INTERVAL },
   agentsRoot: false,
   allOff: false,
   disabled: {},
@@ -313,9 +324,25 @@ export function apply(ctx) {
     }
     if (typeof body?.agentsRoot === 'boolean') state.agentsRoot = body.agentsRoot
     if (typeof body?.allOff === 'boolean') state.allOff = body.allOff
+    let scheduleChanged = false
+    if (body?.updateCheck && typeof body.updateCheck === 'object') {
+      const cfg = body.updateCheck
+      if (typeof cfg.enabled === 'boolean' && state.updateCheck.enabled !== cfg.enabled) {
+        state.updateCheck.enabled = cfg.enabled
+        scheduleChanged = true
+      }
+      if (UPDATE_INTERVALS.some((item) => item.ms === cfg.intervalMs) && state.updateCheck.intervalMs !== cfg.intervalMs) {
+        state.updateCheck.intervalMs = cfg.intervalMs
+        scheduleChanged = true
+      }
+    }
     saveState(state)
     invalidateAll()
-    return { status: 200, body: { ok: true, agentsRoot: state.agentsRoot, allOff: state.allOff === true } }
+    if (scheduleChanged) scheduleUpdateCheck(ctx)
+    return {
+      status: 200,
+      body: { ok: true, agentsRoot: state.agentsRoot, allOff: state.allOff === true, updateCheck: state.updateCheck },
+    }
   })
 
   post(ctx, '/zhiyin/pack', async (body) => {
@@ -756,6 +783,8 @@ export function apply(ctx) {
             durationMs: state.updates?.durationMs ?? 0,
           },
           provenance: Object.keys(state.provenance ?? {}).length,
+          settings: state.updateCheck ?? { enabled: true, intervalMs: DEFAULT_UPDATE_INTERVAL },
+          intervals: UPDATE_INTERVALS,
           running: updateCheckRunning !== null,
           git: await gitUsable(),
         })
@@ -765,6 +794,7 @@ export function apply(ctx) {
 
   post(ctx, '/zhiyin/updates/check', async () => {
     const summary = await runUpdateCheck(ctx)
+    if (summary.ok) scheduleUpdateCheck(ctx)
     return { status: summary.ok ? 200 : 409, body: summary }
   })
 
@@ -775,19 +805,16 @@ export function apply(ctx) {
     return { status: summary.ok ? 200 : 500, body: summary }
   })
 
-  // 每日一次：启动 90 秒后才跑（避开启动高峰），24 小时内不重复；失败只记录不打扰。
+  // 自动检查：开关与周期来自设置页；首次启动延迟 5 分钟避开高峰，之后按所选周期排下一次。
   ctx.effect(() => {
-    const timer = setTimeout(() => {
-      const state = readState()
-      const last = Date.parse(state.updates?.checkedAt ?? '')
-      if (Number.isFinite(last) && Date.now() - last < UPDATE_DAILY_MS) return
-      Promise.resolve()
-        .then(() => runUpdateCheck(ctx))
-        .catch((error) => note('update-check-failed', { error: String(error?.message ?? error).slice(0, 200) }))
-    }, 5 * 60 * 1000)
-    if (typeof timer.unref === 'function') timer.unref()
-    return () => clearTimeout(timer)
-  }, 'zhiyin: 每日更新检查')
+    scheduleUpdateCheck(ctx)
+    return () => {
+      if (updateTimer !== null) {
+        clearTimeout(updateTimer)
+        updateTimer = null
+      }
+    }
+  }, 'zhiyin: 自动更新检查')
 
   post(ctx, '/zhiyin/rollback', async (body) => {
     const wanted = typeof body?.file === 'string' ? body.file.trim() : ''
@@ -1756,6 +1783,12 @@ function readState() {
       allPack.enabled = true
       for (const pack of next.packs) if (pack.id !== ALL_PACK_ID) pack.enabled = false
     }
+    // 自动检查设置：旧状态文件没有这个字段，补默认；周期不在白名单里就退回每天。
+    const cfg = next.updateCheck
+    next.updateCheck = {
+      enabled: cfg?.enabled !== false,
+      intervalMs: UPDATE_INTERVALS.some((item) => item.ms === cfg?.intervalMs) ? cfg.intervalMs : DEFAULT_UPDATE_INTERVAL,
+    }
     cache = next
   } catch {
     // 首次运行还没有 state.json：直接给一份带「全部技能」的初始状态，避免装完什么都不可用。
@@ -2193,6 +2226,34 @@ async function updateSkillFromUpstream(ctx, name, options) {
   } finally {
     try { rmSync(work, { recursive: true, force: true }) } catch { /* 临时目录清不掉不影响结果 */ }
   }
+}
+/**
+ * 按设置里的开关与周期安排下一次自动检查。
+ * 首次启动（没检查过）延迟 5 分钟避开 DSH 启动高峰；此后从「上次检查完成」起算一个周期。
+ * 每次调度都先清掉旧定时器，所以改设置或手动检查后不会出现两个并发的定时任务。
+ */
+let updateTimer = null
+function scheduleUpdateCheck(ctx) {
+  if (updateTimer !== null) {
+    clearTimeout(updateTimer)
+    updateTimer = null
+  }
+  const state = readState()
+  const cfg = state.updateCheck ?? { enabled: true, intervalMs: DEFAULT_UPDATE_INTERVAL }
+  if (cfg.enabled === false) return
+  const interval = UPDATE_INTERVALS.some((item) => item.ms === cfg.intervalMs) ? cfg.intervalMs : DEFAULT_UPDATE_INTERVAL
+  const last = Date.parse(state.updates?.checkedAt ?? '')
+  // 没检查过 → 5 分钟后首跑；检查过 → 距到期还剩多久（至少 1 分钟，避免刚完成就再跑）。
+  const delay = Number.isFinite(last) ? Math.max(60 * 1000, interval - (Date.now() - last)) : 5 * 60 * 1000
+  updateTimer = setTimeout(() => {
+    updateTimer = null
+    Promise.resolve()
+      .then(() => runUpdateCheck(ctx))
+      .catch((error) => note('update-check-failed', { error: String(error?.message ?? error).slice(0, 200) }))
+      .finally(() => scheduleUpdateCheck(ctx))
+  }, delay)
+  // 定时器不该阻止进程退出。
+  if (typeof updateTimer.unref === 'function') updateTimer.unref()
 }
 /** 六态更新检测：up-to-date / update-available / locally-modified / both-changed / check-failed / unknown-source */
 async function runUpdateCheck(ctx) {
@@ -2638,7 +2699,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck }
 
 function invalidateAll() {
   for (const entry of registrations) {
