@@ -23,6 +23,11 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
+- **最后更新**：2026-11-25 00:0x 0.1.5 已发布（自动刷新 + 单行折叠 + BUG-016 修复）；验收实例与临时 profile 已清理
+  - registry latest=0.1.5、shasum 53223494、provenance slsa v1；隔离安装成功；华为云镜像 0.1.5。
+  - 检查完成自动刷新实测：23:38 → 23:51 自动更新，无需手动 F5（111 秒）。
+  - web profile 已还原（无残留）；53117/54517 已停；临时 profile 已清理。
+  - 用户以 desktop 为主：desktop 需从插件市场重装，registry latest=0.1.5，全新安装应得 0.1.5。
 - **最后更新**：2026-11-24 16:4x 用户确认系自行卸载织音；数据完好；等 updates.json 刷新后安装 0.1.2
   - 用户明确「是被我卸载了，需要等更新」。
   - 卸载后数据完好（实测 <profile>/zhiyin-proto：4 个技能包、0 停用、1 备注、1 收藏、1 份归档），重装即恢复。
