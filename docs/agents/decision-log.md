@@ -16,6 +16,19 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-044: 市场描述按真实价值重写；明确织音「能更新技能、不能更新插件」
+
+- **日期**：2026-11-24
+- **用户反馈**：合并版描述「控制模型此刻真正看得见哪些已安装技能」读起来像个查看器，没传达价值——真实卖点是**按任务启停省上下文 + 技能包灵活切换 + 安装卸载归档管理**。
+- **重写稿（v4，已推到 PR #18428 分支，commit 45bb48c）**：
+  - zh：织音（ZhiYin）按任务启停技能：只开当前真正要用的，省下技能目录占用的上下文。技能可编成包一键切换，也支持安装、卸载、归档与恢复。
+  - en：ZhiYin (织音) toggles skills on and off per task: enable only what the current job needs and save the context the skill catalog would otherwise spend. Group skills into packs for one-click switching, and install, uninstall, archive or restore them.
+  - 三次修订共用同一个 PR（中文名 → 去掉已修复的安全提示 → 价值重写），PR body 已同步说明。
+- **「织音能更新插件吗」的核实结论**：
+  - **不能更新插件**（包括自己）：插件更新是插件市场（dshmarket）的职责；织音管技能，不管插件。
+  - **能更新技能**：重装走 installFromText → cloneRepo，GitHub 来源每次**现 clone 最新版**再覆盖安装（原子替换，失败回滚），前端文案「重新安装（覆盖到所选目录，用于更新）」即此意。已验证 installFromText 源码：skills.sh / owner/repo / GitHub 链接都走 fresh clone。
+  - 边界：本地文件夹来源的重装只是重新复制本地文件，不会带来新内容。
+
 ## DEC-043: 更正 DEC-042——市场卡片版本来自 updates.json 的 release 记录，不是 npm 实时查询
 
 - **日期**：2026-11-24
