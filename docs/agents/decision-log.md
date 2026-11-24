@@ -16,6 +16,22 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-041: 0.1.2 补齐全部路由的 DSH 准入检查；市场条目同步更新
+
+- **日期**：2026-11-24
+- **问题（维护者 fkysly 在合并时指出，属实）**：`/zhiyin/*` 路由没有 DSH 的访问检查。核实后确认：只有写入路由自行比对了 Origin/Host；**6 条读取路由（state / probe / guide / archive / export / backups）用 `resource` 风格注册，拿不到 request，完全没有准入判断**。
+- **为什么会漏**：我们的路由分两种写法——`post()` 用 handler 风格（有 request），其余用 `resource` 返回 `Response`（没有 request）。后者当初图省事，正好绕过了所有检查。
+- **对照事实（本地实测）**：装了 5 个做检查的插件（@michengai、@nanmicoder、dsh-better-sidebar、dsh-univer-office、dshmarket），**全部用 handler 风格**；用 `resource:` 注册路由的**只有我们一个**。dsh-better-sidebar 用 `ctx.connection.requestRejection(req) === undefined` 做闸门，且它在本机桌面端正常工作——说明桌面端请求带凭据，强制校验是安全的。
+- **修法**：
+  1. 新增 `refuseUnadmitted(ctx, request, response)`：读 `ctx.get('connection').requestRejection`，返回 undefined 放行，否则回 401/403 JSON；**闸门抛错按 403 处理，不 fail-open**；宿主未提供闸门时放行（没有可执行检查，不等于放水）。
+  2. `post()` 的 handler 最先走闸门，再做方法/同源校验（更强检查不能排在后面）。
+  3. 6 条 `resource` 路由全部改为 handler 风格 + 闸门；删掉因此失效的 `json()` 死代码。
+  4. 客户端在 401/403 时显示宿主给出的原因，而不是只写 `HTTP 403`。
+- **验证（假 ctx 跑真实 handler）**：闸门放行 → 5 条读取路由全 200；闸门返回 403 → 全 403 且带中文原因；闸门抛错 → 403（fail-closed）；宿主无闸门 → 200；POST 在 401 时 → 401。`node --check` 双半边 0。
+- **发布**：0.1.2，tag `v0.1.2` → Release → OIDC 工作流 success；registry `latest=0.1.2`，provenance `slsa.dev/provenance/v1`，shasum `5ee0f286…`；隔离环境 `dsh plugin add dsh-skills-zhiyin@0.1.2` 成功。**全程无令牌、无 OTP**。
+- **市场条目**：PR #18428 更新为两件事——补中文名「织音（ZhiYin）」使中文搜索可命中；**移除维护者那句访问检查提示**（0.1.2 已修复，不再成立）。PR 只改我们自己的一个文件。
+- **用户侧**：已通过插件市场搜到并安装、重启；profile 依赖现为 `dsh-skills-zhiyin: 0.1.1` → 装 0.1.2 后可得到本修复。
+
 ## DEC-040: 市场 PR 已合并；「搜不到」的真因是条目里没有中文名
 
 - **日期**：2026-11-24

@@ -23,7 +23,16 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
-- **最后更新**：2026-11-24 15:2x 市场 PR 已合并；查明「搜不到」真因是条目缺中文名（已提 PR #18428）
+- **最后更新**：2026-11-24 16:0x 0.1.2：全部路由补 DSH 准入检查（维护者指出的缺口），已 OIDC 发布
+  - 真因：6 条读取路由用 resource 风格注册，拿不到 request，完全没有准入判断；写入路由只有自比对 Origin/Host。
+  - 修法：新增 refuseUnadmitted（connection.requestRejection，抛错按 403 不 fail-open）；post 先过闸门；6 条 resource 路由改 handler 风格；删死代码 json()；客户端显示 401/403 原因。
+  - 对照：本机 5 个做检查的插件全用 handler 风格，用 resource 的只有我们。
+  - 验证：假 ctx 跑真实 handler，放行 200 / 拒绝 403 / 抛错 403 / 无闸门 200 / POST 401，五种情形全对。
+  - 0.1.2 已发布：latest=0.1.2，provenance slsa v1，shasum 5ee0f286，隔离环境安装成功，全程无令牌。
+  - 市场 PR #18428：补中文名 + 移除已失效的访问检查提示。
+  - 待验收：用户装 0.1.2 后界面正常（闸门未误伤自身 UI）。
+
+- 上一轮：2026-11-24 15:2x 市场 PR 已合并；查明「搜不到」真因是条目缺中文名（已提 PR #18428）
   - PR #18245 于 2026-11-23T16:49Z 合并，维护者追加了一句安全说明：我们的 HTTP 路由没有 DSH 访问检查（ctx.connection.requestRejection）。这是真实缺口，待修。
   - 市场索引已含我们，详情页 200；但索引里「织音」出现 0 次 → 中文搜索必然为空。可先用 zhiyin / 技能 / skill 搜到。
   - 已提 PR #18428：把「织音（ZhiYin）」写进中英描述，保留维护者那句说明。
