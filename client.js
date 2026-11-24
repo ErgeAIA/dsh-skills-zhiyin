@@ -44,6 +44,9 @@ window.__ModuleLoader__.load({
         checkUpdates: '检查更新',
         autoCheck: '自动检查技能更新',
         infoStatus: '状态详情',
+        infoAll: '状态与更新设置',
+        infoCost: '目录成本',
+        lastCheckedShort: '检查于 ',
         infoUpdate: '更新设置',
         infoSource: '来源与版本',
         updatesBadge: '有 {n} 个更新',
@@ -333,6 +336,9 @@ window.__ModuleLoader__.load({
         checkUpdates: 'Check for updates',
         autoCheck: 'Automatic skill update check',
         infoStatus: 'Status details',
+        infoAll: 'Status and update settings',
+        infoCost: 'Catalog cost',
+        lastCheckedShort: 'checked ',
         infoUpdate: 'Update settings',
         infoSource: 'Source and version',
         updatesBadge: '{n} updates',
@@ -901,7 +907,10 @@ window.__ModuleLoader__.load({
         fontSize: fs.hint, textAlign: 'left', cursor: 'pointer',
       },
       infoHeadOn: { background: 'rgba(128,128,128,0.08)' },
-      infoBody: { padding: '2px 14px 12px' },
+      infoBody: { padding: '2px 14px 14px' },
+      // 展开后的每一块：用极淡的分隔线区隔，不靠标题行占位。
+      infoSection: { paddingTop: 10, marginTop: 10, borderTop: '1px solid rgba(128,128,128,0.10)' },
+      infoSectionLabel: { fontSize: fs.hint, fontWeight: 600, opacity: 0.62, marginBottom: 4 },
       infoAlert: {
         display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 'auto',
         color: 'var(--zhiyin-accent, #e0743c)', fontSize: fs.hint, fontWeight: 600,
@@ -2879,110 +2888,112 @@ function Switch({ label, hint, checked, disabled, onChange }) {
               h(
                 'div',
                 { style: css.infoWrap },
-                [
-                  { key: 'status', label: say('infoStatus', '状态详情'), body: h(
-                    'div',
-                    { style: css.infoBody },
-                    h('div', { style: css.groupDesc }, `${say('statBySource', '来源')}：${srcLine}`),
-                    srcNote ? h('div', { style: { ...css.groupDesc, opacity: 0.7 } }, srcNote) : null,
-                  ) },
-                  { key: 'cost', label: say('budget', '目录字符数') + ' ' + String(data.catalogChars), body: h(
-                    'div',
-                    { style: css.infoBody },
-                    h('div', {
-                      style: { ...css.groupDesc, cursor: 'pointer', textDecoration: 'underline' },
-                      onClick: () => setCostInfoOpen(true),
-                      title: say('costInfoTip', '点开看这个数字的含义、建议与出处'),
-                    }, say('costInfoOpen', '查看计算方式与建议')),
-                    h('div', { style: css.groupDesc }, data.complete ? say('complete', '已完整读取') : say('incomplete', '读取不完整')),
-                  ) },
-                  { key: 'update', label: say('infoUpdate', '更新设置'), body: h(
-                    'div',
-                    { style: css.infoBody },
-                    h('div', { style: css.groupRow },
-                      h('div', { style: css.groupMain },
-                        h('div', { style: css.groupTitle }, say('autoCheck', '自动检查技能更新')),
-                        h('div', { style: css.groupDesc }, say('autoCheckHint', '开启后按所选周期在后台检查，不会卡住界面')),
-                      ),
-                      h(Toggle, {
-                        checked: (state.updates?.settings?.enabled ?? true) !== false,
-                        disabled: busy,
-                        title: say('autoCheck', '自动检查技能更新'),
-                        onChange: () => write('/zhiyin/settings', { updateCheck: { enabled: (state.updates?.settings?.enabled ?? true) === false } }),
-                      }),
-                    ),
-                    h('div', { style: css.groupRowLast },
-                      h('span', { style: css.groupTitle }, say('checkInterval', '检查周期')),
-                      h('div', { style: css.menuWrap },
-                        h('button', {
-                          type: 'button',
-                          style: css.intervalBtn,
-                          disabled: busy || (state.updates?.settings?.enabled ?? true) === false,
-                          onClick: () => setIntervalOpen((open) => !open),
-                          'aria-haspopup': 'listbox',
-                          'aria-expanded': intervalOpen,
-                        }, h('span', null, (state.updates?.intervals ?? []).find((item) => item.ms === (state.updates?.settings?.intervalMs ?? 86400000))?.label ?? say('everyDay', '每天')), h(Icon, { name: 'chevronDown', size: 12 })),
-                        intervalOpen
-                          ? h('div', { style: css.menu, role: 'listbox' }, (state.updates?.intervals ?? []).map((item) => h('button', {
-                              type: 'button',
-                              key: item.ms,
-                              role: 'option',
-                              'aria-selected': item.ms === (state.updates?.settings?.intervalMs ?? 86400000),
-                              style: { ...css.menuItem, ...(item.ms === (state.updates?.settings?.intervalMs ?? 86400000) ? css.menuItemOn : {}) },
-                              onClick: () => {
-                                setIntervalOpen(false)
-                                write('/zhiyin/settings', { updateCheck: { intervalMs: item.ms } })
-                              },
-                            }, item.label)))
-                          : null,
-                      ),
-                      h('span', { style: { ...css.hint, flex: '1 1 auto', textAlign: 'right' } },
-                        state.updates?.checkedAt
-                          ? say('lastChecked', '最近完整检查：') + fmtTime(state.updates.checkedAt)
-                          : say('neverChecked', '还没检查过')),
-                      h('button', {
-                        type: 'button',
-                        style: { ...css.btn, flex: '0 0 auto', whiteSpace: 'nowrap' },
-                        disabled: updateBusy === 'check',
-                        onClick: checkUpdates,
-                      }, updateBusy === 'check' ? h(Spinner, { size: 14 }) : say('checkNow', '立即检查')),
-                    ),
-                  ) },
-                  { key: 'source', label: say('infoSource', '来源与版本'), body: h(
-                    'div',
-                    { style: css.infoBody },
-                    h('div', { style: css.groupRow },
-                      h('div', { style: css.groupMain },
-                        h('div', { style: css.groupTitle }, say('agentsRoot', '加载 ~/.agents/skills')),
-                        h('div', { style: css.groupDesc }, say('agentsRootHintShort', '开启后读取 ~/.agents/skills 与 ~/.dsh/skills 的合集')),
-                      ),
-                      h(Toggle, {
-                        checked: data.agentsRoot !== false,
-                        disabled: busy,
-                        title: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
-                        onChange: () => write('/zhiyin/settings', { agentsRoot: data.agentsRoot === false }),
-                      }),
-                    ),
-                    h('div', { style: css.groupDesc }, `${say('versionLabel', '织音')} v${data.pluginVersion ?? ''} · ${say('observedAt', '更新于')} ${fmtTime(data.lastGoodAt ?? data.observedAt ?? '')}`),
-                  ) },
-                ].map((section) => h(
-                  'div',
-                  { key: section.key },
-                  h('button', {
+                h(
+                  'button',
+                  {
                     type: 'button',
-                    style: { ...css.infoHead, ...(openInfo === section.key ? css.infoHeadOn : {}) },
-                    onClick: () => setOpenInfo((open) => (open === section.key ? '' : section.key)),
-                    'aria-expanded': openInfo === section.key,
+                    style: { ...css.infoHead, ...(openInfo === 'all' ? css.infoHeadOn : {}) },
+                    onClick: () => setOpenInfo((open) => (open === 'all' ? '' : 'all')),
+                    'aria-expanded': openInfo === 'all',
                   },
-                    h(Icon, { name: 'chevronDown', size: 12 }),
-                    h('span', null, section.label),
-                    // 有更新时把提醒留在折叠外，避免用户错过。
-                    section.key === 'update' && updateCount > 0
+                  h(Icon, { name: 'chevronDown', size: 12 }),
+                  h('span', null, say('infoAll', '状态与更新设置')),
+                  // 摘要写在折叠行右侧：不展开也能看到关键数字，右侧不再空一片。
+                  h('span', { style: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, ...css.hint } },
+                    h('span', null, say('budget', '目录字符数') + ' ' + String(data.catalogChars)),
+                    state.updates?.checkedAt ? h('span', null, say('lastCheckedShort', '检查于 ') + fmtTime(state.updates.checkedAt)) : null,
+                    updateCount > 0
                       ? h('span', { style: css.infoAlert }, say('updatesBadge', '有 {n} 个更新').replace('{n}', String(updateCount)))
                       : null,
                   ),
-                  openInfo === section.key ? section.body : null,
-                )),
+                ),
+                openInfo === 'all'
+                  ? h(
+                      'div',
+                      { style: css.infoBody },
+                      h('div', { style: css.infoSection },
+                        h('div', { style: css.infoSectionLabel }, say('infoStatus', '状态详情')),
+                        h('div', { style: css.groupDesc }, `${say('statBySource', '来源')}：${srcLine}`),
+                        srcNote ? h('div', { style: { ...css.groupDesc, opacity: 0.7 } }, srcNote) : null,
+                      ),
+                      h('div', { style: css.infoSection },
+                        h('div', { style: css.infoSectionLabel }, say('infoCost', '目录成本')),
+                        h('div', {
+                          style: { ...css.groupDesc, cursor: 'pointer', textDecoration: 'underline', width: 'fit-content' },
+                          onClick: () => setCostInfoOpen(true),
+                          title: say('costInfoTip', '点开看这个数字的含义、建议与出处'),
+                        }, say('costInfoOpen', '查看计算方式与建议')),
+                        h('div', { style: css.groupDesc }, data.complete ? say('complete', '已完整读取') : say('incomplete', '读取不完整')),
+                      ),
+                      h('div', { style: css.infoSection },
+                        h('div', { style: css.infoSectionLabel }, say('infoUpdate', '更新设置')),
+                        h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0' } },
+                          h('div', { style: css.groupMain },
+                            h('div', { style: css.groupTitle }, say('autoCheck', '自动检查技能更新')),
+                            h('div', { style: css.groupDesc }, say('autoCheckHint', '开启后按所选周期在后台检查，不会卡住界面')),
+                          ),
+                          h(Toggle, {
+                            checked: (state.updates?.settings?.enabled ?? true) !== false,
+                            disabled: busy,
+                            title: say('autoCheck', '自动检查技能更新'),
+                            onChange: () => write('/zhiyin/settings', { updateCheck: { enabled: (state.updates?.settings?.enabled ?? true) === false } }),
+                          }),
+                        ),
+                        h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0' } },
+                          h('span', { style: css.groupTitle }, say('checkInterval', '检查周期')),
+                          h('div', { style: css.menuWrap },
+                            h('button', {
+                              type: 'button',
+                              style: css.intervalBtn,
+                              disabled: busy || (state.updates?.settings?.enabled ?? true) === false,
+                              onClick: () => setIntervalOpen((open) => !open),
+                              'aria-haspopup': 'listbox',
+                              'aria-expanded': intervalOpen,
+                            }, h('span', null, (state.updates?.intervals ?? []).find((item) => item.ms === (state.updates?.settings?.intervalMs ?? 86400000))?.label ?? say('everyDay', '每天')), h(Icon, { name: 'chevronDown', size: 12 })),
+                            intervalOpen
+                              ? h('div', { style: css.menu, role: 'listbox' }, (state.updates?.intervals ?? []).map((item) => h('button', {
+                                  type: 'button',
+                                  key: item.ms,
+                                  role: 'option',
+                                  'aria-selected': item.ms === (state.updates?.settings?.intervalMs ?? 86400000),
+                                  style: { ...css.menuItem, ...(item.ms === (state.updates?.settings?.intervalMs ?? 86400000) ? css.menuItemOn : {}) },
+                                  onClick: () => {
+                                    setIntervalOpen(false)
+                                    write('/zhiyin/settings', { updateCheck: { intervalMs: item.ms } })
+                                  },
+                                }, item.label)))
+                              : null,
+                          ),
+                          h('span', { style: { ...css.hint, flex: '1 1 auto', textAlign: 'right' } },
+                            state.updates?.checkedAt
+                              ? say('lastChecked', '最近完整检查：') + fmtTime(state.updates.checkedAt)
+                              : say('neverChecked', '还没检查过')),
+                          h('button', {
+                            type: 'button',
+                            style: { ...css.btn, flex: '0 0 auto', whiteSpace: 'nowrap' },
+                            disabled: updateBusy === 'check',
+                            onClick: checkUpdates,
+                          }, updateBusy === 'check' ? h(Spinner, { size: 14 }) : say('checkNow', '立即检查')),
+                        ),
+                      ),
+                      h('div', { style: css.infoSection },
+                        h('div', { style: css.infoSectionLabel }, say('infoSource', '来源与版本')),
+                        h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0' } },
+                          h('div', { style: css.groupMain },
+                            h('div', { style: css.groupTitle }, say('agentsRoot', '加载 ~/.agents/skills')),
+                            h('div', { style: css.groupDesc }, say('agentsRootHintShort', '开启后读取 ~/.agents/skills 与 ~/.dsh/skills 的合集')),
+                          ),
+                          h(Toggle, {
+                            checked: data.agentsRoot !== false,
+                            disabled: busy,
+                            title: say('agentsRootHint', '开启后，智能体将自动加载 .agents/skills 路径下的自定义技能'),
+                            onChange: () => write('/zhiyin/settings', { agentsRoot: data.agentsRoot === false }),
+                          }),
+                        ),
+                        h('div', { style: css.groupDesc }, `${say('versionLabel', '织音')} v${data.version ?? '0.1.0'} · ${say('observedAt', '更新于')} ${formatTime(data.at)}`),
+                      ),
+                    )
+                  : null,
               ),
             )
           : null,
