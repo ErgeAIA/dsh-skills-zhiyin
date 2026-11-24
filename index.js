@@ -12,7 +12,8 @@
  * 发行版发布，第三方插件无法新增 Remote 命名空间。同源 HTTP 是唯一开放通路。
  */
 import { execFile, execFileSync, spawn } from 'node:child_process'
-import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { appendFileSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 
@@ -737,6 +738,54 @@ export function apply(ctx) {
       },
     }),
   )
+  // 更新检查（阶段 1+2）：读缓存结果、手动触发、回填来源。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/updates',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const state = readState()
+        sendJson(response, 200, {
+          checkedAt: state.updates?.checkedAt ?? null,
+          results: state.updates?.results ?? {},
+          stats: {
+            repos: state.updates?.repos ?? 0,
+            requests: state.updates?.requests ?? 0,
+            durationMs: state.updates?.durationMs ?? 0,
+          },
+          provenance: Object.keys(state.provenance ?? {}).length,
+          running: updateCheckRunning !== null,
+          git: gitUsable(),
+        })
+      },
+    }),
+  )
+
+  post(ctx, '/zhiyin/updates/check', async () => {
+    const summary = await runUpdateCheck(ctx)
+    return { status: summary.ok ? 200 : 409, body: summary }
+  })
+
+  post(ctx, '/zhiyin/provenance/backfill', async () => {
+    const summary = await backfillProvenance(ctx)
+    return { status: summary.ok ? 200 : 500, body: summary }
+  })
+
+  // 每日一次：启动 90 秒后才跑（避开启动高峰），24 小时内不重复；失败只记录不打扰。
+  ctx.effect(() => {
+    const timer = setTimeout(() => {
+      const state = readState()
+      const last = Date.parse(state.updates?.checkedAt ?? '')
+      if (Number.isFinite(last) && Date.now() - last < UPDATE_DAILY_MS) return
+      Promise.resolve()
+        .then(() => runUpdateCheck(ctx))
+        .catch((error) => note('update-check-failed', { error: String(error?.message ?? error).slice(0, 200) }))
+    }, 90000)
+    if (typeof timer.unref === 'function') timer.unref()
+    return () => clearTimeout(timer)
+  }, 'zhiyin: 每日更新检查')
+
   post(ctx, '/zhiyin/rollback', async (body) => {
     const wanted = typeof body?.file === 'string' ? body.file.trim() : ''
     const backups = listBackups()
@@ -1751,6 +1800,392 @@ function backupState() {
   }
 }
 
+/* ---------------------------------------------------- 技能更新检测（阶段 1+2） */
+
+const UPDATE_DAILY_MS = 24 * 60 * 60 * 1000
+const UPDATE_CONCURRENCY = 4
+const UPDATE_GIT_TIMEOUT = 45000
+const UPDATE_CLONE_TIMEOUT = 240000
+const UPDATE_SKIP_DIRS = new Set(['.git', 'node_modules'])
+
+// 同一时刻只允许一轮检查：手动点击和每日定时撞车时，后来的直接拿现有进度。
+let updateCheckRunning = null
+
+function gitRun(args, options) {
+  const opts = options ?? {}
+  try {
+    const out = execFileSync('git', args, {
+      encoding: 'utf8',
+      timeout: opts.timeout ?? UPDATE_GIT_TIMEOUT,
+      maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true,
+      ...(opts.cwd ? { cwd: opts.cwd } : {}),
+    })
+    return { ok: true, out }
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error?.stderr ?? error?.message ?? error).split('\n').slice(0, 2).join(' ').slice(0, 300),
+    }
+  }
+}
+
+/** 同步睡眠，用于重试退避（不建子进程、不阻塞事件循环之外的东西）。 */
+function sleepSync(ms) {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+  } catch {
+    /* 运行环境不支持就跳过退避 */
+  }
+}
+
+/** 网络类失败重试：TLS 抖动、DNS、连接中断在真实网络里很常见，一次失败不该判成「检查失败」。 */
+function gitRetry(args, options) {
+  let last = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = gitRun(args, options)
+    if (result.ok) return result
+    last = result
+    const retryable = /handshake|SSL|TLS|Could not resolve|timed out|Connection|fetch-pack|RPC failed|early EOF|reset by peer/i.test(result.error)
+    if (!retryable) return result
+    if (attempt < 2) sleepSync(1200 * (attempt + 1))
+  }
+  return last
+}
+
+function gitUsable() {
+  return gitRun(['--version'], { timeout: 8000 }).ok
+}
+
+// 与 git 同口径的 blob 指纹：sha1('blob <字节数>\0' + 内容)，这样本地文件能与 ls-tree 的 blob sha 直接比较。
+function blobSha1(buffer) {
+  return createHash('sha1').update('blob ' + buffer.length + '\0').update(buffer).digest('hex')
+}
+
+function treeDigest(entries) {
+  const sorted = entries.slice().sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+  const hash = createHash('sha256')
+  for (const [rel, sha] of sorted) {
+    hash.update(rel)
+    hash.update('\0')
+    hash.update(sha)
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+function localTreeEntries(dir, base, out) {
+  const root = base ?? dir
+  const list = out ?? []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (UPDATE_SKIP_DIRS.has(entry.name)) continue
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      localTreeEntries(full, root, list)
+      continue
+    }
+    list.push([full.slice(root.length + 1).split(sep).join('/'), blobSha1(readFileSync(full))])
+  }
+  return list
+}
+
+function localSkillDigest(dir) {
+  try {
+    return { ok: true, digest: treeDigest(localTreeEntries(dir)) }
+  } catch (error) {
+    return { ok: false, error: String(error?.message ?? error).slice(0, 200) }
+  }
+}
+
+function repoCacheDir(repo) {
+  return join(stateDir(), 'update-cache', repo.replace(/[^a-zA-Z0-9._-]+/g, '__'))
+}
+
+/** 上游分支当前 HEAD。ls-remote 不消耗 GitHub API 配额。 */
+function upstreamRefSha(repo, branch) {
+  const result = gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'])
+  if (!result.ok) return { ok: false, error: result.error }
+  const heads = new Map()
+  for (const row of result.out.split('\n')) {
+    const match = /^([0-9a-f]{40})\s+refs\/heads\/(.+)$/.exec(row.trim())
+    if (match) heads.set(match[2], match[1])
+  }
+  // 仓库可能换了默认分支（DB 记 main、实际 master 是常见情况）：按记录 → main → master 回退，
+  // 找到哪个就把哪个记回去，避免下次再猜。
+  const wanted = [branch, 'main', 'master'].filter((item, index, list) => item && list.indexOf(item) === index)
+  for (const candidate of wanted) {
+    if (heads.has(candidate)) return { ok: true, sha: heads.get(candidate), branch: candidate }
+  }
+  return { ok: false, error: '上游没有 ' + wanted.join(' / ') + ' 分支' }
+}
+
+/** 上游技能子树的内容指纹：只取树对象（blob:none 部分克隆），不下载文件正文。 */
+function upstreamTreeDigest(repo, branch, subpath) {
+  const dir = repoCacheDir(repo)
+  mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
+  if (!existsSync(join(dir, '.git'))) {
+    rmSync(dir, { recursive: true, force: true })
+    const clone = gitRetry(
+      ['clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--branch', branch || 'main', 'https://github.com/' + repo + '.git', dir],
+      { timeout: UPDATE_CLONE_TIMEOUT },
+    )
+    if (!clone.ok) return { ok: false, error: clone.error }
+  }
+  const fetch = gitRetry(['-C', dir, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
+  if (!fetch.ok) return { ok: false, error: fetch.error }
+  const args = ['-C', dir, 'ls-tree', '-r', 'FETCH_HEAD']
+  if (subpath) args.push('--', subpath)
+  const tree = gitRun(args)
+  if (!tree.ok) return { ok: false, error: tree.error }
+  const prefix = subpath ? subpath.replace(/\/+$/, '') + '/' : ''
+  const entries = []
+  for (const line of tree.out.split('\n')) {
+    const tab = line.indexOf('\t')
+    if (tab < 0) continue
+    const meta = line.slice(0, tab).split(' ')
+    if (meta[1] !== 'blob') continue
+    let rel = line.slice(tab + 1)
+    if (prefix) {
+      if (!rel.startsWith(prefix)) continue
+      rel = rel.slice(prefix.length)
+    }
+    entries.push([rel, meta[2]])
+  }
+  // 子路径在上游取不到文件：多半是技能被改名/移动/删除。这是「查不到」，不是「有更新」。
+  if (entries.length === 0) {
+    return { ok: false, error: subpath ? '上游已经没有这个路径了：' + subpath : '上游仓库此刻为空' }
+  }
+  return { ok: true, digest: treeDigest(entries), files: entries.length }
+}
+
+/**
+ * 上游路径失效时，在同一棵已经拉下来的树里找同名技能目录。
+ * 只作为提示写进原因，绝不自动改写来源——挪位置不等于同一个技能。
+ */
+function suggestUpstreamPath(repo, skillName) {
+  const dir = repoCacheDir(repo)
+  if (!existsSync(join(dir, '.git'))) return null
+  const tree = gitRun(['-C', dir, 'ls-tree', '-r', '--name-only', 'FETCH_HEAD'])
+  if (!tree.ok) return null
+  const hits = tree.out
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /(^|\/)SKILL\.md$/.test(line))
+    .map((line) => line.replace(/\/?SKILL\.md$/, ''))
+    .filter((path) => path && path.split('/').pop() === skillName)
+  return hits.length === 1 ? hits[0] : null
+}
+
+/** 从 AI Vault 库回填来源：同名 + SKILL.md 哈希一致才算命中，绝不按名字猜。 */
+async function backfillProvenance(ctx) {
+  const state = readState()
+  const observed = await collectState(ctx)
+  const skills = (observed.skills ?? []).filter((skill) => typeof skill.path === 'string')
+  const dbPath = join(homedir(), '.aivault', 'aivault.db')
+  if (!existsSync(dbPath)) return { ok: false, error: '没有找到 AI Vault 数据库' }
+  let sqlite = null
+  try {
+    sqlite = await import('node:sqlite')
+  } catch {
+    return { ok: false, error: '当前运行时没有 node:sqlite，无法从 AI Vault 回填来源' }
+  }
+  const snapshot = join(stateDir(), 'aivault-snapshot.db')
+  try {
+    mkdirSync(stateDir(), { recursive: true })
+    copyFileSync(dbPath, snapshot)
+  } catch (error) {
+    return { ok: false, error: '读取 AI Vault 数据库失败：' + String(error?.message ?? error).slice(0, 160) }
+  }
+  let rows = []
+  try {
+    const db = new sqlite.DatabaseSync(snapshot, { readOnly: true })
+    rows = db
+      .prepare('SELECT name, source, repo_owner, repo_name, repo_branch, source_directory, content_hash FROM skills')
+      .all()
+    db.close()
+  } catch (error) {
+    return { ok: false, error: '查询 AI Vault 数据库失败：' + String(error?.message ?? error).slice(0, 160) }
+  }
+  const byName = new Map()
+  for (const row of rows) {
+    if (!byName.has(row.name)) byName.set(row.name, [])
+    byName.get(row.name).push(row)
+  }
+  const provenance = { ...(state.provenance ?? {}) }
+  const now = new Date().toISOString()
+  let added = 0
+  let skippedLocal = 0
+  let unmatched = 0
+  let drifted = 0
+  for (const skill of skills) {
+    const existing = provenance[skill.name]
+    if (existing && existing.repo) continue
+    const candidates = byName.get(skill.name) ?? []
+    const manifest = join(skill.path, 'SKILL.md')
+    if (!existsSync(manifest)) {
+      unmatched += 1
+      continue
+    }
+    let hash = ''
+    try {
+      hash = createHash('sha256').update(readFileSync(manifest)).digest('hex')
+    } catch {
+      unmatched += 1
+      continue
+    }
+    const hit = candidates.find((row) => row.content_hash === hash)
+    if (!hit) {
+      if (candidates.length > 0) drifted += 1
+      else unmatched += 1
+      continue
+    }
+    if (!hit.repo_owner || !hit.repo_name || hit.source === 'local') {
+      skippedLocal += 1
+      continue
+    }
+    const local = localSkillDigest(skill.path)
+    provenance[skill.name] = {
+      repo: hit.repo_owner + '/' + hit.repo_name,
+      branch: hit.repo_branch || 'main',
+      subpath: typeof hit.source_directory === 'string' ? hit.source_directory : '',
+      source: hit.source,
+      headSha: null,
+      digest: null,
+      localDigest: local.ok ? local.digest : null,
+      method: 'aivault-db',
+      recordedAt: now,
+    }
+    added += 1
+  }
+  // 同上：回填期间用户可能改过启停，别用旧快照覆盖。
+  const latest = readState()
+  saveState({ ...latest, provenance: { ...(latest.provenance ?? {}), ...provenance } })
+  note('provenance-backfilled', { added, skippedLocal, unmatched, drifted, total: skills.length })
+  return { ok: true, added, skippedLocal, unmatched, drifted, total: skills.length }
+}
+
+/** 六态更新检测：up-to-date / update-available / locally-modified / both-changed / check-failed / unknown-source */
+async function runUpdateCheck(ctx) {
+  if (updateCheckRunning) return { ok: false, running: true, error: '已有一轮检查在进行' }
+  updateCheckRunning = (async () => {
+    const started = Date.now()
+    if (!gitUsable()) return { ok: false, error: '找不到 git：更新检查需要本机安装 git' }
+    const state = readState()
+    const observed = await collectState(ctx)
+    const skills = (observed.skills ?? []).filter((skill) => typeof skill.path === 'string')
+    const provenance = { ...(state.provenance ?? {}) }
+    const now = new Date().toISOString()
+    const results = {}
+    const groups = new Map()
+    for (const skill of skills) {
+      const record = provenance[skill.name]
+      if (!record || !record.repo) {
+        results[skill.name] = { status: 'unknown-source', checkedAt: now }
+        continue
+      }
+      const key = record.repo + '@' + (record.branch || 'main')
+      if (!groups.has(key)) groups.set(key, { repo: record.repo, branch: record.branch || 'main', items: [] })
+      groups.get(key).items.push({ skill, record })
+    }
+    const queue = [...groups.values()]
+    let cursor = 0
+    let requests = 0
+    const worker = async () => {
+      while (cursor < queue.length) {
+        const group = queue[cursor++]
+        requests += 1
+        const head = upstreamRefSha(group.repo, group.branch)
+        // 子树指纹必须按「技能子路径」算，不能按仓库算——同一仓库的多个技能子目录不同。
+        const digestCache = new Map()
+        for (const item of group.items) {
+          const name = item.skill.name
+          const record = item.record
+          const local = localSkillDigest(item.skill.path)
+          if (!local.ok) {
+            results[name] = { status: 'check-failed', checkedAt: now, note: '读取本地技能失败：' + local.error }
+            continue
+          }
+          if (!head.ok) {
+            results[name] = { status: 'check-failed', checkedAt: now, note: head.error }
+            continue
+          }
+          const resolvedBranch = head.branch || group.branch
+          // 已装基线就是当前上游：什么都不用下载。
+          if (record.headSha && record.headSha === head.sha && record.digest) {
+            results[name] = {
+              status: local.digest === record.localDigest ? 'up-to-date' : 'locally-modified',
+              checkedAt: now,
+              upstreamSha: head.sha,
+            }
+            continue
+          }
+          // 上次已经算过这个 HEAD 的上游指纹：直接复用，避免每天重复拉取。
+          const subpathKey = record.subpath || ''
+          let upstream = null
+          if (record.remoteSha && record.remoteSha === head.sha && record.remoteDigest) {
+            upstream = { ok: true, digest: record.remoteDigest }
+          } else if (digestCache.has(subpathKey)) {
+            upstream = digestCache.get(subpathKey)
+          } else {
+            upstream = upstreamTreeDigest(group.repo, resolvedBranch, record.subpath)
+            requests += 1
+            digestCache.set(subpathKey, upstream)
+          }
+          if (!upstream.ok) {
+            // 上游路径没了：给一个「可能在哪儿」的提示，用户才知道下一步做什么。
+            const moved = upstream.error.includes('上游已经没有这个路径')
+              ? suggestUpstreamPath(group.repo, name)
+              : null
+            results[name] = {
+              status: 'check-failed',
+              checkedAt: now,
+              note: moved ? upstream.error + '（上游可能在 ' + moved + '）' : upstream.error,
+            }
+            continue
+          }
+          const remoteRecord = { ...record, branch: resolvedBranch, remoteSha: head.sha, remoteDigest: upstream.digest }
+          if (upstream.digest === local.digest) {
+            results[name] = { status: 'up-to-date', checkedAt: now, upstreamSha: head.sha }
+            provenance[name] = { ...remoteRecord, headSha: head.sha, digest: upstream.digest, localDigest: local.digest, verifiedAt: now }
+            continue
+          }
+          if (record.digest && upstream.digest === record.digest) {
+            results[name] = { status: 'locally-modified', checkedAt: now, upstreamSha: head.sha }
+            provenance[name] = remoteRecord
+            continue
+          }
+          if (!record.digest || local.digest === record.localDigest) {
+            results[name] = { status: 'update-available', checkedAt: now, upstreamSha: head.sha }
+            provenance[name] = remoteRecord
+            continue
+          }
+          results[name] = { status: 'both-changed', checkedAt: now, upstreamSha: head.sha }
+          provenance[name] = remoteRecord
+        }
+      }
+    }
+    const width = Math.max(1, Math.min(UPDATE_CONCURRENCY, queue.length))
+    await Promise.all(Array.from({ length: width }, worker))
+    const counts = {}
+    for (const value of Object.values(results)) counts[value.status] = (counts[value.status] ?? 0) + 1
+    const durationMs = Date.now() - started
+    // 检查可能跑几分钟：以最新 state 为底，只并入本次结果，避免覆盖检查期间的启停改动。
+    const latest = readState()
+    saveState({
+      ...latest,
+      provenance: { ...(latest.provenance ?? {}), ...provenance },
+      updates: { checkedAt: now, results, durationMs, repos: queue.length, requests },
+    })
+    note('update-check', { repos: queue.length, requests, durationMs, counts })
+    return { ok: true, checkedAt: now, counts, durationMs, repos: queue.length, requests, total: skills.length }
+  })()
+  try {
+    return await updateCheckRunning
+  } finally {
+    updateCheckRunning = null
+  }
+}
+
 /** 可用备份（新的在前）：只认 stateDir 下的 backup-*.json。 */
 function listBackups() {
   try {
@@ -2073,7 +2508,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath }
 
 function invalidateAll() {
   for (const entry of registrations) {

@@ -39,6 +39,7 @@ YOU MUST 安装写盘前先确认目标根（~/.dsh/skills 或 <项目>/.dsh/ski
 | 安装插件包依赖 | 无依赖，不需要安装步骤（npm install 为空操作） | `npm install` 实测 removed 20 packages / audited 1 package |
 | 让宿主改动生效 | 完全退出并重开 DSH，不是刷新页面 | README.md |
 | 观测当前目录数据 | GET http://127.0.0.1:<port>/zhiyin/state | index.js |
+| 手动检查技能更新 | POST /zhiyin/updates/check；读结果 GET /zhiyin/updates | index.js |
 | 查看发布内容 | npm pack --dry-run（仓库根目录） | package.json 的 files |
 
 ## Conventions
