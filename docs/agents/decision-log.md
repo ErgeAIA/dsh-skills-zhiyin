@@ -16,6 +16,29 @@ description: >
 > 格式：`## DEC-NNN: 标题`，新条目置顶，NNN 三位递增。
 > 字段：`- **日期**：` / `- **背景**：` / `- **决策**：` / `- **验证**：`
 
+## DEC-045: 阶段 0 测量——162/171 技能可验证来源，覆盖 51 个仓库；参照 AI Vault 的两段式检测
+
+- **日期**：2026-11-24
+- **问题**：给织音加「技能更新检测」，前提是知道每个技能的来源。现状是未知的。
+- **测量结果（本机实测）**：
+  - `~/.agents/skills/` 真实目录 **171** 个；其中带 `.git` 的 **0** 个——安装时 cpSync 过滤掉了 `.git`，磁盘上没有任何上游痕迹。
+  - `~/.dsh/skills/` 是指向它们的 junction / symbolic link（98 个）。所以「本体」在 `.agents`，链接自动跟随。
+  - 织音 state 里 `linked` 只记了 3 个技能名，**不含来源 URL / commit / 子路径**；`known` 只有 name+description。
+  - **AI Vault 的库里有**：`~/.aivault/aivault.db` 的 skills 表 182 条，`repo_owner/repo_name/repo_branch/source_directory/content_hash/upstream_updated_at` 齐全，167 条有仓库。
+  - 用 **SKILL.md 的 sha256**（= AI Vault 的 `content_hash` 口径）逐一对名核对：**162 个可验证**（哈希一致且有仓库）、0 个漂移、9 个是 local 无仓库、0 个查不到。
+  - 这 162 个聚成 **51 个独立仓库**（ergeaia/erge-private 34、mattpocock/skills 26、obra/superpowers 14、heygen-com/hyperframes 11…）。
+- **结论：全量可行，不需要缩范围。** 每日检查只需 51 次仓库级探测（不是 171 次），再用 git 原生方式比对子树。9 个 local 技能标 `unknown`，永远不出徽标。
+- **AI Vault 的做法（可直接借鉴）**：
+  1. 来源是一等数据：`SkillSource::{GitHub, SkillsSh, Local, Zip, Unknown}`，只有 github/skillssh 参与检查（`github_backed`）。
+  2. **按仓库聚类**：同一仓库多个技能共享一次网络检查（分组键 owner/name/branch）。
+  3. **两段式**：先 `git ls-remote` 取 HEAD（秒级、并发），与缓存 HEAD 比对；**没变就不下载**。只有变了的仓库才下载并算目录哈希。
+  4. 远端与本地都算**目录哈希**（递归、跳过 `.` 开头、按相对路径排序、`relpath\0content\0` 串接 sha256），不等即 `has_update`。
+  5. 注意区分两个哈希：`skills.content_hash` 是 **SKILL.md 单文件** sha256（用于来源核对），目录哈希只用于更新判定。
+- **我要改进它的三点**：
+  1. **不占 GitHub API 配额**：它用 zipball（每仓库一个 API 请求）。我们用 `git ls-remote` 取 HEAD + 仅在 HEAD 变化时 shallow clone 算子树，全程不碰 REST。
+  2. **能识别本地被改**：它的 `has_update = remote != local`，用户改过本地也会显示「有更新」，更新即静默覆盖。我们做三态（上游 / 安装记录 / 本地当前）四态判定，`locally-modified` 与 `both-changed` 拒绝自动覆盖。
+  3. **失败不等于没更新**：它检查失败也返回 `has_update=false`（只打 stderr），UI 无法区分。我们区分 `up-to-date / update-available / locally-modified / both-changed / check-failed / unknown-source`。
+
 ## DEC-044: 市场描述按真实价值重写；明确织音「能更新技能、不能更新插件」
 
 - **日期**：2026-11-24
