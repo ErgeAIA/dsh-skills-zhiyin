@@ -63,11 +63,14 @@ window.__ModuleLoader__.load({
         checkNow: '立即检查',
         checkUpdatesHint: '按上游仓库检查技能是否有新版本；每天启动后会自动检查一次',
         checkUpdatesFound: '有 {n} 个更新',
+        recheckUpdates: '重新检查（有 {n} 个更新）',
         updateBadge: '有更新',
         updateLocalOnly: '本地已改',
         updateApplyHint: '更新到上游当前版本；本地没改过才允许',
         updateAsk: '把「{name}」更新到上游当前版本？会原子替换技能文件，软链接保持不动。',
         cancelUpdate: '取消更新',
+        updateCancelled: '已取消更新，技能未改动',
+        dismiss: '知道了',
         updatingSkill: '正在更新 {name}…',
         updateBlockedHint: '本地内容被改过：点一下可先备份到归档再强制更新',
         forceUpdateAsk: '本地内容被改过。先把当前版本整份备份到归档，再用上游版本覆盖？',
@@ -238,7 +241,42 @@ window.__ModuleLoader__.load({
         originUnknown: '未知',
         statBySource: '来源',
         costInfoTip: '点开看这个数字的含义、建议与出处',
-        tabMarket: '技能市场',
+        tabMarket: 'SKILLS.SH',
+        tabSkillhub: 'SkillHub',
+        hubSearchPlaceholder: '搜索 SkillHub 技能（留空看热门）',
+        hubResult: '搜索结果',
+        hubTrending: '热门技能（按下载量排序）',
+        hubTrendingSorted: '热门技能（按{s}排序）',
+        hubEmptyHint: '换个关键词试试，或清空搜索框看热门',
+        hubOpen: '在 skillhub.cn 打开技能页',
+        hubSourceTitle: '上游来源',
+        hubDownloadsTitle: 'skillhub.cn 记录的下载次数',
+        hubDownloads: '次下载',
+        hubPaid: '付费',
+        hubPaidHint: '上游标注为付费技能',
+        hubNeedsKey: '需 Key',
+        hubKeyHint: '使用这个技能需要自备 API Key',
+        hubCategoryLabel: '分类',
+        hubAllCategories: '全部分类',
+        hubSortDownloads: '下载最多',
+        hubSortScore: '相关度',
+        hubSortUpdated: '最近更新',
+        hubSortStars: '收藏最多',
+        hubSortInstalls: '安装最多',
+
+        hubDetailOpen: '查看技能详情',
+        hubDetailLoading: '正在读取详情…',
+        hubSecurityHead: '安全扫描',
+        hubReport: '查看报告',
+        hubChangelogHead: '最新版本变更',
+        hubFilesHead: '文件清单',
+        hubPreviewHead: 'SKILL.md 预览',
+        hubPreviewLoading: '正在读取 SKILL.md…',
+        hubPreviewSource: '查看源码',
+        hubPreviewRendered: '查看渲染',
+
+        hubVersionsHead: '版本历史',
+
         tabArchive: '归档',
         installHintShort: '从 skills.sh / GitHub / 本地安装技能',
         packEmptyTitle: '还没有技能包',
@@ -362,11 +400,14 @@ window.__ModuleLoader__.load({
         checkNow: 'Check now',
         checkUpdatesHint: 'Check each upstream repo for a newer version; also runs once a day after startup',
         checkUpdatesFound: '{n} updates',
+        recheckUpdates: 'Check again ({n} updates)',
         updateBadge: 'Update',
         updateLocalOnly: 'Edited',
         updateApplyHint: 'Update to the current upstream version (only when the local copy is unedited)',
         updateAsk: 'Update {name} to the current upstream version? Skill files are replaced atomically; symlinks stay untouched.',
         cancelUpdate: 'Cancel update',
+        updateCancelled: 'Update cancelled; the skill was not changed',
+        dismiss: 'Got it',
         updatingSkill: 'Updating {name}…',
         updateBlockedHint: 'Local files were edited; click to back up and force the update',
         forceUpdateAsk: 'The local copy was edited. Back it up to the archive first, then overwrite with the upstream version?',
@@ -537,7 +578,42 @@ window.__ModuleLoader__.load({
         originUnknown: 'Unknown',
         statBySource: 'Source',
         costInfoTip: 'Open the meaning, suggested ceilings and sources behind this number',
-        tabMarket: 'Market',
+        tabMarket: 'SKILLS.SH',
+        tabSkillhub: 'SkillHub',
+        hubSearchPlaceholder: 'Search SkillHub (leave empty for trending)',
+        hubResult: 'Search results',
+        hubTrending: 'Trending skills (by download count)',
+        hubTrendingSorted: 'Trending skills (sorted by {s})',
+        hubEmptyHint: 'Try another keyword, or clear the box to see trending',
+        hubOpen: 'Open the skill page on skillhub.cn',
+        hubSourceTitle: 'Upstream source',
+        hubDownloadsTitle: 'Download count recorded by skillhub.cn',
+        hubDownloads: 'downloads',
+        hubPaid: 'Paid',
+        hubPaidHint: 'Upstream marks this skill as paid',
+        hubNeedsKey: 'Needs key',
+        hubKeyHint: 'Using this skill requires your own API key',
+        hubCategoryLabel: 'Category',
+        hubAllCategories: 'All categories',
+        hubSortDownloads: 'Most downloads',
+        hubSortScore: 'Relevance',
+        hubSortUpdated: 'Recently updated',
+        hubSortStars: 'Most stars',
+        hubSortInstalls: 'Most installs',
+
+        hubDetailOpen: 'View skill details',
+        hubDetailLoading: 'Loading details…',
+        hubSecurityHead: 'Security scan',
+        hubReport: 'View report',
+        hubChangelogHead: 'Latest version changes',
+        hubFilesHead: 'Files',
+        hubPreviewHead: 'SKILL.md preview',
+        hubPreviewLoading: 'Loading SKILL.md…',
+        hubPreviewSource: 'View source',
+        hubPreviewRendered: 'View rendered',
+
+        hubVersionsHead: 'Version history',
+
         tabArchive: 'Archive',
         installHintShort: 'Install a skill from skills.sh, GitHub or a local folder',
         packEmptyTitle: 'No skill packs yet',
@@ -648,6 +724,9 @@ window.__ModuleLoader__.load({
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--vscode-editorWidget-background, #252526)',
+        // 之前只给了背景没给前景：浅色页面里继承到深色文字，落到深色弹窗上几乎看不清。
+        // 与其它浮层保持同一对前景/背景 token，深浅主题都不会出现「看不见的字」。
+        color: 'var(--vscode-foreground, #e6e6e6)',
         border: 'none',
         borderRadius: 10,
         boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
@@ -1601,10 +1680,27 @@ function Switch({ label, hint, checked, disabled, onChange }) {
     }
 
     /**
+     * SKILL.md 顶部的 YAML frontmatter 不是正文：直接渲染会把 name:/description: 和两段 --- 当成段落与横线。
+     * 轻量版只把它剥掉；名称与版本弹窗标题已经展示，不重复。
+     */
+    function stripSkillFrontmatter(markdown) {
+      const text = String(markdown ?? '').replace(/\r\n/g, '\n')
+      const lines = text.split('\n')
+      if (lines[0]?.trim() !== '---') return text
+      let end = -1
+      for (let i = 1; i < lines.length; i += 1) {
+        if (lines[i].trim() === '---') { end = i; break }
+      }
+      if (end < 0) return text
+      return lines.slice(end + 1).join('\n').replace(/^\n+/, '')
+    }
+
+    /**
      * 使用指南渲染：GUIDE.md 只用到 Markdown 的最小子集（标题、列表、表格、代码块、
      * 行内代码、粗体、链接）。这里只实现这个子集，不引第三方依赖。
      */
-    function renderMarkdown(markdown) {
+    function renderMarkdown(markdown, options = {}) {
+      const safeLinks = options.safeLinks === true
       const source = String(markdown ?? '').replace(/\r\n/g, '\n').split('\n')
       const blocks = []
       let seq = 0
@@ -1623,7 +1719,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             nodes.push(h('code', { key: nextKey(), style: css.guideCode }, token.slice(1, -1)))
           } else {
             const parts = token.match(/\[([^\]]+)\]\(([^)]+)\)/) ?? []
-            nodes.push(h('a', { key: nextKey(), href: parts[2] ?? '#', target: '_blank', rel: 'noreferrer', style: css.guideLink }, parts[1] ?? token))
+            const href = parts[2] ?? '#'
+            // 预览的是上游技能正文，属于外部内容：只放行 http/https，其余按纯文本显示。
+            if (safeLinks && !/^https?:\/\//i.test(href)) {
+              nodes.push(parts[1] ?? token)
+            } else {
+              nodes.push(h('a', { key: nextKey(), href, target: '_blank', rel: 'noreferrer', style: css.guideLink }, parts[1] ?? token))
+            }
           }
           last = match.index + token.length
         }
@@ -1643,7 +1745,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           blocks.push(h('pre', { key: nextKey(), style: css.guidePre }, h('code', null, code.join('\n'))))
           continue
         }
-        const heading = trimmed.match(/^(#{1,3})\s+(.*)$/)
+        const heading = trimmed.match(/^(#{1,6})\s+(.*)$/)
         if (heading) {
           const level = heading[1].length
           const style = level === 1 ? css.guideH1 : level === 2 ? css.guideH2 : css.guideH3
@@ -1681,7 +1783,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         const para = []
         while (i < source.length) {
           const t = source[i].trim()
-          if (!t || t.charAt(0) === '|' || /^#{1,3}\s/.test(t) || /^[-*]\s+/.test(t) || /^\d+\.\s+/.test(t) || t === '---' || t.slice(0, 3) === '\x60\x60\x60') break
+          if (!t || t.charAt(0) === '|' || /^#{1,6}\s/.test(t) || /^[-*]\s+/.test(t) || /^\d+\.\s+/.test(t) || t === '---' || t.slice(0, 3) === '\x60\x60\x60') break
           para.push(t)
           i += 1
         }
@@ -1853,6 +1955,37 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [marketDone, setMarketDone] = React.useState({})     // 已装完的条目 id
       const [marketHover, setMarketHover] = React.useState(null) // 鼠标悬停的卡片 id
       const [marketLimit, setMarketLimit] = React.useState(40)   // 每次加载条数；「加载更多」按 20 递增（上限与 MARKET_MAX 一致：200）
+      // skillhub.cn 市场（第二个供应商）：独立状态，不与 skills.sh 混在一起，
+      // 这样两边的搜索词、页码、错误互不影响。
+      const [hubKeyword, setHubKeyword] = React.useState('')
+      const [hubItems, setHubItems] = React.useState([])
+      const [hubTotal, setHubTotal] = React.useState(0)
+      const [hubPage, setHubPage] = React.useState(1)
+      const [hubLoading, setHubLoading] = React.useState(false)
+      const [hubLoaded, setHubLoaded] = React.useState(false)
+      const [hubError, setHubError] = React.useState('')
+      const [hubBusy, setHubBusy] = React.useState(null)
+      const [hubDone, setHubDone] = React.useState({})
+      const [hubHover, setHubHover] = React.useState(null)
+      const [hubMore, setHubMore] = React.useState(false)
+      // 分类与排序：上游分类只读，排序值来自它真实接受的 sortBy。
+      const [hubCategories, setHubCategories] = React.useState([])
+      const [hubCategoriesLoaded, setHubCategoriesLoaded] = React.useState(false)
+      const [hubCategory, setHubCategory] = React.useState('')
+      const [hubSort, setHubSort] = React.useState('downloads')
+      // 详情弹窗：详情/文件清单/预览三条数据分开存——失败一项不影响其余内容展示。
+      const [hubDetailItem, setHubDetailItem] = React.useState(null)
+      const [hubDetail, setHubDetail] = React.useState(null)
+      const [hubDetailLoading, setHubDetailLoading] = React.useState(false)
+      const [hubDetailError, setHubDetailError] = React.useState('')
+      const [hubFiles, setHubFiles] = React.useState([])
+      const [hubPreview, setHubPreview] = React.useState('')
+      const [hubPreviewLoading, setHubPreviewLoading] = React.useState(false)
+      const [hubPreviewError, setHubPreviewError] = React.useState('')
+      // 预览默认渲染；技能作者排版可能千奇百怪，保留「源码」切换兜底。
+      const [hubPreviewMode, setHubPreviewMode] = React.useState('rendered')
+      // 文件清单默认收起：长清单（实测有 72 个文件）会把预览挤出屏幕。
+      const [hubFilesOpen, setHubFilesOpen] = React.useState(false)
       const [marketMore, setMarketMore] = React.useState(false)  // 正在加载更多
       const [marketRefreshing, setMarketRefreshing] = React.useState(false) // 刷新按钮自己的执行态
       /**
@@ -1951,6 +2084,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       // 更新动作独立于全局 busy：检查一轮要一两分钟，不该把整页按钮都锁死。
       const [updateBusy, setUpdateBusy] = React.useState('')
+      // 用户主动取消后给一句中性提示（不是错误）；下次发起更新时清掉。
+      const [cancelNotice, setCancelNotice] = React.useState('')
       const [intervalOpen, setIntervalOpen] = React.useState(false)
       const [openInfo, setOpenInfo] = React.useState('')
       const cancelUpdates = React.useCallback(() => {
@@ -2015,13 +2150,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           if (!ok) return
         }
         setUpdateBusy(name)
+        setCancelNotice('')
         fetch('/zhiyin/updates/apply', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(force === true ? { name, force: true } : { name }),
         })
-          .then((response) => response.json())
-          .then((result) => {
+          .then((response) => response.json().then((result) => ({ result, status: response.status })))
+          .then(({ result, status }) => {
+            // 用户自己点取消不是错误：不该弹红字，给一句中性说明就好。
+            if (status === 499 || result?.cancelled === true) {
+              setCancelNotice(say('updateCancelled', '已取消更新，技能未改动'))
+              return null
+            }
             if (!result || result.ok !== true) throw new Error(result?.error ?? '更新失败')
             return null
           })
@@ -2247,6 +2388,141 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           })
           .finally(() => setMarketLoading(false))
       }, [marketLimit])
+
+      /** 打开某个技能的详情：先显示卡片信息，再异步取详情、文件清单、SKILL.md 预览。 */
+      const openHubDetail = React.useCallback((item) => {
+        setHubDetailItem(item)
+        setHubDetail(null)
+        setHubDetailError('')
+        setHubFiles([])
+        setHubFilesOpen(false)
+        setHubPreview('')
+        setHubPreviewError('')
+        setHubPreviewMode('rendered')
+        setHubDetailLoading(true)
+        setHubPreviewLoading(true)
+        const params = new URLSearchParams({ slug: item.slug })
+        if (item.namespace) params.set('namespace', item.namespace)
+        fetch('/zhiyin/skillhub/detail?' + params.toString(), { headers: { accept: 'application/json' } })
+          .then((response) => response.json())
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '读取详情失败')
+            setHubDetail(payload)
+            return null
+          })
+          .catch((error) => setHubDetailError(String(error?.message ?? error)))
+          .finally(() => setHubDetailLoading(false))
+        // 文件清单与 SKILL.md 预览独立于详情：列表接口偶尔比详情慢，不该互相拖住。
+        const fileParams = new URLSearchParams({ slug: item.slug })
+        fetch('/zhiyin/skillhub/files?' + fileParams.toString(), { headers: { accept: 'application/json' } })
+          .then((response) => response.json())
+          .then((payload) => setHubFiles(Array.isArray(payload?.files) ? payload.files : []))
+          .catch(() => setHubFiles([]))
+        fetch('/zhiyin/skillhub/file?' + fileParams.toString() + '&path=' + encodeURIComponent('SKILL.md'), { headers: { accept: 'application/json' } })
+          .then((response) => response.json())
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '读取预览失败')
+            setHubPreview(String(payload.text ?? ''))
+            return null
+          })
+          .catch((error) => setHubPreviewError(String(error?.message ?? error)))
+          .finally(() => setHubPreviewLoading(false))
+      }, [])
+
+      /** 关弹窗：把所有详情态清掉，避免下次打开还留有上一份内容。 */
+      const closeHubDetail = React.useCallback(() => {
+        setHubDetailItem(null)
+        setHubDetail(null)
+        setHubDetailError('')
+        setHubFiles([])
+        setHubFilesOpen(false)
+        setHubPreview('')
+        setHubPreviewError('')
+        setHubPreviewMode('rendered')
+        setHubDetailLoading(false)
+        setHubPreviewLoading(false)
+      }, [])
+
+      /**
+       * 读 skillhub.cn。分页与 skills.sh 不同：上游单页硬上限 100，
+       * 所以这里是「页码 + 每页条数」，不是靠 limit 一次拉满。
+       */
+      const loadHub = React.useCallback((keyword, page, category, sort) => {
+        const target = Math.max(1, page || 1)
+        const selectedCategory = category || ''
+        const selectedSort = sort || 'downloads'
+        setHubLoaded(true)
+        setHubLoading(true)
+        setHubError('')
+        const params = new URLSearchParams({ page: String(target), pageSize: '40', sortBy: selectedSort })
+        if (keyword && String(keyword).trim()) params.set('keyword', String(keyword).trim())
+        if (selectedCategory) params.set('category', selectedCategory)
+        return fetch('/zhiyin/skillhub/search?' + params.toString(), { headers: { accept: 'application/json' } })
+          .then((response) => response.json())
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '请求失败')
+            setHubItems(Array.isArray(payload.skills) ? payload.skills : [])
+            setHubTotal(Number(payload.total ?? 0) || 0)
+            setHubPage(target)
+          })
+          .catch((error) => {
+            setHubError(String(error?.message ?? error))
+            throw error
+          })
+          .finally(() => setHubLoading(false))
+      }, [])
+
+      // 分类只读一次：上级目录不会频繁变，缓存 1 小时在宿主侧 already done。
+      const loadHubCategories = React.useCallback(() => {
+        setHubCategoriesLoaded(true)
+        return fetch('/zhiyin/skillhub/categories', { headers: { accept: 'application/json' } })
+          .then((response) => response.json())
+          .then((payload) => setHubCategories(Array.isArray(payload?.categories) ? payload.categories : []))
+          .catch(() => setHubCategories([]))
+      }, [])
+
+      // 加载更多：页码 +1，追加而不是替换；必须沿用当前分类与排序，否则翻页会串。
+      const loadMoreHub = React.useCallback(() => {
+        const next = hubPage + 1
+        setHubMore(true)
+        const params = new URLSearchParams({ page: String(next), pageSize: '40', sortBy: hubSort })
+        if (hubKeyword && hubKeyword.trim()) params.set('keyword', hubKeyword.trim())
+        if (hubCategory) params.set('category', hubCategory)
+        fetch('/zhiyin/skillhub/search?' + params.toString(), { headers: { accept: 'application/json' } })
+          .then((response) => response.json())
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '请求失败')
+            setHubItems((previous) => previous.concat(Array.isArray(payload.skills) ? payload.skills : []))
+            setHubTotal(Number(payload.total ?? 0) || 0)
+            setHubPage(next)
+          })
+          .catch((error) => setHubError(String(error?.message ?? error)))
+          .finally(() => setHubMore(false))
+      }, [hubKeyword, hubPage, hubCategory, hubSort])
+
+      /**
+       * 装一个 skillhub 技能。
+       * 宿主下载 zip、按清单逐个校验 sha256 后才落盘，所以这里不需要额外确认内容是否完整。
+       */
+      const installFromHub = React.useCallback((item, overwrite) => {
+        const key = item.id
+        setHubBusy(key)
+        return fetch('/zhiyin/skillhub/install', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(overwrite ? { slug: item.slug, target: 'agents', overwrite: true } : { slug: item.slug, target: 'agents' }),
+        })
+          .then((response) => response.json())
+          .then((payload) => {
+            if (!payload || payload.ok !== true) throw new Error(payload?.error ?? '安装失败')
+            setHubDone((previous) => ({ ...previous, [key]: true }))
+            load()
+            return null
+          })
+          .catch((error) => setHubError(String(error?.message ?? error)))
+          .finally(() => setHubBusy(null))
+      }, [load])
+
       // 加载更多：按 +20 递增直到 MARKET_MAX（skills.sh 单次上限 200 条）。
       const loadMoreMarket = React.useCallback(() => {
         setMarketMore(true)
@@ -2321,7 +2597,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       }
       React.useEffect(() => {
         if (tab === 'market' && !marketLoaded) loadMarket('')
-      }, [tab, marketLoaded, loadMarket])
+        // skillhub 首屏默认看热门（空关键词 + 下载量排序）。
+        if (tab === 'skillhub' && !hubLoaded) loadHub('', 1, hubCategory, hubSort)
+        if (tab === 'skillhub' && !hubCategoriesLoaded) loadHubCategories()
+      }, [tab, marketLoaded, loadMarket, hubLoaded, loadHub, hubCategory, hubSort, hubCategoriesLoaded, loadHubCategories])
       // 技能描述：搜索 API 不含描述，前 12 张卡片按需从详情页取（宿主代理 + 缓存）。
       React.useEffect(() => {
         if (!marketItems.length) return undefined
@@ -2455,6 +2734,20 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       // 更新徽标只认六态里的两种：有新版可点、本地改过只提示。
       const updateResults = state.updates?.results ?? {}
       const updateCount = Object.keys(updateResults).filter((name) => updateResults[name]?.status === 'update-available').length
+
+      // 市场标题要反映当前筛选与排序，否则用户点完下拉会以为没生效。
+      const hubSortName =
+        hubSort === 'score' ? say('hubSortScore', '相关度')
+        : hubSort === 'updated_at' ? say('hubSortUpdated', '最近更新')
+        : hubSort === 'stars' ? say('hubSortStars', '收藏最多')
+        : hubSort === 'installs' ? say('hubSortInstalls', '安装最多')
+        : say('hubSortDownloads', '下载最多')
+      const hubCategoryName = hubCategory
+        ? (() => {
+            const hit = hubCategories.find((item) => item.key === hubCategory)
+            return (lang === 'en' ? (hit?.nameEn || hit?.name) : (hit?.name || hit?.nameEn)) || hubCategory
+          })()
+        : ''
 
       // 一致性修复：只剪掉指向已消失技能的引用，不猜技能去哪了；后端先备份。
       const repairDrift = React.useCallback(() => {
@@ -3073,7 +3366,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                 { style: css.seg },
                 h('button', { type: 'button', style: tab === 'list' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('list') }, `${say('tabList', '技能')} ${counts.total}`),
                 h('button', { type: 'button', style: tab === 'packs' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('packs') }, `${say('tabPacks', '技能包')} ${(data.packs ?? []).length}`),
-                h('button', { type: 'button', style: tab === 'market' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('market') }, say('tabMarket', '技能市场')),
+                // 两个市场并列：SKILLS.SH 是国际站，SkillHub 是国内站。名字用上游原名，不自造译名。
+                h('button', { type: 'button', style: tab === 'market' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('market') }, say('tabMarket', 'SKILLS.SH')),
+                h('button', { type: 'button', style: tab === 'skillhub' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('skillhub') }, say('tabSkillhub', 'SkillHub')),
                 h('button', { type: 'button', style: tab === 'archive' ? { ...css.segBtn, ...css.segBtnOn } : css.segBtn, onClick: () => setTab('archive') }, `${say('tabArchive', '归档')} ${archiveEntries.length}`),
     
               ),
@@ -3092,7 +3387,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     }, updateBusy === 'check'
                       ? h(Spinner, { size: 14 })
                       : updateCount > 0
-                        ? say('checkUpdatesFound', '有 {n} 个更新').replace('{n}', String(updateCount))
+                        // 文案必须说清这是「再查一次」：和上方信息区的「有 N 个更新」是筛选，点错了会以为筛选坏了。
+                        ? say('recheckUpdates', '重新检查（有 {n} 个更新）').replace('{n}', String(updateCount))
                         : say('checkUpdates', '检查更新')),
                     tab === 'list'
                       ? h(
@@ -3107,7 +3403,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           : null,
 
         // 更新中的进度提示：明确告诉用户正在写哪个技能，并可中断。
-        updateBusy && updateBusy !== 'check' && tab === 'list'
+        // 取消后的中性回执：说明技能没被动过，并允许用户自己关掉。
+        cancelNotice && updateBusy === ''
+          ? h('div', { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 0' } },
+              h('span', null, cancelNotice),
+              h('button', { type: 'button', style: { ...css.btn, padding: '4px 10px' }, onClick: () => setCancelNotice('') }, say('dismiss', '知道了')),
+            )
+          : null,
+
+        // 更新中切到别的标签页也要能看到进度和「取消更新」，否则取消入口会凭空消失。
+        updateBusy && updateBusy !== 'check'
           ? h('div', { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 0', color: 'var(--zhiyin-accent, #e0743c)' } },
               h(Spinner, { size: 14 }),
               h('span', null, say('updatingSkill', '正在更新 {name}…').replace('{name}', updateBusy)),
@@ -3123,8 +3428,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             )
           : null,
 
-        // 工具条：分组动作 · 搜索（占满）· 排序 / 安装（技能市场页用自带搜索）
-        data && tab !== 'market' && tab !== 'archive'
+        // 工具条：分组动作 · 搜索（占满）· 排序 / 安装（两个市场页各自带搜索，不复用这条）
+        data && tab !== 'market' && tab !== 'archive' && tab !== 'skillhub'
           ? h(
               'div',
               { style: css.toolbar },
@@ -3299,6 +3604,354 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
         !data
           ? h('p', { style: { ...css.hint, marginTop: 12 } }, say('loading', '正在读取技能列表…'))
+          : null,
+
+
+
+        // SkillHub 详情弹窗
+        hubDetailItem
+          ? h(
+              'div',
+              { style: css.overlay, onClick: closeHubDetail },
+              h(
+                'div',
+                { style: { ...css.modal, ...css.modalWide, maxHeight: '88vh' }, onClick: (event) => event.stopPropagation() },
+                h(
+                  'div',
+                  { style: css.modalHead },
+                  h('span', { style: css.modalTitle }, hubDetailItem.name + (hubDetailItem.version ? ' · v' + hubDetailItem.version : '')),
+                  h('button', {
+                    type: 'button',
+                    style: css.iconBtn,
+                    title: say('close', '关闭'),
+                    'aria-label': say('close', '关闭'),
+                    onClick: closeHubDetail,
+                  }, h(Icon, { name: 'close', size: 13 })),
+                ),
+                h(
+                  'div',
+                  { style: css.modalBody },
+                  // 决策区：安全报告 + 付费/Key 提醒 + 安装。
+                  h(
+                    'div',
+                    { style: { ...css.groupDesc, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10 } },
+                    h('span', null, String(hubDetailItem.source || 'skillhub')),
+                    h('span', { style: { opacity: 0.5 } }, '·'),
+                    h('span', null, formatInstalls(hubDetailItem.downloads) + ' ' + say('hubDownloads', '次下载')),
+                    hubDetailItem.namespace
+                      ? h('span', { style: { opacity: 0.7 } }, '· ' + hubDetailItem.namespace)
+                      : null,
+                  ),
+                  hubDetailItem.paid
+                    ? h('div', { style: { ...css.infoAlert, marginBottom: 8 } }, say('hubPaidHint', '上游标注为付费技能'))
+                    : hubDetailItem.needsKey
+                      ? h('div', { style: { ...css.infoAlert, marginBottom: 8 } }, say('hubKeyHint', '使用这个技能需要自备 API Key'))
+                      : null,
+                  hubDetailError
+                    ? h('div', { style: css.errorBox }, hubDetailError)
+                    : hubDetailLoading
+                      ? h('div', { style: css.hint }, say('hubDetailLoading', '正在读取详情…'))
+                      : hubDetail
+                        ? h(
+                            'div',
+                            null,
+                            // 安全扫描结论放最前：安装前最先想知道的是「有没有风险」。
+                            (hubDetail.security ?? []).length > 0
+                              ? h(
+                                  'div',
+                                  { style: { marginBottom: 12 } },
+                                  h('div', { style: css.costHead }, say('hubSecurityHead', '安全扫描')),
+                                  ...hubDetail.security.map((item) =>
+                                    h(
+                                      'div',
+                                      { key: item.engine, style: { ...css.costBullet, display: 'flex', gap: 8, alignItems: 'center' } },
+                                      h('span', { style: { opacity: 0.7 } }, item.engine),
+                                      h('span', null, item.text || item.status),
+                                      item.url
+                                        ? h('a', { href: item.url, target: '_blank', rel: 'noreferrer', style: css.costLink }, say('hubReport', '查看报告'))
+                                        : null,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                            hubDetail.latestVersion?.changelog
+                              ? h(
+                                  'div',
+                                  { style: { marginBottom: 12 } },
+                                  h('div', { style: css.costHead }, say('hubChangelogHead', '最新版本变更')),
+                                  h('div', { style: { ...css.costBullet, whiteSpace: 'pre-wrap' } }, hubDetail.latestVersion.changelog),
+                                )
+                              : null,
+                            h(
+                              'div',
+                              { style: { ...css.costHead, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                              h('span', null, say('hubPreviewHead', 'SKILL.md 预览')),
+                              h('button', {
+                                type: 'button',
+                                style: { ...css.btn, padding: '2px 8px', fontSize: fs.meta },
+                                onClick: () => setHubPreviewMode((mode) => (mode === 'rendered' ? 'source' : 'rendered')),
+                              }, hubPreviewMode === 'rendered' ? say('hubPreviewSource', '查看源码') : say('hubPreviewRendered', '查看渲染')),
+                            ),
+                            hubPreviewLoading
+                              ? h('div', { style: css.hint }, say('hubPreviewLoading', '正在读取 SKILL.md…'))
+                              : hubPreviewError
+                                ? h('div', { style: css.errorBox }, hubPreviewError)
+                                : hubPreviewMode === 'source'
+                                  ? h('pre', { style: { ...css.guidePre, maxHeight: 360, overflowY: 'auto' } }, hubPreview.slice(0, 12000))
+                                  : h('div', { style: { ...css.guideBody, maxHeight: 360, overflowY: 'auto', paddingRight: 4 } },
+                                      ...renderMarkdown(stripSkillFrontmatter(hubPreview).slice(0, 12000), { safeLinks: true }),
+                                    ),
+                            // 文件清单默认收起：它是参考材料，不该抢在预览前面占满弹窗。
+                            hubFiles.length > 0
+                              ? h(
+                                  'div',
+                                  { style: { marginTop: 12 } },
+                                  h('button', {
+                                    type: 'button',
+                                    'aria-expanded': hubFilesOpen,
+                                    onClick: () => setHubFilesOpen((open) => !open),
+                                    style: { ...css.costHead, display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' },
+                                  },
+                                    h('span', { style: { display: 'inline-flex', transform: hubFilesOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' } },
+                                      h(Icon, { name: 'chevronDown', size: 13 })),
+                                    say('hubFilesHead', '文件清单') + '（' + hubFiles.length + '）',
+                                  ),
+                                  hubFilesOpen
+                                    ? h('div', { style: { marginTop: 6 } },
+                                        ...hubFiles.map((file) =>
+                                          h('div', { key: file.path, style: { ...css.costBullet, fontFamily: 'monospace', fontSize: fs.meta } }, file.path),
+                                        ),
+                                      )
+                                    : null,
+                                )
+                              : null,
+                            (hubDetail.versions ?? []).length > 1
+                              ? h(
+                                  'div',
+                                  { style: { marginTop: 12 } },
+                                  h('div', { style: css.costHead }, say('hubVersionsHead', '版本历史')),
+                                  ...hubDetail.versions.slice(0, 10).map((version) =>
+                                    h('div', { key: version.version, style: css.costBullet },
+                                      'v' + version.version + ' · ' + (version.changelog || '').split('\n')[0]),
+                                  ),
+                                )
+                              : null,
+                          )
+                        : null,
+                ),
+                h(
+                  'div',
+                  { style: css.modalFoot },
+                  // 右上角已有 × 关闭；底部只留唯一主行动，避免同一动作两个入口。
+                  h('button', {
+                    type: 'button',
+                    style: css.primaryBtn,
+                    disabled: hubBusy != null,
+                    onClick: () => {
+                      installFromHub(hubDetailItem)
+                      closeHubDetail()
+                    },
+                  }, say('install', '安装技能')),
+                ),
+              ),
+            )
+          : null,
+
+        // SkillHub（skillhub.cn）：国内站。与 SKILLS.SH 并列，交互同构，但分页按页码而不是 limit。
+        data && tab === 'skillhub'
+          ? h(
+              'div',
+              null,
+              h(
+                'div',
+                { style: css.toolbar },
+                h(ClearField, {
+                  wrapperStyle: { flex: '1 1 220px', minWidth: 0 },
+                  style: css.input,
+                  value: hubKeyword,
+                  placeholder: say('hubSearchPlaceholder', '搜索 SkillHub 技能（留空看热门）'),
+                  onChange: (event) => setHubKeyword(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key !== 'Enter') return
+                    event.preventDefault()
+                    loadHub(hubKeyword, 1, hubCategory, hubSort).catch(() => {})
+                  },
+                }),
+                h('button', {
+                  type: 'button',
+                  style: css.btn,
+                  disabled: hubLoading,
+                  onClick: () => loadHub(hubKeyword, 1, hubCategory, hubSort).catch(() => {}),
+                }, hubLoading ? h(Spinner, { size: 14 }) : say('marketSearch', '搜索')),
+                h('label', { style: css.sortWrap },
+                  h(Icon, { name: 'layers', size: 13 }),
+                  say('hubCategoryLabel', '分类'),
+                  h('select', {
+                    style: css.sortSelect,
+                    value: hubCategory,
+                    onChange: (event) => {
+                      const next = event.target.value
+                      setHubCategory(next)
+                      loadHub(hubKeyword, 1, next, hubSort).catch(() => {})
+                    },
+                  },
+                    h('option', { value: '', style: css.optionStyle }, say('hubAllCategories', '全部分类')),
+                    ...hubCategories.map((item) =>
+                      h('option', { key: item.key, value: item.key, style: css.optionStyle }, lang === 'en' ? (item.nameEn || item.name) : (item.name || item.nameEn)),
+                    ),
+                  ),
+                ),
+                h('label', { style: css.sortWrap },
+                  h(Icon, { name: 'sort', size: 13 }),
+                  say('sortBy', '排序'),
+                  h('select', {
+                    style: css.sortSelect,
+                    value: hubSort,
+                    onChange: (event) => {
+                      const next = event.target.value
+                      setHubSort(next)
+                      loadHub(hubKeyword, 1, hubCategory, next).catch(() => {})
+                    },
+                  },
+                    h('option', { value: 'downloads', style: css.optionStyle }, say('hubSortDownloads', '下载最多')),
+                    h('option', { value: 'score', style: css.optionStyle }, say('hubSortScore', '相关度')),
+                    h('option', { value: 'updated_at', style: css.optionStyle }, say('hubSortUpdated', '最近更新')),
+                    h('option', { value: 'stars', style: css.optionStyle }, say('hubSortStars', '收藏最多')),
+                    h('option', { value: 'installs', style: css.optionStyle }, say('hubSortInstalls', '安装最多')),
+                  ),
+                ),
+              ),
+              h(
+                'div',
+                { style: { ...css.hint, marginTop: 8 } },
+                hubKeyword.trim()
+                  ? say('hubResult', '搜索结果') + '：' + hubItems.length + ' / ' + hubTotal
+                  : (hubCategoryName ? hubCategoryName + ' · ' : '')
+                    + say('hubTrendingSorted', '热门技能（按 {s} 排序）').replace('{s}', hubSortName)
+                    + (hubTotal ? '：共 ' + hubTotal + ' 个' : ''),
+              ),
+              hubError
+                ? h('div', { style: css.errorBox }, h(Icon, { name: 'info', size: 14 }), h('span', null, hubError))
+                : null,
+              hubLoading && hubItems.length === 0
+                ? h('div', { style: css.marketGrid },
+                    Array.from({ length: skeletonCount }).map((_, index) =>
+                      h('div', { key: 'hsk-' + index, style: css.skeletonCard },
+                        h('div', { style: css.skeletonBar('70%', 16) }),
+                        h('div', { style: css.skeletonBar('45%') }),
+                        h('div', { style: css.skeletonBar('100%') }),
+                        h('div', { style: css.skeletonBar('92%') }),
+                        h('div', { style: css.skeletonBar('38%', 28) }),
+                      ),
+                    ),
+                  )
+                : null,
+              !hubLoading && hubItems.length === 0 && !hubError
+                ? h('div', { style: css.emptyBox },
+                    h('span', { style: css.emptyTitle }, say('marketEmpty', '没有找到技能')),
+                    h('span', null, say('hubEmptyHint', '换个关键词试试，或清空搜索框看热门')))
+                : null,
+              h(
+                'div',
+                { style: css.marketGrid },
+                hubItems.map((item) => {
+                  const key = item.id
+                  const installed = (data.skills ?? []).some((skill) => skill.name === item.slug)
+                  const hovered = hubHover === key
+                  const running = hubBusy === key
+                  const done = hubDone[key] === true
+                  const busyElsewhere = hubBusy != null && !running
+                  return h(
+                    'div',
+                    {
+                      key,
+                      style: css.marketCard(hovered),
+                      onMouseEnter: () => setHubHover(key),
+                      onMouseLeave: () => setHubHover((previous) => (previous === key ? null : previous)),
+                    },
+                    h(
+                      'div',
+                      { style: css.marketCardTop },
+                      // 名称点开详情弹窗；外链放到旁边的小按钮，避免在同一行抢点击。
+                      h('button', {
+                        type: 'button',
+                        title: say('hubDetailOpen', '查看技能详情'),
+                        style: { ...css.marketCardTitle, flex: '1 1 auto', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit' },
+                        onClick: () => openHubDetail(item),
+                      }, item.name),
+                      h('a', {
+                        href: item.url,
+                        target: '_blank',
+                        rel: 'noreferrer',
+                        title: say('hubOpen', '在 skillhub.cn 打开技能页'),
+                        style: { ...css.iconBtn, flex: '0 0 auto', textDecoration: 'none' },
+                      }, h(Icon, { name: 'globe', size: 13 })),
+                      // 付费 / 要 Key 这类需要先知道的事，放在标题行右侧；不阻止安装，只提醒。
+                      item.paid
+                        ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.75 }, title: say('hubPaidHint', '上游标注为付费技能') }, say('hubPaid', '付费'))
+                        : null,
+                      !item.paid && item.needsKey
+                        ? h('span', { style: { ...css.badge(true), flex: '0 0 auto', opacity: 0.75 }, title: say('hubKeyHint', '使用这个技能需要自备 API Key') }, say('hubNeedsKey', '需 Key'))
+                        : null,
+                    ),
+                    h(
+                      'div',
+                      { style: css.marketCardMeta },
+                      h('span', { title: say('hubSourceTitle', '上游来源') }, String(item.source || 'skillhub')),
+                      h('span', { style: { opacity: 0.5 } }, '·'),
+                      h('span', { title: say('hubDownloadsTitle', 'skillhub.cn 记录的下载次数') },
+                        formatInstalls(item.downloads) + ' ' + say('hubDownloads', '次下载')),
+                      item.version
+                        ? h('span', { style: { opacity: 0.5 } }, '·')
+                        : null,
+                      item.version ? h('span', null, 'v' + item.version) : null,
+                    ),
+                    item.summary
+                      ? h('div', { style: css.marketCardDesc }, item.summary)
+                      : h('div', { style: { ...css.marketCardDesc, opacity: 0.55 } }, say('marketNoDesc', '暂无描述')),
+                    h(
+                      'div',
+                      { style: css.marketCardFoot },
+                      h('span', { style: { flex: '1 1 auto' } }),
+                      done || installed
+                        ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto', whiteSpace: 'nowrap' } },
+                            h('span', { style: { ...css.metaText, color: '#4a9d6a', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }, title: say('marketInstalled', '已安装') },
+                              h(Icon, { name: 'check', size: 13 }), say('marketInstalled', '已安装')),
+                            h('button', {
+                              type: 'button',
+                              style: css.iconBtn,
+                              title: say('marketReinstallHint', '重新安装（覆盖到所选目录，用于更新）'),
+                              'aria-label': say('marketReinstall', '重新安装'),
+                              disabled: busyElsewhere,
+                              onClick: () => installFromHub(item, true),
+                            }, h(Icon, { name: 'refresh', size: 13 })),
+                          )
+                        : h('button', {
+                            type: 'button',
+                            style: running ? { ...css.primaryBtn, opacity: 0.8, cursor: 'progress' } : css.primaryBtn,
+                            title: running ? say('marketInstalling', '正在安装…') : busyElsewhere ? say('marketBusyOther', '另一个技能正在安装，请稍候') : say('install', '安装技能'),
+                            'aria-busy': running ? 'true' : 'false',
+                            disabled: running || busyElsewhere,
+                            onClick: () => installFromHub(item),
+                          },
+                          running ? h(Spinner, { size: 14 }) : h(Icon, { name: 'packagePlus', size: 14 }),
+                          running ? say('marketInstalling', '安装中…') : say('installShort', '安装')),
+                    ),
+                  )
+                }),
+              ),
+              hubItems.length > 0 && hubItems.length < hubTotal
+                ? h('div', { style: { display: 'flex', justifyContent: 'center', marginTop: 20 } },
+                    h('button', {
+                      type: 'button',
+                      style: { ...css.btn, display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' },
+                      disabled: hubMore,
+                      onClick: loadMoreHub,
+                    },
+                    hubMore ? h(Spinner, { size: 13 }) : h(Icon, { name: 'chevronDown', size: 13 }),
+                    hubMore ? say('marketMoreLoading', '加载中…') : say('marketMore', '加载更多') + '（' + hubItems.length + ' / ' + hubTotal + '）'))
+                : null,
+            )
           : null,
 
         // 技能市场（skills.sh）：热门默认、关键词搜索、一键安装

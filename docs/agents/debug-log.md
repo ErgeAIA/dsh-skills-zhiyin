@@ -16,6 +16,18 @@ description: >
 
 ***
 
+## BUG-018 隔离测试未覆盖 homedir()，把测试技能装进了真实 ~/.dsh/skills
+
+- **日期**：2026-11-25
+- **现象**：测试 skillhub 安装功能时，真实 `C:\Users\GigaByte\.dsh\skills` 里多出一条 `seedance-prompt-expert` Junction，指向已被清理的临时目录（悬空链接）。技能总数从 96 变成 97。
+- **根因**：隔离只设了 `DSH_HOME` 与 `DSH_AGENTS_HOME`，但 `dshSkillsRoot()` 硬编码 `homedir()`（index.js:937），完全不受这两个变量影响。于是 `installDirectory` 的 `target: 'agents'` 分支在真实 `~/.dsh/skills` 建了软链。此前几轮测试没暴露，是因为只测了不写盘的护栏（404/409）与取消（499），从未跑到「安装成功」分支。
+- **修复**：用 `[System.IO.Directory]::Delete(path, false)` 删掉链接本身（不能对 Junction 用 `Remove-Item -Recurse`，那会跟到目标里删文件）。已确认技能数回到 96、`~/.agents/skills` 无残留、desktop profile 仍为 0.1.7。
+- **预防规则**：
+  1. 任何会走到 `installDirectory` / `dshSkillsRoot()` 的测试，必须同时隔离 `USERPROFILE`、`HOME`、`DSH_HOME`、`DSH_AGENTS_HOME` 四个变量——前两个才决定 `homedir()`。
+  2. 测试前后都要数一次真实技能目录条目数，作为「没碰用户目录」的证据。
+  3. 删除 Junction 一律用 `Directory.Delete(path, false)`；禁止对链接使用递归删除。
+- **验证限制**：本条只清理了泄漏产物；「安装成功」这条路径的隔离复测尚待补做（需带 USERPROFILE 隔离）。
+
 ## BUG-015 发布后凭 registry 404 误判失败；unpkg 返回空文件
 
 - **现象**：0.1.1 由 GitHub Actions 发布，工作流 `success` 且日志含 `+ dsh-skills-zhiyin@0.1.1` 与 provenance 签名，但随后多次查询 registry 均只有 0.0.0-stage / 0.1.0，于是判断「发布没生效」。约 10 分钟后同一查询返回了 0.1.1。

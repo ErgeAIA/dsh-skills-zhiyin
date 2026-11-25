@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-25
+
+### Added
+
+- **New SkillHub (skillhub.cn) market tab**: sits beside SKILLS.SH and targets users in China. Supports trending (by downloads), keyword search, paged loading and one-click install
+- Cards show upstream source, download count, version and summary, and flag "paid" / "needs key" when the upstream says so
+- Filter by 13 categories and sort by downloads / relevance / recently updated / stars / installs
+- Installs now use a **single zip package**: each extracted file is checked against the upstream sha256 manifest; encrypted, zip64, path-traversal and oversized packages are rejected
+- **SkillHub detail dialog**: click a skill name to review security scans (Tencent keen/sanbu), latest changes, SKILL.md preview and version history before installing
+- SKILL.md preview now sits above the file list, and the file list is a collapsed accordion by default
+- SKILL.md preview renders as readable Markdown (headings / lists / tables / code) by default, strips YAML frontmatter, and keeps a "View source" toggle; external links are limited to http/https
+
+### Fixed
+
+- **"Cancel update" did nothing during the fetch phase**: cancelling only set a flag while the git child process kept running, so on a slow network the cancel appeared unresponsive for tens of seconds. Cancellation now uses a real AbortController that kills the running git process — measured to return "update cancelled" within 500 ms
+- Cancelling no longer surfaces a red error; it shows a neutral "Update cancelled; the skill was not changed" notice
+- SkillHub category/sort dropdown options were white-on-white in the dark theme; native `<option>`s now use `optionStyle` with a dark background and light text
+
+### Changed
+
+- The former "Market" tab is now **SKILLS.SH**, using the upstream name rather than an invented translation
+- The toolbar button now reads "Check again (N updates)" when updates exist, distinguishing it from the info-row "N updates" (which only filters) — both previously shared a label while behaving differently
+- Update progress and "Cancel update" are no longer limited to the skills tab; they stay visible on other tabs
+
+### Notes
+
+- Cancellation takes precedence over the "locally modified" verdict: once the user has cancelled, the panel no longer answers with a local-edit warning
+
 ## [0.1.8] - 2026-11-25
 
 ### Added

@@ -13,6 +13,7 @@
  */
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { inflateRawSync } from 'node:zlib'
 import { promisify } from 'node:util'
 import { appendFileSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -288,6 +289,82 @@ export function apply(ctx) {
       },
     }),
   )
+
+
+  // skillhub.cn 市场（第二个供应商）：搜索/详情/文件清单/文件正文。
+  // 全部只读，统一过准入闸门——和 skills.sh 那条路同样的口径。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/search',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubSearch({
+          keyword: url.searchParams.get('keyword') ?? '',
+          category: url.searchParams.get('category') ?? '',
+          sort: url.searchParams.get('sort') ?? '',
+          page: url.searchParams.get('page') ?? '1',
+          pageSize: url.searchParams.get('pageSize') ?? '40',
+        })
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/categories',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const result = await skillhubCategories()
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/detail',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubDetail(url.searchParams.get('slug') ?? '', url.searchParams.get('namespace') ?? '')
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/files',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubFiles(url.searchParams.get('slug') ?? '')
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/file',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubFile(url.searchParams.get('slug') ?? '', url.searchParams.get('path') ?? '')
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  post(ctx, '/zhiyin/skillhub/install', async (body) => installSkillhubSkill(ctx, body))
 
   // 单个技能的开关；传 names 时合并成一次提交（FR-023 批量提交：  
   // 一次写盘 / 一次 invalidate，目录只翻一遍）。
@@ -799,15 +876,25 @@ export function apply(ctx) {
   })
 
   post(ctx, '/zhiyin/updates/apply', async (body) => {
-    updateApplyCancelled = false
-    const result = await updateSkillFromUpstream(ctx, body?.name, { force: body?.force === true })
-    updateApplyCancelled = false
-    return result
+    // 一次更新一个令牌：新的 apply 顶掉旧的，避免上一次的取消信号串到这一次。
+    const controller = new AbortController()
+    updateApplyRun = controller
+    try {
+      return await updateSkillFromUpstream(ctx, body?.name, {
+        force: body?.force === true,
+        signal: controller.signal,
+      })
+    } finally {
+      if (updateApplyRun === controller) updateApplyRun = null
+    }
   })
 
   post(ctx, '/zhiyin/updates/cancel', async () => {
-    updateApplyCancelled = true
-    return { status: 200, body: { ok: true } }
+    // 没有在跑的更新也要回 ok：界面可能刚好错过那一帧，不该报错。
+    const run = updateApplyRun
+    if (!run) return { status: 200, body: { ok: true, cancelled: false } }
+    run.abort()
+    return { status: 200, body: { ok: true, cancelled: true } }
   })
 
   post(ctx, '/zhiyin/provenance/backfill', async () => {
@@ -1338,6 +1425,272 @@ function httpGetText(url, timeoutMs = 20000) {
   })
 }
 
+
+/* ------------------------------------------------------- skillhub.cn 市场 */
+
+/**
+ * skillhub.cn 适配层。
+ *
+ * 与 skills.sh 的根本差异：skills.sh 只知道「哪个 GitHub 仓库」，安装要靠 npx/git；
+ * skillhub 有逐文件清单与 sha256，可以直接把技能正文取下来并逐个校验。
+ * 因此这里的安装不依赖 bash、CLI 或登录 —— 这是 Windows 桌面能用的前提。
+ */
+
+const SKILLHUB_BASE = 'https://api.skillhub.cn'
+const SKILLHUB_PAGE_MAX = 100
+// zip 安装的硬上限：防止上游包异常时把内存或磁盘吃满。
+const SKILLHUB_ZIP_MAX_BYTES = 64 * 1024 * 1024
+const SKILLHUB_ZIP_MAX_FILES = 400
+const SKILLHUB_ZIP_MAX_TOTAL = 128 * 1024 * 1024
+const skillhubCache = new Map()
+
+/** 统一缓存：键 + TTL，超限淘汰最旧。市场浏览是高频只读，没必要每次打上游。 */
+function cached(key, ttlMs, produce) {
+  const hit = skillhubCache.get(key)
+  if (hit && Date.now() - hit.at < ttlMs) return { value: hit.value, cached: true }
+  return null
+}
+function remember(key, value) {
+  if (skillhubCache.size >= 40) {
+    const oldest = [...skillhubCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]
+    if (oldest) skillhubCache.delete(oldest[0])
+  }
+  skillhubCache.set(key, { at: Date.now(), value })
+  return value
+}
+
+/** 取 skillhub 的 JSON；上游抖动重试两次，仍失败就把原因带回去。 */
+async function skillhubJson(path, timeoutMs = 15000) {
+  const url = SKILLHUB_BASE + path
+  let lastError = ''
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const text = await httpGetText(url, timeoutMs)
+      return { ok: true, json: JSON.parse(text) }
+    } catch (error) {
+      lastError = String(error?.message ?? error)
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350))
+    }
+  }
+  return { ok: false, error: lastError }
+}
+
+/**
+ * 能力标志：把上游字段翻成界面能直接用的「能不能装、要不要提醒」。
+ * 只描述事实，不替用户做决定。
+ */
+function skillhubCapabilities(raw) {
+  const labels = raw?.labels ?? {}
+  const paid = labels.pricing_type === 'paid'
+  const needsKey = labels.requires_api_key === 'true'
+  const serviceized = raw?.isServiceized === true
+  const notes = []
+  if (paid) notes.push('paid')
+  if (needsKey) notes.push('requires-api-key')
+  if (serviceized) notes.push('serviceized')
+  return { paid, needsKey, serviceized, notes }
+}
+
+/** 安全结论：取最新版本里腾讯两家的扫描结果，只保留有结论的。 */
+function skillhubSecurity(reports) {
+  const out = []
+  for (const key of ['keen', 'sanbu']) {
+    const item = reports?.[key]
+    if (!item) continue
+    out.push({
+      engine: key,
+      status: String(item.status ?? ''),
+      text: String(item.statusText ?? ''),
+      url: String(item.reportUrl ?? ''),
+    })
+  }
+  return out
+}
+
+/** 把一条上游记录归一成界面卡片模型（与 skills.sh 共用一个形状）。 */
+function skillhubCard(raw) {
+  const slug = String(raw?.slug ?? '')
+  const caps = skillhubCapabilities(raw)
+  // slug 在上游不唯一：同一个 slug 会以不同命名空间/来源各存一条（实测 seedance 搜索里
+  // video-generation 与 seedance-prompt-expert 各出现两次）。用它当 React key 会撞车，
+  // 于是把命名空间与来源一起编进 id；两者都缺时才退回 slug。
+  const namespace = String(raw?.namespace?.canonicalName ?? '')
+  const source = String(raw?.source ?? '')
+  const unique = namespace || source || ''
+  return {
+    id: 'skillhub:' + slug + (unique ? '@' + unique : ''),
+    provider: 'skillhub',
+    name: String(raw?.name ?? raw?.displayName ?? slug),
+    slug,
+    namespace: String(raw?.namespace?.canonicalName ?? ''),
+    summary: String(raw?.description_zh || raw?.description || ''),
+    category: String(raw?.category ?? ''),
+    subCategories: Array.isArray(raw?.subCategories) ? raw.subCategories.map((s) => String(s?.name ?? '')).filter(Boolean) : [],
+    version: String(raw?.version ?? ''),
+    downloads: Number(raw?.downloads ?? 0) || 0,
+    installs: Number(raw?.installs ?? 0) || 0,
+    stars: Number(raw?.stars ?? 0) || 0,
+    source: String(raw?.source ?? ''),
+    iconUrl: typeof raw?.iconUrl === 'string' ? raw.iconUrl : '',
+    homepage: typeof raw?.homepage === 'string' ? raw.homepage : '',
+    updatedAt: Number(raw?.updated_at ?? 0) || 0,
+    ...caps,
+    // skillhub 的技能内容可从 API 直接取，所以只要有 slug 就可装。
+    installable: slug.length > 0,
+    url: slug ? 'https://skillhub.cn/skills/' + slug : '',
+    installCommand: slug ? 'skillhub install ' + slug : '',
+  }
+}
+
+/**
+ * 搜索 / 浏览 skillhub。
+ * 空关键词 = 热门（上游无 trending，用 downloads 排序近似）。
+ * 分页硬上限 100：超过会被上游 400 拒绝，这里先夹住，别把错误抛给界面。
+ */
+async function skillhubSearch(options) {
+  const keyword = String(options?.keyword ?? '').trim()
+  const category = String(options?.category ?? '').trim()
+  const sort = String(options?.sort ?? '').trim()
+  const page = Math.max(1, Number(options?.page ?? 1) || 1)
+  const pageSize = Math.min(SKILLHUB_PAGE_MAX, Math.max(1, Number(options?.pageSize ?? 40) || 40))
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  params.set('pageSize', String(pageSize))
+  if (keyword) params.set('keyword', keyword)
+  if (category) params.set('category', category)
+  // 实测参数名是 sortBy，不是 sort —— 写成 sort 会被静默忽略并返回默认序（全是 0 下载的条目）。
+  params.set('sortBy', sort || 'downloads')
+  const cacheKey = 'sh:list:' + params.toString()
+  const hit = cached(cacheKey, 3 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const result = await skillhubJson('/api/skills?' + params.toString())
+  if (!result.ok) return { status: 502, body: { ok: false, error: '连接 skillhub.cn 失败：' + result.error } }
+  const rows = Array.isArray(result.json?.data?.skills) ? result.json.data.skills : []
+  const body = {
+    ok: true,
+    provider: 'skillhub',
+    keyword,
+    category,
+    sort: sort || 'downloads',
+    page,
+    pageSize,
+    total: Number(result.json?.data?.total ?? 0) || 0,
+    count: rows.length,
+    skills: rows.map(skillhubCard),
+  }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+
+/** 分类列表：上游给 13 个一级类目，前端只做只读展示。 */
+async function skillhubCategories() {
+  const cacheKey = 'sh:categories'
+  const hit = cached(cacheKey, 60 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const result = await skillhubJson('/api/v1/categories')
+  if (!result.ok) return { status: 502, body: { ok: false, error: '读取 skillhub 分类失败：' + result.error } }
+  const items = (Array.isArray(result.json?.items) ? result.json.items : [])
+    .filter((item) => Number(item?.level ?? 1) === 1)
+    .map((item) => ({
+      key: String(item?.key ?? ''),
+      name: String(item?.name ?? ''),
+      nameEn: String(item?.nameEn ?? item?.name ?? ''),
+      sortOrder: Number(item?.sortOrder ?? 0) || 0,
+    }))
+    .filter((item) => item.key)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  const body = { ok: true, provider: 'skillhub', count: items.length, categories: items }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+/** 详情：附带版本历史、安全报告、能力标志。 */
+async function skillhubDetail(slug, namespace) {
+  const clean = String(slug ?? '').trim()
+  // 实测 namespace 传裸 handle（user_b26ab084）；带 @ 也能过，带完整 @ns/slug 会被判非法。
+  // 只取 @ 前那一段，避免把卡片上的 canonicalName 直接当参数传。
+  const rawNs = String(namespace ?? '').trim()
+  const handle = rawNs.startsWith('@') ? rawNs.slice(1).split('/')[0] : rawNs.split('/')[0]
+  const suffix = handle ? '?namespace=' + encodeURIComponent(handle) : ''
+  if (!clean) return { status: 400, body: { ok: false, error: '缺少 slug' } }
+  const cacheKey = 'sh:detail:' + clean + '|' + handle
+  const hit = cached(cacheKey, 10 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const [detail, versions] = await Promise.all([
+    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + suffix),
+    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + '/versions' + suffix),
+  ])
+  if (!detail.ok) return { status: 502, body: { ok: false, error: '连接 skillhub.cn 失败：' + detail.error } }
+  const raw = detail.json?.skill ?? {}
+  const latest = detail.json?.latestVersion ?? {}
+  const list = Array.isArray(versions.json?.versions) ? versions.json.versions : []
+  const body = {
+    ok: true,
+    provider: 'skillhub',
+    slug: clean,
+    skill: {
+      ...skillhubCard({
+        ...raw,
+        slug: clean,
+        description_zh: raw.summary_zh || raw.summary || '',
+        updated_at: raw.updatedAt,
+        version: latest.version ?? raw?.tags?.latest ?? '',
+      }),
+      // 详情才有：字数、评论、是否企业、是否认领。
+      comments: Number(raw?.stats?.comments ?? 0) || 0,
+      versions: Number(raw?.stats?.versions ?? 0) || 0,
+      verified: raw?.verified === true,
+      claimState: String(raw?.claim_state ?? ''),
+      owner: String(detail.json?.owner?.displayName ?? ''),
+    },
+    latestVersion: { version: String(latest.version ?? ''), changelog: String(latest.changelog ?? '') },
+    security: skillhubSecurity(list[0]?.securityReports ?? detail.json?.securityReports),
+    versions: list.slice(0, 20).map((v) => ({
+      version: String(v?.version ?? ''),
+      changelog: String(v?.changelog ?? ''),
+      createdAt: Number(v?.createdAt ?? 0) || 0,
+      security: skillhubSecurity(v?.securityReports),
+    })),
+  }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+/**
+ * 文件清单 + 逐文件内容。
+ * 预览只取前若干个小文件，避免把大资产也拉进弹窗。
+ */
+async function skillhubFiles(slug) {
+  const clean = String(slug ?? '').trim()
+  if (!clean) return { status: 400, body: { ok: false, error: '缺少 slug' } }
+  const cacheKey = 'sh:files:' + clean
+  const hit = cached(cacheKey, 10 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const result = await skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + '/files')
+  if (!result.ok) return { status: 502, body: { ok: false, error: '读取文件清单失败：' + result.error } }
+  const files = (Array.isArray(result.json?.files) ? result.json.files : []).map((f) => ({
+    path: String(f?.path ?? ''),
+    sha256: String(f?.sha256 ?? ''),
+    size: Number(f?.size ?? 0) || 0,
+  }))
+  const body = { ok: true, slug: clean, version: String(result.json?.version ?? ''), count: files.length, files }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+/** 取单个文件正文（预览 SKILL.md 用）。 */
+async function skillhubFile(slug, path) {
+  const clean = String(slug ?? '').trim()
+  const rel = String(path ?? '').trim()
+  if (!clean || !rel) return { status: 400, body: { ok: false, error: '缺少 slug 或 path' } }
+  try {
+    const text = await httpGetText(
+      SKILLHUB_BASE + '/api/v1/skills/' + encodeURIComponent(clean) + '/file?path=' + encodeURIComponent(rel),
+      20000,
+    )
+    return { status: 200, body: { ok: true, slug: clean, path: rel, text } }
+  } catch (error) {
+    return { status: 502, body: { ok: false, error: '读取文件失败：' + String(error?.message ?? error) } }
+  }
+}
+
 const marketCache = new Map()
 const marketDescCache = new Map()
 
@@ -1534,6 +1887,187 @@ function installDirectory(ctx, body, source, fallbackName) {
   }
   invalidateAll()
   return { status: 200, body: { ok: true, name, dest } }
+}
+
+
+/**
+ * 下载 zip：有代理时走 curl（继承系统代理），否则用 fetch。
+ * 二进制不能走 httpGetText —— 文本解码会破坏 zip 字节。
+ */
+async function httpGetBuffer(url, timeoutMs = 60000) {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy
+  if (proxy) {
+    const dir = mkdtempSync(join(tmpdir(), 'zhiyin-zipdl-'))
+    const out = join(dir, 'package.zip')
+    try {
+      const curl = process.platform === 'win32' ? 'curl.exe' : 'curl'
+      await execFileAsync(curl, ['-sS', '-L', '-m', String(Math.max(1, Math.ceil(timeoutMs / 1000))), '-x', proxy, '-o', out, url], {
+        windowsHide: true,
+        timeout: timeoutMs + 3000,
+        maxBuffer: 64 * 1024,
+      })
+      const bytes = readFileSync(out)
+      if (bytes.length > SKILLHUB_ZIP_MAX_BYTES) throw new Error('zip 超过大小上限')
+      return bytes
+    } finally {
+      try { rmSync(dir, { recursive: true, force: true }) } catch { /* 清理失败不影响结果 */ }
+    }
+  }
+  const response = await fetch(url, {
+    headers: { 'user-agent': 'dsh-zhiyin/0.1' },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) throw new Error('HTTP ' + response.status)
+  const bytes = Buffer.from(await response.arrayBuffer())
+  if (bytes.length > SKILLHUB_ZIP_MAX_BYTES) throw new Error('zip 超过大小上限')
+  return bytes
+}
+
+/**
+ * 解析 skillhub 的 zip：只接受 store/deflate，逐项做路径穿越防护与大小上限。
+ * 不解压到磁盘，先返回内存中的文件表，交给调用方按清单校验 sha256。
+ */
+function unzipSkillhubPackage(buffer) {
+  const need = (offset, length, label) => {
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset + length > buffer.length) {
+      throw new Error(label)
+    }
+  }
+  if (!Buffer.isBuffer(buffer) || buffer.length < 22) throw new Error('zip 太小，不是有效安装包')
+  let eocd = -1
+  const floor = Math.max(0, buffer.length - 65557)
+  for (let cursor = buffer.length - 22; cursor >= floor; cursor -= 1) {
+    if (buffer.readUInt32LE(cursor) === 0x06054b50) { eocd = cursor; break }
+  }
+  if (eocd < 0) throw new Error('找不到 zip 结束记录')
+  need(eocd, 22, 'zip 结束记录不完整')
+  const count = buffer.readUInt16LE(eocd + 10)
+  const directorySize = buffer.readUInt32LE(eocd + 12)
+  const directoryOffset = buffer.readUInt32LE(eocd + 16)
+  if (count < 1 || count > SKILLHUB_ZIP_MAX_FILES) throw new Error('zip 文件数量异常')
+  if (directorySize === 0xffffffff || directoryOffset === 0xffffffff) throw new Error('不支持 zip64 安装包')
+  need(directoryOffset, directorySize, 'zip 目录越界')
+
+  const out = []
+  const seen = new Set()
+  let totalUncompressed = 0
+  let cursor = directoryOffset
+  for (let index = 0; index < count; index += 1) {
+    need(cursor, 46, 'zip 目录项不完整')
+    if (buffer.readUInt32LE(cursor) !== 0x02014b50) throw new Error('zip 目录签名不对')
+    const flags = buffer.readUInt16LE(cursor + 8)
+    const method = buffer.readUInt16LE(cursor + 10)
+    const compressedSize = buffer.readUInt32LE(cursor + 20)
+    const uncompressedSize = buffer.readUInt32LE(cursor + 24)
+    const nameLength = buffer.readUInt16LE(cursor + 28)
+    const extraLength = buffer.readUInt16LE(cursor + 30)
+    const commentLength = buffer.readUInt16LE(cursor + 32)
+    const localOffset = buffer.readUInt32LE(cursor + 42)
+    if (flags & 1) throw new Error('zip 已加密，无法安装')
+    if (method !== 0 && method !== 8) throw new Error('zip 使用了不支持的压缩方式')
+    if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff) throw new Error('不支持 zip64 安装包')
+    if (uncompressedSize > SKILLHUB_ZIP_MAX_TOTAL - totalUncompressed) throw new Error('zip 解压后体积超过上限')
+    need(cursor + 46, nameLength + extraLength + commentLength, 'zip 文件名越界')
+    const entryName = buffer.slice(cursor + 46, cursor + 46 + nameLength).toString('utf8')
+    // 路径只允许 POSIX 相对路径：反斜杠、绝对路径、盘符、.. 一律拒绝。
+    if (entryName.indexOf(String.fromCharCode(0)) >= 0 || entryName.indexOf(String.fromCharCode(92)) >= 0) {
+      throw new Error('zip 里有不合法的路径')
+    }
+    let rel = entryName
+    if (rel.startsWith('/') || /^[A-Za-z]:/.test(rel) || rel.split('/').some((part) => !part || part === '.' || part === '..')) {
+      throw new Error('zip 里有不合法的路径：' + rel)
+    }
+    if (seen.has(rel)) throw new Error('zip 里有重复路径：' + rel)
+    need(localOffset, 30, 'zip 本地头越界')
+    if (buffer.readUInt32LE(localOffset) !== 0x04034b50) throw new Error('zip 本地头签名不对')
+    const localNameLength = buffer.readUInt16LE(localOffset + 26)
+    const localExtraLength = buffer.readUInt16LE(localOffset + 28)
+    const dataOffset = localOffset + 30 + localNameLength + localExtraLength
+    need(dataOffset, compressedSize, 'zip 数据越界')
+    const packed = buffer.slice(dataOffset, dataOffset + compressedSize)
+    let data
+    try {
+      data = method === 0 ? packed : inflateRawSync(packed)
+    } catch {
+      throw new Error('zip 解压失败：' + rel)
+    }
+    if (data.length !== uncompressedSize) throw new Error('zip 文件大小不符：' + rel)
+    seen.add(rel)
+    out.push({ path: rel, data })
+    totalUncompressed += uncompressedSize
+    cursor += 46 + nameLength + extraLength + commentLength
+  }
+  // 有些发布包会把技能放进一层顶层目录；只要 SKILL.md 唯一，就把这层前缀剥掉。
+  if (!out.some((file) => file.path === 'SKILL.md')) {
+    const candidates = out.filter((file) => file.path.endsWith('/SKILL.md'))
+    if (candidates.length !== 1) throw new Error('zip 里没有根目录 SKILL.md')
+    const prefix = candidates[0].path.slice(0, -'SKILL.md'.length)
+    for (const file of out) {
+      if (!file.path.startsWith(prefix)) throw new Error('zip 目录层级不一致')
+      file.path = file.path.slice(prefix.length)
+    }
+    if (!out.some((file) => file.path === 'SKILL.md')) throw new Error('zip 里没有 SKILL.md')
+  }
+  return out
+}
+
+/**
+ * 从 skillhub 安装技能。
+ *
+ * 与 GitHub 安装的差别：内容来自 zip 包。做法：先取文件清单 → 下载 zip →
+ * 解包 → 逐文件比对 sha256 → 全部通过才落到临时目录 → 再走原子安装。
+ * 任一文件不符就中止，绝不让半套内容进技能目录。
+ */
+async function installSkillhubSkill(ctx, body) {
+  const slug = String(body?.slug ?? '').trim()
+  const target = String(body?.target ?? 'agents')
+  if (!slug) return { status: 400, body: { ok: false, error: '缺少 slug' } }
+  const manifest = await skillhubFiles(slug)
+  if (manifest.status !== 200) return manifest
+  const expectedFiles = manifest.body.files ?? []
+  if (expectedFiles.length === 0) return { status: 502, body: { ok: false, error: '这个技能没有文件清单，无法安装' } }
+  if (!expectedFiles.some((file) => file.path === 'SKILL.md')) {
+    return { status: 502, body: { ok: false, error: '这个技能缺少 SKILL.md，不是合法技能包' } }
+  }
+  let archive
+  try {
+    archive = await httpGetBuffer(SKILLHUB_BASE + '/api/v1/download?slug=' + encodeURIComponent(slug))
+  } catch (error) {
+    return { status: 502, body: { ok: false, error: '下载 zip 失败：' + String(error?.message ?? error).slice(0, 160) } }
+  }
+  let unpacked
+  try {
+    unpacked = unzipSkillhubPackage(archive)
+  } catch (error) {
+    return { status: 502, body: { ok: false, error: '解析 zip 失败：' + String(error?.message ?? error).slice(0, 160) } }
+  }
+  const expected = new Map(expectedFiles.map((file) => [file.path, file]))
+  const bad = []
+  for (const file of unpacked) {
+    const meta = expected.get(file.path)
+    if (!meta) { bad.push(file.path + '（清单里没有）'); continue }
+    const actual = createHash('sha256').update(file.data).digest('hex')
+    if (meta.sha256 && actual !== meta.sha256) bad.push(file.path + '（校验不符）')
+  }
+  for (const meta of expectedFiles) {
+    if (!unpacked.some((file) => file.path === meta.path)) bad.push(meta.path + '（zip 里缺失）')
+  }
+  if (bad.length > 0) {
+    return { status: 502, body: { ok: false, error: 'zip 校验未通过，已放弃安装：' + bad.slice(0, 3).join('；') } }
+  }
+  const work = mkdtempSync(join(tmpdir(), 'zhiyin-skillhub-'))
+  try {
+    for (const file of unpacked) {
+      const dest = join(work, file.path)
+      mkdirSync(dirname(dest), { recursive: true })
+      writeFileSync(dest, file.data)
+    }
+    const installed = installDirectory(ctx, { target, overwrite: body?.overwrite === true }, work, slug)
+    if (installed.status === 200) note('skillhub-zip-installed', { slug, name: installed.body?.name, files: unpacked.length })
+    return installed
+  } finally {
+    try { rmSync(work, { recursive: true, force: true }) } catch { /* 临时目录清不掉不影响结果 */ }
+  }
 }
 
 /** 从直链 SKILL.md 安装：只接受纯文本，写完再走同一套目录安装。 */
@@ -1860,7 +2394,9 @@ const execFileAsync = promisify(execFile)
 // 同一仓库+同一 HEAD 的 ls-tree 全树输出缓存：只在单轮检查内有效，避免重复 git 调用。
 let treeCache = { key: null, out: null }
 let updateCheckRunning = null
-let updateApplyCancelled = false
+// 取消必须能真正打断在跑的 git：只置一个布尔量时命令还在跑，用户在拉取阶段点取消会像「没反应」。
+// 用 AbortController 让子进程立刻收到中止；下面的 checkpoint 只是兜底，不是唯一生效点。
+let updateApplyRun = null
 
 /**
  * 异步跑 git：网络与克隆可能几十秒到几分钟，用同步调用会把 DSH 主进程整个卡住。
@@ -1873,10 +2409,16 @@ async function gitRun(args, options) {
       timeout: opts.timeout ?? UPDATE_GIT_TIMEOUT,
       maxBuffer: 64 * 1024 * 1024,
       windowsHide: true,
+      // 传了 signal 就由它中止：Node 会杀掉子进程，不必等命令自己跑完。
+      ...(opts.signal ? { signal: opts.signal } : {}),
       ...(opts.cwd ? { cwd: opts.cwd } : {}),
     })
     return { ok: true, out: stdout }
   } catch (error) {
+    // 中止与失败要分开报：中止是用户意图，不该被当成网络错误重试或提示「检查失败」。
+    if (opts.signal?.aborted || error?.name === 'AbortError' || error?.code === 'ABORT_ERR') {
+      return { ok: false, aborted: true, error: '已取消' }
+    }
     return {
       ok: false,
       error: String(error?.stderr ?? error?.message ?? error).split('\n').slice(0, 2).join(' ').slice(0, 300),
@@ -1903,6 +2445,8 @@ async function gitRetry(args, options) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const result = await gitRun(args, options)
     if (result.ok) return result
+    // 用户取消不是网络抖动：立刻返回，绝不重试。
+    if (result.aborted) return result
     last = result
     const retryable = /handshake|SSL|TLS|Could not resolve|timed out|Connection|fetch-pack|RPC failed|early EOF|reset by peer/i.test(result.error)
     if (!retryable) return result
@@ -1971,9 +2515,9 @@ function repoCacheDir(repo) {
 }
 
 /** 上游分支当前 HEAD。ls-remote 不消耗 GitHub API 配额。 */
-async function upstreamRefSha(repo, branch) {
-  const result = await gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'])
-  if (!result.ok) return { ok: false, error: result.error }
+async function upstreamRefSha(repo, branch, signal) {
+  const result = await gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'], signal ? { signal } : {})
+  if (!result.ok) return { ok: false, aborted: result.aborted === true, error: result.error }
   const heads = new Map()
   for (const row of result.out.split('\n')) {
     const match = /^([0-9a-f]{40})\s+refs\/heads\/(.+)$/.exec(row.trim())
@@ -2179,12 +2723,21 @@ async function backfillProvenance(ctx) {
 async function updateSkillFromUpstream(ctx, name, options) {
   const wanted = typeof name === 'string' ? name.trim() : ''
   const force = options?.force === true
+  const signal = options?.signal
+  /** 取消检查：AbortController 已中止就立刻退出，不再往下写盘。 */
+  const aborted = () => {
+    if (signal?.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    return null
+  }
   if (!wanted) return { status: 400, body: { ok: false, error: '缺少技能名' } }
   const state = readState()
   const record = state.provenance?.[wanted]
   if (!record || !record.repo) {
     return { status: 404, body: { ok: false, error: '这个技能没有来源记录，先做一次「检查更新」' } }
   }
+  // 取消优先于一切判定：用户已经点了取消，再回「本地被改过」会让人以为取消没生效。
+  const stopFirst = aborted()
+  if (stopFirst) return stopFirst
   const current = state.updates?.results?.[wanted]?.status
   if (!force && (current === 'locally-modified' || current === 'both-changed')) {
     return {
@@ -2233,32 +2786,48 @@ async function updateSkillFromUpstream(ctx, name, options) {
       return { status: 500, body: { ok: false, error: '备份失败，已放弃更新：' + String(error?.message ?? error).slice(0, 160) } }
     }
   }
-  if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
-  const head = await upstreamRefSha(record.repo, record.branch || 'main')
-  if (!head.ok) return { status: 502, body: { ok: false, error: head.error } }
-  if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
+  const stopBeforeFetch = aborted()
+  if (stopBeforeFetch) return stopBeforeFetch
+  const head = await upstreamRefSha(record.repo, record.branch || 'main', signal)
+  if (!head.ok) {
+    if (head.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    return { status: 502, body: { ok: false, error: head.error } }
+  }
+  const stopBeforeClone = aborted()
+  if (stopBeforeClone) return stopBeforeClone
   const cache = repoCacheDir(record.repo)
   mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
   if (!existsSync(join(cache, '.git'))) {
     const clone = await gitRetry(
       ['clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--branch', record.branch || 'main', 'https://github.com/' + record.repo + '.git', cache],
-      { timeout: UPDATE_CLONE_TIMEOUT },
+      { timeout: UPDATE_CLONE_TIMEOUT, signal },
     )
-    if (!clone.ok) return { status: 502, body: { ok: false, error: clone.error } }
+    if (!clone.ok) {
+      if (clone.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+      return { status: 502, body: { ok: false, error: clone.error } }
+    }
   }
-  const fetch = await gitRetry(['-C', cache, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', head.branch || record.branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
-  if (!fetch.ok) return { status: 502, body: { ok: false, error: fetch.error } }
+  const fetch = await gitRetry(['-C', cache, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', head.branch || record.branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT, signal })
+  if (!fetch.ok) {
+    if (fetch.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    return { status: 502, body: { ok: false, error: fetch.error } }
+  }
   const work = mkdtempSync(join(tmpdir(), 'zhiyin-update-'))
   try {
     const args = ['-C', cache, '--work-tree', work, 'checkout', '-f', 'FETCH_HEAD']
     if (record.subpath) args.push('--', record.subpath)
-    const checkout = await gitRun(args, { timeout: UPDATE_CLONE_TIMEOUT })
-    if (!checkout.ok) return { status: 502, body: { ok: false, error: '取上游内容失败：' + checkout.error } }
+    const checkout = await gitRun(args, { timeout: UPDATE_CLONE_TIMEOUT, signal })
+    if (!checkout.ok) {
+      if (checkout.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+      return { status: 502, body: { ok: false, error: '取上游内容失败：' + checkout.error } }
+    }
     const source = record.subpath ? join(work, record.subpath) : work
     if (!existsSync(join(source, 'SKILL.md'))) {
       return { status: 502, body: { ok: false, error: '上游这个位置没有 SKILL.md，可能已经改结构' } }
     }
-    if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    // 写盘前最后一道闸：到这里取消就绝不覆盖用户文件。
+    const stopBeforeWrite = aborted()
+    if (stopBeforeWrite) return stopBeforeWrite
     const upstreamDigest = localSkillDigest(source)
     const result = installDirectory(ctx, { target, overwrite: true }, source, wanted)
     if (result.status !== 200) return result
@@ -2803,7 +3372,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, skillhubSearch, skillhubCategories, skillhubDetail, skillhubFiles, skillhubFile, skillhubCard, skillhubCapabilities, httpGetBuffer, unzipSkillhubPackage, installSkillhubSkill, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
 
 function invalidateAll() {
   for (const entry of registrations) {
