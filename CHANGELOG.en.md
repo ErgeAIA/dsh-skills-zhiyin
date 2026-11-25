@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-25
+
+### Changed
+
+- **Skill update checks went from 577s to 33–43s**: a check only needs to know whether upstream moved, but every repo was fetched unconditionally. Now `ls-remote` reads the HEAD first and the whole repo is skipped when every member is already verified at that SHA; concurrency raised from 2 to 6
+- A verified HEAD becomes the baseline (`headSha` / `digest`), so the same SHA short-circuits next time
+
 ## [0.1.6] - 2026-11-25
 
 ### Fixed
