@@ -51,6 +51,8 @@ dsh plugin --profile <profile> add ./dsh-skills-zhiyin-0.1.7.tgz
 
 After installing, **fully quit and reopen DSH** — the host half loads at process start, so reloading the page is not enough.
 
+When reinstalling from the plugin market, a freshly published version is held by pnpm's "24-hour safety window": it shows as "new version waiting" for about a day before it can be installed. This is a default safety policy of npm/pnpm and the market, not a ZhiYin limitation, and needs no manual config changes. The market's "Update now" button is an explicit opt-out if you do not want to wait.
+
 Requirements: DSH ≥ `0.2.2-rc.5` (see `engines.dsh` in `package.json`). This package has **no runtime dependencies and no lifecycle scripts**, so installing runs no build and needs no build approval.
 
 ## Usage
@@ -155,7 +157,7 @@ If the config references skills that no longer exist, the consistency badge turn
 ### FAQ
 
 **Do I need to restart DSH after installing or toggling?**
-No. Switches apply immediately; after installing, hit refresh once (top right). Only changing the plugin's own code needs a restart.
+Switches apply immediately and need no restart, but **installing or upgrading the plugin itself requires fully quitting and reopening DSH** — the host half loads at startup and a page refresh is not enough.
 
 **What does the "link" badge mean?**
 The skill is symlinked from `~/.agents/skills`; the real directory is elsewhere. Click the badge to jump there.
