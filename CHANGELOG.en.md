@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **"Cancel update" did nothing during the fetch phase**: cancelling only set a flag while the git child process kept running, so on a slow network the cancel appeared unresponsive for tens of seconds. Cancellation now uses a real AbortController that kills the running git process — measured to return "update cancelled" within 500 ms
 - Cancelling no longer surfaces a red error; it shows a neutral "Update cancelled; the skill was not changed" notice
+- SkillHub category/sort dropdown options were white-on-white in the dark theme; native `<option>`s now use `optionStyle` with a dark background and light text
 
 ### Changed
 

@@ -3795,9 +3795,9 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       loadHub(hubKeyword, 1, next, hubSort).catch(() => {})
                     },
                   },
-                    h('option', { value: '' }, say('hubAllCategories', '全部分类')),
+                    h('option', { value: '', style: css.optionStyle }, say('hubAllCategories', '全部分类')),
                     ...hubCategories.map((item) =>
-                      h('option', { key: item.key, value: item.key }, lang === 'en' ? (item.nameEn || item.name) : (item.name || item.nameEn)),
+                      h('option', { key: item.key, value: item.key, style: css.optionStyle }, lang === 'en' ? (item.nameEn || item.name) : (item.name || item.nameEn)),
                     ),
                   ),
                 ),
@@ -3813,11 +3813,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                       loadHub(hubKeyword, 1, hubCategory, next).catch(() => {})
                     },
                   },
-                    h('option', { value: 'downloads' }, say('hubSortDownloads', '下载最多')),
-                    h('option', { value: 'score' }, say('hubSortScore', '相关度')),
-                    h('option', { value: 'updated_at' }, say('hubSortUpdated', '最近更新')),
-                    h('option', { value: 'stars' }, say('hubSortStars', '收藏最多')),
-                    h('option', { value: 'installs' }, say('hubSortInstalls', '安装最多')),
+                    h('option', { value: 'downloads', style: css.optionStyle }, say('hubSortDownloads', '下载最多')),
+                    h('option', { value: 'score', style: css.optionStyle }, say('hubSortScore', '相关度')),
+                    h('option', { value: 'updated_at', style: css.optionStyle }, say('hubSortUpdated', '最近更新')),
+                    h('option', { value: 'stars', style: css.optionStyle }, say('hubSortStars', '收藏最多')),
+                    h('option', { value: 'installs', style: css.optionStyle }, say('hubSortInstalls', '安装最多')),
                   ),
                 ),
               ),

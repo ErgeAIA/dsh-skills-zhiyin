@@ -34,6 +34,7 @@ description: >
   - 详情弹窗（0.1.9）：点技能名打开；展示安全扫描（keen/sanbu）、最新变更、SKILL.md 预览、版本历史；文件清单改为手风琴（默认收起，点标题展开）。预览排在清单上方并限高 360px 内部滚动；SKILL.md 默认渲染为可读 Markdown（复用 renderMarkdown，支持标题/列表/表格/代码），剥掉 YAML frontmatter，保留「查看源码/查看渲染」切换，链接白名单只放行 http/https（防 javascript:）。详情支持 namespace 区分同名 slug；修掉浅色主题下深底继承暗字对比度不足（css.modal 补 foreground token）。实测：预览在清单前；手风琴默认 aria-expanded=false / 0 行，点开后 72 行。左下角重复「关闭」已删，只留右上角 ×。
   - zip 安装（0.1.9）：按参考插件思路改用 `/api/v1/download?slug=` 整包 zip（上游不支持 namespace 参数）；宿主自研最小 zip 解析器（store/deflate + EOCD/中央目录），逐文件按 `/files` 清单校验 sha256；拒绝加密/zip64/路径穿越/超大包。实测：手写恶意路径 zip 四种全部拒绝；真实包装 5 文件、SKILL.md 23564 字节；UI 安装技能总数 9→10；真实目录 96→96。
   - 分类/排序（0.1.9）：新增 `/zhiyin/skillhub/categories` 只读路由；前端 13 类下拉 + 5 种排序（downloads/score/updated_at/stars/installs，均实测有效）。修复标题写死「按下载量排序」的问题，现在显示当前分类与排序。
+  - 下拉可见性修复：SkillHub 分类/排序的原生 option 漏套 `css.optionStyle`，深色主题下白底浅字几乎看不见；补齐后计算样式为深底 rgb(37,37,38) + 浅字 rgb(230,230,230)。
 - **最后更新**：2026-11-25 16:2x 0.1.9 分支 feat/0.1.9-cancel-abort——三处边界修复 + 隔离验收实例（待用户验收，未合并/未发版）
   - 根因：取消只是置布尔 `updateApplyCancelled`，git 子进程照跑，拉取阶段点取消要等网络超时；改为 AbortController 真中止（gitRun 支持 signal、gitRetry 遇 abort 不重试、apply 建令牌/cancel abort、取消优先于本地判定、写盘前三道 checkpoint 仍保留）。
   - 真跑（隔离 DSH_HOME，真实 git）：已中止→499；mid-flight 600ms 点取消→499（远快于网络超时，证明确实杀掉子进程）；无来源→404、locally/both-changed→409 不写盘。
