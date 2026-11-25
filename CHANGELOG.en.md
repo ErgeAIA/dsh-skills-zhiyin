@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Installs now use a **single zip package**: each extracted file is checked against the upstream sha256 manifest; encrypted, zip64, path-traversal and oversized packages are rejected
 - **SkillHub detail dialog**: click a skill name to review security scans (Tencent keen/sanbu), latest changes, SKILL.md preview and version history before installing
 - SKILL.md preview now sits above the file list, and the file list is a collapsed accordion by default
+- SKILL.md preview renders as readable Markdown (headings / lists / tables / code) by default, strips YAML frontmatter, and keeps a "View source" toggle; external links are limited to http/https
 
 ### Fixed
 

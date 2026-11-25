@@ -272,6 +272,9 @@ window.__ModuleLoader__.load({
         hubFilesHead: '文件清单',
         hubPreviewHead: 'SKILL.md 预览',
         hubPreviewLoading: '正在读取 SKILL.md…',
+        hubPreviewSource: '查看源码',
+        hubPreviewRendered: '查看渲染',
+
         hubVersionsHead: '版本历史',
 
         tabArchive: '归档',
@@ -606,6 +609,9 @@ window.__ModuleLoader__.load({
         hubFilesHead: 'Files',
         hubPreviewHead: 'SKILL.md preview',
         hubPreviewLoading: 'Loading SKILL.md…',
+        hubPreviewSource: 'View source',
+        hubPreviewRendered: 'View rendered',
+
         hubVersionsHead: 'Version history',
 
         tabArchive: 'Archive',
@@ -1674,10 +1680,27 @@ function Switch({ label, hint, checked, disabled, onChange }) {
     }
 
     /**
+     * SKILL.md 顶部的 YAML frontmatter 不是正文：直接渲染会把 name:/description: 和两段 --- 当成段落与横线。
+     * 轻量版只把它剥掉；名称与版本弹窗标题已经展示，不重复。
+     */
+    function stripSkillFrontmatter(markdown) {
+      const text = String(markdown ?? '').replace(/\r\n/g, '\n')
+      const lines = text.split('\n')
+      if (lines[0]?.trim() !== '---') return text
+      let end = -1
+      for (let i = 1; i < lines.length; i += 1) {
+        if (lines[i].trim() === '---') { end = i; break }
+      }
+      if (end < 0) return text
+      return lines.slice(end + 1).join('\n').replace(/^\n+/, '')
+    }
+
+    /**
      * 使用指南渲染：GUIDE.md 只用到 Markdown 的最小子集（标题、列表、表格、代码块、
      * 行内代码、粗体、链接）。这里只实现这个子集，不引第三方依赖。
      */
-    function renderMarkdown(markdown) {
+    function renderMarkdown(markdown, options = {}) {
+      const safeLinks = options.safeLinks === true
       const source = String(markdown ?? '').replace(/\r\n/g, '\n').split('\n')
       const blocks = []
       let seq = 0
@@ -1696,7 +1719,13 @@ function Switch({ label, hint, checked, disabled, onChange }) {
             nodes.push(h('code', { key: nextKey(), style: css.guideCode }, token.slice(1, -1)))
           } else {
             const parts = token.match(/\[([^\]]+)\]\(([^)]+)\)/) ?? []
-            nodes.push(h('a', { key: nextKey(), href: parts[2] ?? '#', target: '_blank', rel: 'noreferrer', style: css.guideLink }, parts[1] ?? token))
+            const href = parts[2] ?? '#'
+            // 预览的是上游技能正文，属于外部内容：只放行 http/https，其余按纯文本显示。
+            if (safeLinks && !/^https?:\/\//i.test(href)) {
+              nodes.push(parts[1] ?? token)
+            } else {
+              nodes.push(h('a', { key: nextKey(), href, target: '_blank', rel: 'noreferrer', style: css.guideLink }, parts[1] ?? token))
+            }
           }
           last = match.index + token.length
         }
@@ -1716,7 +1745,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           blocks.push(h('pre', { key: nextKey(), style: css.guidePre }, h('code', null, code.join('\n'))))
           continue
         }
-        const heading = trimmed.match(/^(#{1,3})\s+(.*)$/)
+        const heading = trimmed.match(/^(#{1,6})\s+(.*)$/)
         if (heading) {
           const level = heading[1].length
           const style = level === 1 ? css.guideH1 : level === 2 ? css.guideH2 : css.guideH3
@@ -1754,7 +1783,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         const para = []
         while (i < source.length) {
           const t = source[i].trim()
-          if (!t || t.charAt(0) === '|' || /^#{1,3}\s/.test(t) || /^[-*]\s+/.test(t) || /^\d+\.\s+/.test(t) || t === '---' || t.slice(0, 3) === '\x60\x60\x60') break
+          if (!t || t.charAt(0) === '|' || /^#{1,6}\s/.test(t) || /^[-*]\s+/.test(t) || /^\d+\.\s+/.test(t) || t === '---' || t.slice(0, 3) === '\x60\x60\x60') break
           para.push(t)
           i += 1
         }
@@ -1953,6 +1982,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [hubPreview, setHubPreview] = React.useState('')
       const [hubPreviewLoading, setHubPreviewLoading] = React.useState(false)
       const [hubPreviewError, setHubPreviewError] = React.useState('')
+      // 预览默认渲染；技能作者排版可能千奇百怪，保留「源码」切换兜底。
+      const [hubPreviewMode, setHubPreviewMode] = React.useState('rendered')
       // 文件清单默认收起：长清单（实测有 72 个文件）会把预览挤出屏幕。
       const [hubFilesOpen, setHubFilesOpen] = React.useState(false)
       const [marketMore, setMarketMore] = React.useState(false)  // 正在加载更多
@@ -2367,6 +2398,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setHubFilesOpen(false)
         setHubPreview('')
         setHubPreviewError('')
+        setHubPreviewMode('rendered')
         setHubDetailLoading(true)
         setHubPreviewLoading(true)
         const params = new URLSearchParams({ slug: item.slug })
@@ -2406,6 +2438,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setHubFilesOpen(false)
         setHubPreview('')
         setHubPreviewError('')
+        setHubPreviewMode('rendered')
         setHubDetailLoading(false)
         setHubPreviewLoading(false)
       }, [])
@@ -3649,12 +3682,25 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                                   h('div', { style: { ...css.costBullet, whiteSpace: 'pre-wrap' } }, hubDetail.latestVersion.changelog),
                                 )
                               : null,
-                            h('div', { style: css.costHead }, say('hubPreviewHead', 'SKILL.md 预览')),
+                            h(
+                              'div',
+                              { style: { ...css.costHead, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                              h('span', null, say('hubPreviewHead', 'SKILL.md 预览')),
+                              h('button', {
+                                type: 'button',
+                                style: { ...css.btn, padding: '2px 8px', fontSize: fs.meta },
+                                onClick: () => setHubPreviewMode((mode) => (mode === 'rendered' ? 'source' : 'rendered')),
+                              }, hubPreviewMode === 'rendered' ? say('hubPreviewSource', '查看源码') : say('hubPreviewRendered', '查看渲染')),
+                            ),
                             hubPreviewLoading
                               ? h('div', { style: css.hint }, say('hubPreviewLoading', '正在读取 SKILL.md…'))
                               : hubPreviewError
                                 ? h('div', { style: css.errorBox }, hubPreviewError)
-                                : h('pre', { style: { ...css.guidePre, maxHeight: 280, overflowY: 'auto' } }, hubPreview.slice(0, 12000)),
+                                : hubPreviewMode === 'source'
+                                  ? h('pre', { style: { ...css.guidePre, maxHeight: 360, overflowY: 'auto' } }, hubPreview.slice(0, 12000))
+                                  : h('div', { style: { ...css.guideBody, maxHeight: 360, overflowY: 'auto', paddingRight: 4 } },
+                                      ...renderMarkdown(stripSkillFrontmatter(hubPreview).slice(0, 12000), { safeLinks: true }),
+                                    ),
                             // 文件清单默认收起：它是参考材料，不该抢在预览前面占满弹窗。
                             hubFiles.length > 0
                               ? h(
