@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-25
+
+### Added
+
+- Three-step update flow: **filter → confirm → interruptible**. Clicking "N updates" first filters to updatable skills; clicking a card's "Update" badge asks for confirmation before writing; while updating, a "Cancel update" button is shown
+- Faster checks: read HEAD with `ls-remote` first and skip whole repos already verified at that SHA
+
+### Notes
+
+- Skill updates write directly to the upstream SSOT directory (`~/.agents/skills/<name>` in unified mode) and never replace the `~/.dsh/skills` symlink. AI Vault keeps its own HEAD cache and will not recalculate after a ZhiYin update — a cross-app cache difference, not files written to the wrong place
+
 ## [0.1.7] - 2026-11-25
 
 ### Changed
