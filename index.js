@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto'
 import { promisify } from 'node:util'
 import { appendFileSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { basename, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 
 
 import { stateDir } from './paths.js'
@@ -1847,6 +1847,8 @@ const UPDATE_SKIP_DIRS = new Set(['.git', 'node_modules'])
 // 同一时刻只允许一轮检查：手动点击和每日定时撞车时，后来的直接拿现有进度。
 const execFileAsync = promisify(execFile)
 
+// 同一仓库+同一 HEAD 的 ls-tree 全树输出缓存：只在单轮检查内有效，避免重复 git 调用。
+let treeCache = { key: null, out: null }
 let updateCheckRunning = null
 
 /**
@@ -1934,6 +1936,17 @@ function localTreeEntries(dir, base, out) {
   return list
 }
 
+/**
+ * DSH 快照里的 skill.path 有两种形态：技能目录，或直接指向 SKILL.md 文件。
+ * 更新检测要的是目录；统一在这里归一化，避免 scandir 落在文件上。
+ */
+function skillDirFromPath(value) {
+  if (typeof value !== 'string' || value.length === 0) return ''
+  try {
+    if (basename(value).toLowerCase() === 'skill.md') return dirname(value)
+  } catch { /* 交给调用方报错 */ }
+  return value
+}
 function localSkillDigest(dir) {
   try {
     return { ok: true, digest: treeDigest(localTreeEntries(dir)) }
@@ -1965,6 +1978,44 @@ async function upstreamRefSha(repo, branch) {
 }
 
 /** 上游技能子树的内容指纹：只取树对象（blob:none 部分克隆），不下载文件正文。 */
+/** 每个仓库只 clone/fetch 一次，同仓库多个技能共用 FETCH_HEAD。 */
+async function prepareRepo(repo, branch) {
+  const dir = repoCacheDir(repo)
+  mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
+  if (!existsSync(join(dir, '.git'))) {
+    rmSync(dir, { recursive: true, force: true })
+    const clone = await gitRetry(
+      ['clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--branch', branch || 'main', 'https://github.com/' + repo + '.git', dir],
+      { timeout: UPDATE_CLONE_TIMEOUT },
+    )
+    if (!clone.ok) return { ok: false, error: clone.error }
+  }
+  const fetch = await gitRetry(['-C', dir, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
+  if (!fetch.ok) return { ok: false, error: fetch.error }
+  return { ok: true, dir }
+}
+
+/** 从 ls-tree -r 输出里切出某个子目录，按相对路径 + blob sha 求指纹。 */
+function treeDigestFromOutput(out, subpath) {
+  const prefix = subpath ? subpath.replace(/\/+$/, '') + '/' : ''
+  const entries = []
+  for (const line of out.split('\n')) {
+    const tab = line.indexOf('\t')
+    if (tab < 0) continue
+    const meta = line.slice(0, tab).split(' ')
+    if (meta[1] !== 'blob') continue
+    let rel = line.slice(tab + 1)
+    if (prefix) {
+      if (!rel.startsWith(prefix)) continue
+      rel = rel.slice(prefix.length)
+    }
+    entries.push([rel, meta[2]])
+  }
+  if (entries.length === 0) {
+    return { ok: false, error: subpath ? '上游已经没有这个路径了：' + subpath : '上游仓库此刻为空' }
+  }
+  return { ok: true, digest: treeDigest(entries), files: entries.length }
+}
 async function upstreamTreeDigest(repo, branch, subpath) {
   const dir = repoCacheDir(repo)
   mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
@@ -2066,7 +2117,8 @@ async function backfillProvenance(ctx) {
     const existing = provenance[skill.name]
     if (existing && existing.repo) continue
     const candidates = byName.get(skill.name) ?? []
-    const manifest = join(skill.path, 'SKILL.md')
+    const skillDir = skillDirFromPath(skill.path)
+    const manifest = join(skillDir, 'SKILL.md')
     if (!existsSync(manifest)) {
       unmatched += 1
       continue
@@ -2088,7 +2140,7 @@ async function backfillProvenance(ctx) {
       skippedLocal += 1
       continue
     }
-    const local = localSkillDigest(skill.path)
+    const local = localSkillDigest(skillDir)
     provenance[skill.name] = {
       repo: hit.repo_owner + '/' + hit.repo_name,
       branch: hit.repo_branch || 'main',
@@ -2260,6 +2312,7 @@ async function runUpdateCheck(ctx) {
   if (updateCheckRunning) return { ok: false, running: true, error: '已有一轮检查在进行' }
   updateCheckRunning = (async () => {
     const started = Date.now()
+    treeCache = { key: null, out: null }
     if (!(await gitUsable())) return { ok: false, error: '找不到 git：更新检查需要本机安装 git' }
     // 新装用户第一次检查时没有任何来源记录：会自动从 AI Vault 库回填一次。
     // 不回填就会出现「检查 85ms、171 个全 unknown-source」这种假成功。
@@ -2296,12 +2349,22 @@ async function runUpdateCheck(ctx) {
         const group = queue[cursor++]
         requests += 1
         const head = await upstreamRefSha(group.repo, group.branch)
+        // 同一仓库只 fetch 一次、只读一次全树；子树指纹在本地切片。
+        let prepared = null
+        let fullTree = null
+        if (head.ok) {
+          prepared = await prepareRepo(group.repo, head.branch || group.branch)
+          if (prepared.ok) {
+            fullTree = await gitRun(['-C', prepared.dir, 'ls-tree', '-r', 'FETCH_HEAD'])
+            if (!fullTree.ok) fullTree = null
+          }
+        }
         // 子树指纹必须按「技能子路径」算，不能按仓库算——同一仓库的多个技能子目录不同。
         const digestCache = new Map()
         for (const item of group.items) {
           const name = item.skill.name
           const record = item.record
-          const local = localSkillDigest(item.skill.path)
+          const local = localSkillDigest(skillDirFromPath(item.skill.path))
           if (!local.ok) {
             results[name] = { status: 'check-failed', checkedAt: now, note: '读取本地技能失败：' + local.error }
             continue
@@ -2327,11 +2390,13 @@ async function runUpdateCheck(ctx) {
             upstream = { ok: true, digest: record.remoteDigest }
           } else if (digestCache.has(subpathKey)) {
             upstream = digestCache.get(subpathKey)
+          } else if (fullTree) {
+            upstream = treeDigestFromOutput(fullTree.out, record.subpath)
           } else {
             upstream = await upstreamTreeDigest(group.repo, resolvedBranch, record.subpath)
             requests += 1
-            digestCache.set(subpathKey, upstream)
           }
+          digestCache.set(subpathKey, upstream)
           if (!upstream.ok) {
             // 上游路径没了：给一个「可能在哪儿」的提示，用户才知道下一步做什么。
             const moved = upstream.error.includes('上游已经没有这个路径')
@@ -2709,7 +2774,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
 
 function invalidateAll() {
   for (const entry of registrations) {

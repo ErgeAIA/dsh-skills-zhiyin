@@ -173,3 +173,12 @@ description: >
 - **教训**：
   1. node --check 只能验语法，验不出运行时求值顺序错误。改 client.js 后必须在真实页面加载一次并检查 importErrors。
   2. 排查 client 不显示时，查 __dshSidebarModuleSystem__.importErrors 比看 console 有效——错误对象可能是空 {}，要调 loadBundle 拿原文。
+
+## BUG-017: 桌面端更新检查秒完成且 162 条全 check-failed
+
+- **日期**：2026-11-25
+- **现象**：用户 desktop 装 0.1.5 后点检查更新，瞬间完成。
+- **真因**：DSH 技能快照的 `skill.path` 在本机是 `C:\Users\...\skills\academy-guide\SKILL.md`（文件路径），`localSkillDigest` 对它 `scandir` → ENOTDIR → 全部立即失败。
+- **修法**：新增 `skillDirFromPath()`，把指向 SKILL.md 的路径归一化为其父目录；回填与检测统一使用。
+- **附带优化**：每仓库只 clone/fetch 一次，全树 `ls-tree` 本地切片。实测 213 请求/577 秒 → 51 请求/214 秒。
+- **验证**：真实桌面状态跑一轮：up-to-date 133 / update-available 20 / check-failed 9 / unknown-source 9。
