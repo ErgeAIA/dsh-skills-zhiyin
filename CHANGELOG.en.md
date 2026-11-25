@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-25
+
+### Fixed
+
+- **Skill update check finished instantly and marked everything as failed on desktop** (BUG-017): the DSH snapshot gives `skill.path` as the `SKILL.md` file, which was treated as a directory. The path is now normalized before hashing
+- Skills from the same repo each fetched separately (213 requests / 577s); now each repo fetches once and subtrees are sliced locally from one `ls-tree` (51 requests / 214s)
+
 ## [0.1.5] - 2026-11-24
 
 ### Added
