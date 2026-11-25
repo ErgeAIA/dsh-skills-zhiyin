@@ -142,6 +142,26 @@ payload 内含 `package_md5, file_count, publisher_id, publisher_real_name_verif
 - 真实 `~/.dsh/skills` 前后均为 96 条（未受影响）
 - 无 cookie 请求 → 401（准入闸门生效）
 
+## 7.5 参考实现与授权口径（读源码后补）
+
+两份参考插件（只学方法，不抄代码）：
+
+| 项目 | 它到底做什么 | 对本项目的意义 |
+| --- | --- | --- |
+| **vonweller/dsh-skillhub** | 宿主代理 skillhub.cn 公开目录；配置 `apiBase https://api.skillhub.cn`、`installDir ~/.dsh/skills`；安装走 `/api/v1/download?slug=...` 整包 zip，自己解压、先预览 SKILL.md | 证明公开目录可无登录读取；zip 端点确实存在 |
+| **aa2246740/dsh-skillhub** | 完全不连 skillhub.cn，只管本机已安装技能的三层可见性开关 | 与远程市场无关，不能作为 ToS/接口依据 |
+
+**授权口径**（vonweller 的做法，非法律意见）：
+- `NOTICE.md`：*"skillhub.cn is operated by its own publisher. This plugin is an independent DeepSeek Harness client for that public catalog. Listing a skill is not an endorsement."*
+- `SECURITY.md`：*"only installs a skill after you click Install … treat third-party skills as untrusted text. Prefer community listings with a benign security scan, and do not install paid or API-key skills unless you already have that vendor account."*
+- 其调研文档还记录了 WorkBuddy 客户端使用的同一组接口：`/api/skills?page&pageSize&sortBy&order&keyword&category`、`/api/v1/categories`、`/api/v1/search?q&limit`、`/api/v1/skills/{slug}?namespace={ns}`、`/api/v1/skills/exists`。
+
+**准确结论**：没有找到 skillhub.cn 的书面 ToS 授权，但两个事实成立——
+1. 该目录对匿名请求公开可读（本项目实测）；
+2. 一个公开在 GitHub 的第三方插件按"独立客户端 + 公开目录 + 收录非背书 + 技能不可信"的口径接入。
+
+**我们要补的口径**（不写进 README，README 归 shuxu；先记在此）：安装前必须由用户点击；展示上游安全扫描结论；付费/需 Key 明确标注；不把收录当推荐。
+
 ## 8. 实施中踩到的坑
 
 1. **slug 不唯一**：同一 slug 会以不同命名空间各存一条（`video-generation`、`seedance-prompt-expert` 在搜索结果里各出现两次）。直接当 React key 会撞车，导致列表渲染错乱。已改为 `slug@namespace`。

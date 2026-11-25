@@ -30,6 +30,8 @@ description: >
   - 前端：新增 SkillHub Tab，原「技能市场」更名 SKILLS.SH；中英词条各 14 条已对齐。
   - 修掉三个实施问题：① slug 上游不唯一（同 slug 多命名空间各一条）导致 React key 撞车、列表渲染错乱 → 改 slug@namespace；② 技能列表工具条泄漏到 SkillHub 页（tab 判断漏排除）；③ 测试隔离不全把技能装进真实 ~/.dsh/skills（BUG-018，已清理，真实目录回到 96 条）。
   - 隔离纪律：测试必须同时改 USERPROFILE/HOME/DSH_HOME/DSH_AGENTS_HOME 四个变量，前后各数一次真实目录条目数。
+  - 参考实现核实（读源码，不抄）：vonweller 接公开目录、安装走 /api/v1/download?slug 整包 zip、NOTICE/SECURITY 有"独立客户端/公开目录/收录非背书/技能不可信"口径；aa2246740 不连远程目录，仅本地可见性。ToS 无书面授权，但公开可读 + 第三方按独立客户端接入两事实成立。
+  - 详情弹窗（0.1.9）：点技能名打开；展示安全扫描（keen/sanbu）、最新变更、文件清单、SKILL.md 预览、版本历史；详情支持 namespace 区分同名 slug；修掉浅色主题下弹窗深底继承暗字对比度不足的问题（css.modal 补 foreground token）。实测浏览器弹窗各区块正常显示。
 - **最后更新**：2026-11-25 16:2x 0.1.9 分支 feat/0.1.9-cancel-abort——三处边界修复 + 隔离验收实例（待用户验收，未合并/未发版）
   - 根因：取消只是置布尔 `updateApplyCancelled`，git 子进程照跑，拉取阶段点取消要等网络超时；改为 AbortController 真中止（gitRun 支持 signal、gitRetry 遇 abort 不重试、apply 建令牌/cancel abort、取消优先于本地判定、写盘前三道 checkpoint 仍保留）。
   - 真跑（隔离 DSH_HOME，真实 git）：已中止→499；mid-flight 600ms 点取消→499（远快于网络超时，证明确实杀掉子进程）；无来源→404、locally/both-changed→409 不写盘。

@@ -318,7 +318,7 @@ export function apply(ctx) {
       handler: async (request, response) => {
         if (refuseUnadmitted(ctx, request, response)) return
         const url = new URL(String(request.url ?? '/'), 'http://localhost')
-        const result = await skillhubDetail(url.searchParams.get('slug') ?? '')
+        const result = await skillhubDetail(url.searchParams.get('slug') ?? '', url.searchParams.get('namespace') ?? '')
         sendJson(response, result.status, result.body)
       },
     }),
@@ -1564,15 +1564,20 @@ async function skillhubSearch(options) {
 }
 
 /** 详情：附带版本历史、安全报告、能力标志。 */
-async function skillhubDetail(slug) {
+async function skillhubDetail(slug, namespace) {
   const clean = String(slug ?? '').trim()
+  // 实测 namespace 传裸 handle（user_b26ab084）；带 @ 也能过，带完整 @ns/slug 会被判非法。
+  // 只取 @ 前那一段，避免把卡片上的 canonicalName 直接当参数传。
+  const rawNs = String(namespace ?? '').trim()
+  const handle = rawNs.startsWith('@') ? rawNs.slice(1).split('/')[0] : rawNs.split('/')[0]
+  const suffix = handle ? '?namespace=' + encodeURIComponent(handle) : ''
   if (!clean) return { status: 400, body: { ok: false, error: '缺少 slug' } }
-  const cacheKey = 'sh:detail:' + clean
+  const cacheKey = 'sh:detail:' + clean + '|' + handle
   const hit = cached(cacheKey, 10 * 60 * 1000)
   if (hit) return { status: 200, body: hit.value }
   const [detail, versions] = await Promise.all([
-    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean)),
-    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + '/versions'),
+    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + suffix),
+    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + '/versions' + suffix),
   ])
   if (!detail.ok) return { status: 502, body: { ok: false, error: '连接 skillhub.cn 失败：' + detail.error } }
   const raw = detail.json?.skill ?? {}
