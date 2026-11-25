@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.1.9] - 2026-11-25
 
+### Added
+
+- **New SkillHub (skillhub.cn) market tab**: sits beside SKILLS.SH and targets users in China. Supports trending (by downloads), keyword search, paged loading and one-click install
+- Cards show upstream source, download count, version and summary, and flag "paid" / "needs key" when the upstream says so
+- Installs download each file from the upstream manifest and verify its sha256; nothing is written unless every file matches, with path-traversal protection
+
 ### Fixed
 
 - **"Cancel update" did nothing during the fetch phase**: cancelling only set a flag while the git child process kept running, so on a slow network the cancel appeared unresponsive for tens of seconds. Cancellation now uses a real AbortController that kills the running git process — measured to return "update cancelled" within 500 ms
@@ -18,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The former "Market" tab is now **SKILLS.SH**, using the upstream name rather than an invented translation
 - The toolbar button now reads "Check again (N updates)" when updates exist, distinguishing it from the info-row "N updates" (which only filters) — both previously shared a label while behaving differently
 - Update progress and "Cancel update" are no longer limited to the skills tab; they stay visible on other tabs
 

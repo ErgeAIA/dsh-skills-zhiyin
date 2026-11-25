@@ -289,6 +289,69 @@ export function apply(ctx) {
     }),
   )
 
+
+  // skillhub.cn 市场（第二个供应商）：搜索/详情/文件清单/文件正文。
+  // 全部只读，统一过准入闸门——和 skills.sh 那条路同样的口径。
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/search',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubSearch({
+          keyword: url.searchParams.get('keyword') ?? '',
+          category: url.searchParams.get('category') ?? '',
+          sort: url.searchParams.get('sort') ?? '',
+          page: url.searchParams.get('page') ?? '1',
+          pageSize: url.searchParams.get('pageSize') ?? '40',
+        })
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/detail',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubDetail(url.searchParams.get('slug') ?? '')
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/files',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubFiles(url.searchParams.get('slug') ?? '')
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/file',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const url = new URL(String(request.url ?? '/'), 'http://localhost')
+        const result = await skillhubFile(url.searchParams.get('slug') ?? '', url.searchParams.get('path') ?? '')
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+  post(ctx, '/zhiyin/skillhub/install', async (body) => installSkillhubSkill(ctx, body))
+
   // 单个技能的开关；传 names 时合并成一次提交（FR-023 批量提交：  
   // 一次写盘 / 一次 invalidate，目录只翻一遍）。
   post(ctx, '/zhiyin/skill', async (body) => {
@@ -1348,6 +1411,241 @@ function httpGetText(url, timeoutMs = 20000) {
   })
 }
 
+
+/* ------------------------------------------------------- skillhub.cn 市场 */
+
+/**
+ * skillhub.cn 适配层。
+ *
+ * 与 skills.sh 的根本差异：skills.sh 只知道「哪个 GitHub 仓库」，安装要靠 npx/git；
+ * skillhub 有逐文件清单与 sha256，可以直接把技能正文取下来并逐个校验。
+ * 因此这里的安装不依赖 bash、CLI 或登录 —— 这是 Windows 桌面能用的前提。
+ */
+
+const SKILLHUB_BASE = 'https://api.skillhub.cn'
+const SKILLHUB_PAGE_MAX = 100
+const skillhubCache = new Map()
+
+/** 统一缓存：键 + TTL，超限淘汰最旧。市场浏览是高频只读，没必要每次打上游。 */
+function cached(key, ttlMs, produce) {
+  const hit = skillhubCache.get(key)
+  if (hit && Date.now() - hit.at < ttlMs) return { value: hit.value, cached: true }
+  return null
+}
+function remember(key, value) {
+  if (skillhubCache.size >= 40) {
+    const oldest = [...skillhubCache.entries()].sort((a, b) => a[1].at - b[1].at)[0]
+    if (oldest) skillhubCache.delete(oldest[0])
+  }
+  skillhubCache.set(key, { at: Date.now(), value })
+  return value
+}
+
+/** 取 skillhub 的 JSON；上游抖动重试两次，仍失败就把原因带回去。 */
+async function skillhubJson(path, timeoutMs = 15000) {
+  const url = SKILLHUB_BASE + path
+  let lastError = ''
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const text = await httpGetText(url, timeoutMs)
+      return { ok: true, json: JSON.parse(text) }
+    } catch (error) {
+      lastError = String(error?.message ?? error)
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350))
+    }
+  }
+  return { ok: false, error: lastError }
+}
+
+/**
+ * 能力标志：把上游字段翻成界面能直接用的「能不能装、要不要提醒」。
+ * 只描述事实，不替用户做决定。
+ */
+function skillhubCapabilities(raw) {
+  const labels = raw?.labels ?? {}
+  const paid = labels.pricing_type === 'paid'
+  const needsKey = labels.requires_api_key === 'true'
+  const serviceized = raw?.isServiceized === true
+  const notes = []
+  if (paid) notes.push('paid')
+  if (needsKey) notes.push('requires-api-key')
+  if (serviceized) notes.push('serviceized')
+  return { paid, needsKey, serviceized, notes }
+}
+
+/** 安全结论：取最新版本里腾讯两家的扫描结果，只保留有结论的。 */
+function skillhubSecurity(reports) {
+  const out = []
+  for (const key of ['keen', 'sanbu']) {
+    const item = reports?.[key]
+    if (!item) continue
+    out.push({
+      engine: key,
+      status: String(item.status ?? ''),
+      text: String(item.statusText ?? ''),
+      url: String(item.reportUrl ?? ''),
+    })
+  }
+  return out
+}
+
+/** 把一条上游记录归一成界面卡片模型（与 skills.sh 共用一个形状）。 */
+function skillhubCard(raw) {
+  const slug = String(raw?.slug ?? '')
+  const caps = skillhubCapabilities(raw)
+  // slug 在上游不唯一：同一个 slug 会以不同命名空间/来源各存一条（实测 seedance 搜索里
+  // video-generation 与 seedance-prompt-expert 各出现两次）。用它当 React key 会撞车，
+  // 于是把命名空间与来源一起编进 id；两者都缺时才退回 slug。
+  const namespace = String(raw?.namespace?.canonicalName ?? '')
+  const source = String(raw?.source ?? '')
+  const unique = namespace || source || ''
+  return {
+    id: 'skillhub:' + slug + (unique ? '@' + unique : ''),
+    provider: 'skillhub',
+    name: String(raw?.name ?? raw?.displayName ?? slug),
+    slug,
+    namespace: String(raw?.namespace?.canonicalName ?? ''),
+    summary: String(raw?.description_zh || raw?.description || ''),
+    category: String(raw?.category ?? ''),
+    subCategories: Array.isArray(raw?.subCategories) ? raw.subCategories.map((s) => String(s?.name ?? '')).filter(Boolean) : [],
+    version: String(raw?.version ?? ''),
+    downloads: Number(raw?.downloads ?? 0) || 0,
+    installs: Number(raw?.installs ?? 0) || 0,
+    stars: Number(raw?.stars ?? 0) || 0,
+    source: String(raw?.source ?? ''),
+    iconUrl: typeof raw?.iconUrl === 'string' ? raw.iconUrl : '',
+    homepage: typeof raw?.homepage === 'string' ? raw.homepage : '',
+    updatedAt: Number(raw?.updated_at ?? 0) || 0,
+    ...caps,
+    // skillhub 的技能内容可从 API 直接取，所以只要有 slug 就可装。
+    installable: slug.length > 0,
+    url: slug ? 'https://skillhub.cn/skills/' + slug : '',
+    installCommand: slug ? 'skillhub install ' + slug : '',
+  }
+}
+
+/**
+ * 搜索 / 浏览 skillhub。
+ * 空关键词 = 热门（上游无 trending，用 downloads 排序近似）。
+ * 分页硬上限 100：超过会被上游 400 拒绝，这里先夹住，别把错误抛给界面。
+ */
+async function skillhubSearch(options) {
+  const keyword = String(options?.keyword ?? '').trim()
+  const category = String(options?.category ?? '').trim()
+  const sort = String(options?.sort ?? '').trim()
+  const page = Math.max(1, Number(options?.page ?? 1) || 1)
+  const pageSize = Math.min(SKILLHUB_PAGE_MAX, Math.max(1, Number(options?.pageSize ?? 40) || 40))
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  params.set('pageSize', String(pageSize))
+  if (keyword) params.set('keyword', keyword)
+  if (category) params.set('category', category)
+  // 实测参数名是 sortBy，不是 sort —— 写成 sort 会被静默忽略并返回默认序（全是 0 下载的条目）。
+  params.set('sortBy', sort || 'downloads')
+  const cacheKey = 'sh:list:' + params.toString()
+  const hit = cached(cacheKey, 3 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const result = await skillhubJson('/api/skills?' + params.toString())
+  if (!result.ok) return { status: 502, body: { ok: false, error: '连接 skillhub.cn 失败：' + result.error } }
+  const rows = Array.isArray(result.json?.data?.skills) ? result.json.data.skills : []
+  const body = {
+    ok: true,
+    provider: 'skillhub',
+    keyword,
+    category,
+    sort: sort || 'downloads',
+    page,
+    pageSize,
+    total: Number(result.json?.data?.total ?? 0) || 0,
+    count: rows.length,
+    skills: rows.map(skillhubCard),
+  }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+/** 详情：附带版本历史、安全报告、能力标志。 */
+async function skillhubDetail(slug) {
+  const clean = String(slug ?? '').trim()
+  if (!clean) return { status: 400, body: { ok: false, error: '缺少 slug' } }
+  const cacheKey = 'sh:detail:' + clean
+  const hit = cached(cacheKey, 10 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const [detail, versions] = await Promise.all([
+    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean)),
+    skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + '/versions'),
+  ])
+  if (!detail.ok) return { status: 502, body: { ok: false, error: '连接 skillhub.cn 失败：' + detail.error } }
+  const raw = detail.json?.skill ?? {}
+  const latest = detail.json?.latestVersion ?? {}
+  const list = Array.isArray(versions.json?.versions) ? versions.json.versions : []
+  const body = {
+    ok: true,
+    provider: 'skillhub',
+    slug: clean,
+    skill: {
+      ...skillhubCard({
+        ...raw,
+        slug: clean,
+        description_zh: raw.summary_zh || raw.summary || '',
+        updated_at: raw.updatedAt,
+        version: latest.version ?? raw?.tags?.latest ?? '',
+      }),
+      // 详情才有：字数、评论、是否企业、是否认领。
+      comments: Number(raw?.stats?.comments ?? 0) || 0,
+      versions: Number(raw?.stats?.versions ?? 0) || 0,
+      verified: raw?.verified === true,
+      claimState: String(raw?.claim_state ?? ''),
+      owner: String(detail.json?.owner?.displayName ?? ''),
+    },
+    latestVersion: { version: String(latest.version ?? ''), changelog: String(latest.changelog ?? '') },
+    security: skillhubSecurity(list[0]?.securityReports ?? detail.json?.securityReports),
+    versions: list.slice(0, 20).map((v) => ({
+      version: String(v?.version ?? ''),
+      changelog: String(v?.changelog ?? ''),
+      createdAt: Number(v?.createdAt ?? 0) || 0,
+      security: skillhubSecurity(v?.securityReports),
+    })),
+  }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+/**
+ * 文件清单 + 逐文件内容。
+ * 预览只取前若干个小文件，避免把大资产也拉进弹窗。
+ */
+async function skillhubFiles(slug) {
+  const clean = String(slug ?? '').trim()
+  if (!clean) return { status: 400, body: { ok: false, error: '缺少 slug' } }
+  const cacheKey = 'sh:files:' + clean
+  const hit = cached(cacheKey, 10 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const result = await skillhubJson('/api/v1/skills/' + encodeURIComponent(clean) + '/files')
+  if (!result.ok) return { status: 502, body: { ok: false, error: '读取文件清单失败：' + result.error } }
+  const files = (Array.isArray(result.json?.files) ? result.json.files : []).map((f) => ({
+    path: String(f?.path ?? ''),
+    sha256: String(f?.sha256 ?? ''),
+    size: Number(f?.size ?? 0) || 0,
+  }))
+  const body = { ok: true, slug: clean, version: String(result.json?.version ?? ''), count: files.length, files }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+/** 取单个文件正文（预览 SKILL.md 用）。 */
+async function skillhubFile(slug, path) {
+  const clean = String(slug ?? '').trim()
+  const rel = String(path ?? '').trim()
+  if (!clean || !rel) return { status: 400, body: { ok: false, error: '缺少 slug 或 path' } }
+  try {
+    const text = await httpGetText(
+      SKILLHUB_BASE + '/api/v1/skills/' + encodeURIComponent(clean) + '/file?path=' + encodeURIComponent(rel),
+      20000,
+    )
+    return { status: 200, body: { ok: true, slug: clean, path: rel, text } }
+  } catch (error) {
+    return { status: 502, body: { ok: false, error: '读取文件失败：' + String(error?.message ?? error) } }
+  }
+}
+
 const marketCache = new Map()
 const marketDescCache = new Map()
 
@@ -1544,6 +1842,66 @@ function installDirectory(ctx, body, source, fallbackName) {
   }
   invalidateAll()
   return { status: 200, body: { ok: true, name, dest } }
+}
+
+
+/**
+ * 从 skillhub 安装技能。
+ *
+ * 与 GitHub 安装的差别：内容来自 HTTP 逐文件接口，所以必须自己保证「取到的就是清单上的」。
+ * 做法：先取清单 → 全部文件下载并逐个比对 sha256 → 全部通过才落到临时目录 → 再走原子安装。
+ * 任一文件不符就中止，绝不让半套内容进技能目录。
+ */
+async function installSkillhubSkill(ctx, body) {
+  const slug = String(body?.slug ?? '').trim()
+  const target = String(body?.target ?? 'agents')
+  if (!slug) return { status: 400, body: { ok: false, error: '缺少 slug' } }
+  const manifest = await skillhubFiles(slug)
+  if (manifest.status !== 200) return manifest
+  const files = manifest.body.files ?? []
+  if (files.length === 0) return { status: 502, body: { ok: false, error: '这个技能没有文件清单，无法安装' } }
+  if (!files.some((f) => f.path === 'SKILL.md')) {
+    return { status: 502, body: { ok: false, error: '这个技能缺少 SKILL.md，不是合法技能包' } }
+  }
+  const work = mkdtempSync(join(tmpdir(), 'zhiyin-skillhub-'))
+  const bad = []
+  try {
+    for (const file of files) {
+      // 路径穿越防护：上游清单也是外部输入，不能直接当本地路径用。
+      const rel = String(file.path).replace(/\\/g, '/')
+      if (rel.startsWith('/') || rel.split('/').some((part) => part === '..' || part === '')) {
+        bad.push(file.path + '（路径不合法）')
+        continue
+      }
+      const dest = join(work, rel)
+      mkdirSync(dirname(dest), { recursive: true })
+      let buffer
+      try {
+        const text = await httpGetText(
+          SKILLHUB_BASE + '/api/v1/skills/' + encodeURIComponent(slug) + '/file?path=' + encodeURIComponent(file.path),
+          30000,
+        )
+        buffer = Buffer.from(text, 'utf8')
+      } catch (error) {
+        bad.push(file.path + '（下载失败：' + String(error?.message ?? error).slice(0, 80) + '）')
+        continue
+      }
+      const actual = createHash('sha256').update(buffer).digest('hex')
+      if (file.sha256 && actual !== file.sha256) {
+        bad.push(file.path + '（校验不符）')
+        continue
+      }
+      writeFileSync(dest, buffer)
+    }
+    if (bad.length > 0) {
+      return { status: 502, body: { ok: false, error: '内容校验未通过，已放弃安装：' + bad.slice(0, 3).join('；') } }
+    }
+    const installed = installDirectory(ctx, { target, overwrite: body?.overwrite === true }, work, slug)
+    if (installed.status === 200) note('skillhub-installed', { slug, name: installed.body?.name, files: files.length })
+    return installed
+  } finally {
+    try { rmSync(work, { recursive: true, force: true }) } catch { /* 临时目录清不掉不影响结果 */ }
+  }
 }
 
 /** 从直链 SKILL.md 安装：只接受纯文本，写完再走同一套目录安装。 */
@@ -2848,7 +3206,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, skillhubSearch, skillhubDetail, skillhubFiles, skillhubFile, skillhubCard, skillhubCapabilities, installSkillhubSkill, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
 
 function invalidateAll() {
   for (const entry of registrations) {

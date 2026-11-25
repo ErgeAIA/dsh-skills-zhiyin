@@ -23,6 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
+- **最后更新**：2026-11-25 18:1x 0.1.9 续：skillhub.cn 第二个市场接入（B0 契约侦察 → 适配层 → 安装校验 → 前端 Tab）
+  - B0 契约（docs/design/ZhiYin-skillhub-契约.md）：总量 239,241；pageSize 上限 100；**搜索参数是 keyword、排序参数是 sortBy**（写成 q/sort 会被静默忽略，返回默认序——最坑的一处）；详情/版本/文件清单/逐文件内容全部走 /api/v1；无公开 zip 端点，只能逐文件取。
+  - 安装模型与 skills.sh 根本不同：skillhub 有逐文件 sha256 清单，所以「安装 = 按清单下载 + 逐个校验 + 全通过才原子落盘」，不需要 bash/CLI/登录（官方 install.sh 是 macOS/Linux 脚本，Windows 桌面不可用）。
+  - 实测：搜索 keyword=seedance → 974；热门首条 12.28M 下载；文件校验 5/5 全匹配；安装落盘 5 文件、SKILL.md 23564 字节、软链建在隔离 .dsh/skills；技能总数 8→9；无 cookie → 401。
+  - 前端：新增 SkillHub Tab，原「技能市场」更名 SKILLS.SH；中英词条各 14 条已对齐。
+  - 修掉三个实施问题：① slug 上游不唯一（同 slug 多命名空间各一条）导致 React key 撞车、列表渲染错乱 → 改 slug@namespace；② 技能列表工具条泄漏到 SkillHub 页（tab 判断漏排除）；③ 测试隔离不全把技能装进真实 ~/.dsh/skills（BUG-018，已清理，真实目录回到 96 条）。
+  - 隔离纪律：测试必须同时改 USERPROFILE/HOME/DSH_HOME/DSH_AGENTS_HOME 四个变量，前后各数一次真实目录条目数。
 - **最后更新**：2026-11-25 16:2x 0.1.9 分支 feat/0.1.9-cancel-abort——三处边界修复 + 隔离验收实例（待用户验收，未合并/未发版）
   - 根因：取消只是置布尔 `updateApplyCancelled`，git 子进程照跑，拉取阶段点取消要等网络超时；改为 AbortController 真中止（gitRun 支持 signal、gitRetry 遇 abort 不重试、apply 建令牌/cancel abort、取消优先于本地判定、写盘前三道 checkpoint 仍保留）。
   - 真跑（隔离 DSH_HOME，真实 git）：已中止→499；mid-flight 600ms 点取消→499（远快于网络超时，证明确实杀掉子进程）；无来源→404、locally/both-changed→409 不写盘。
