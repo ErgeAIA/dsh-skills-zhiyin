@@ -13,6 +13,7 @@
  */
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { inflateRawSync } from 'node:zlib'
 import { promisify } from 'node:util'
 import { appendFileSync, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -306,6 +307,19 @@ export function apply(ctx) {
           page: url.searchParams.get('page') ?? '1',
           pageSize: url.searchParams.get('pageSize') ?? '40',
         })
+        sendJson(response, result.status, result.body)
+      },
+    }),
+  )
+
+
+  ctx.effect(() =>
+    ctx.webServer.register({
+      kind: 'exact',
+      path: '/zhiyin/skillhub/categories',
+      handler: async (request, response) => {
+        if (refuseUnadmitted(ctx, request, response)) return
+        const result = await skillhubCategories()
         sendJson(response, result.status, result.body)
       },
     }),
@@ -1424,6 +1438,10 @@ function httpGetText(url, timeoutMs = 20000) {
 
 const SKILLHUB_BASE = 'https://api.skillhub.cn'
 const SKILLHUB_PAGE_MAX = 100
+// zip 安装的硬上限：防止上游包异常时把内存或磁盘吃满。
+const SKILLHUB_ZIP_MAX_BYTES = 64 * 1024 * 1024
+const SKILLHUB_ZIP_MAX_FILES = 400
+const SKILLHUB_ZIP_MAX_TOTAL = 128 * 1024 * 1024
 const skillhubCache = new Map()
 
 /** 统一缓存：键 + TTL，超限淘汰最旧。市场浏览是高频只读，没必要每次打上游。 */
@@ -1560,6 +1578,28 @@ async function skillhubSearch(options) {
     count: rows.length,
     skills: rows.map(skillhubCard),
   }
+  return { status: 200, body: remember(cacheKey, body) }
+}
+
+
+/** 分类列表：上游给 13 个一级类目，前端只做只读展示。 */
+async function skillhubCategories() {
+  const cacheKey = 'sh:categories'
+  const hit = cached(cacheKey, 60 * 60 * 1000)
+  if (hit) return { status: 200, body: hit.value }
+  const result = await skillhubJson('/api/v1/categories')
+  if (!result.ok) return { status: 502, body: { ok: false, error: '读取 skillhub 分类失败：' + result.error } }
+  const items = (Array.isArray(result.json?.items) ? result.json.items : [])
+    .filter((item) => Number(item?.level ?? 1) === 1)
+    .map((item) => ({
+      key: String(item?.key ?? ''),
+      name: String(item?.name ?? ''),
+      nameEn: String(item?.nameEn ?? item?.name ?? ''),
+      sortOrder: Number(item?.sortOrder ?? 0) || 0,
+    }))
+    .filter((item) => item.key)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  const body = { ok: true, provider: 'skillhub', count: items.length, categories: items }
   return { status: 200, body: remember(cacheKey, body) }
 }
 
@@ -1851,10 +1891,131 @@ function installDirectory(ctx, body, source, fallbackName) {
 
 
 /**
+ * 下载 zip：有代理时走 curl（继承系统代理），否则用 fetch。
+ * 二进制不能走 httpGetText —— 文本解码会破坏 zip 字节。
+ */
+async function httpGetBuffer(url, timeoutMs = 60000) {
+  const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy
+  if (proxy) {
+    const dir = mkdtempSync(join(tmpdir(), 'zhiyin-zipdl-'))
+    const out = join(dir, 'package.zip')
+    try {
+      const curl = process.platform === 'win32' ? 'curl.exe' : 'curl'
+      await execFileAsync(curl, ['-sS', '-L', '-m', String(Math.max(1, Math.ceil(timeoutMs / 1000))), '-x', proxy, '-o', out, url], {
+        windowsHide: true,
+        timeout: timeoutMs + 3000,
+        maxBuffer: 64 * 1024,
+      })
+      const bytes = readFileSync(out)
+      if (bytes.length > SKILLHUB_ZIP_MAX_BYTES) throw new Error('zip 超过大小上限')
+      return bytes
+    } finally {
+      try { rmSync(dir, { recursive: true, force: true }) } catch { /* 清理失败不影响结果 */ }
+    }
+  }
+  const response = await fetch(url, {
+    headers: { 'user-agent': 'dsh-zhiyin/0.1' },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) throw new Error('HTTP ' + response.status)
+  const bytes = Buffer.from(await response.arrayBuffer())
+  if (bytes.length > SKILLHUB_ZIP_MAX_BYTES) throw new Error('zip 超过大小上限')
+  return bytes
+}
+
+/**
+ * 解析 skillhub 的 zip：只接受 store/deflate，逐项做路径穿越防护与大小上限。
+ * 不解压到磁盘，先返回内存中的文件表，交给调用方按清单校验 sha256。
+ */
+function unzipSkillhubPackage(buffer) {
+  const need = (offset, length, label) => {
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset + length > buffer.length) {
+      throw new Error(label)
+    }
+  }
+  if (!Buffer.isBuffer(buffer) || buffer.length < 22) throw new Error('zip 太小，不是有效安装包')
+  let eocd = -1
+  const floor = Math.max(0, buffer.length - 65557)
+  for (let cursor = buffer.length - 22; cursor >= floor; cursor -= 1) {
+    if (buffer.readUInt32LE(cursor) === 0x06054b50) { eocd = cursor; break }
+  }
+  if (eocd < 0) throw new Error('找不到 zip 结束记录')
+  need(eocd, 22, 'zip 结束记录不完整')
+  const count = buffer.readUInt16LE(eocd + 10)
+  const directorySize = buffer.readUInt32LE(eocd + 12)
+  const directoryOffset = buffer.readUInt32LE(eocd + 16)
+  if (count < 1 || count > SKILLHUB_ZIP_MAX_FILES) throw new Error('zip 文件数量异常')
+  if (directorySize === 0xffffffff || directoryOffset === 0xffffffff) throw new Error('不支持 zip64 安装包')
+  need(directoryOffset, directorySize, 'zip 目录越界')
+
+  const out = []
+  const seen = new Set()
+  let totalUncompressed = 0
+  let cursor = directoryOffset
+  for (let index = 0; index < count; index += 1) {
+    need(cursor, 46, 'zip 目录项不完整')
+    if (buffer.readUInt32LE(cursor) !== 0x02014b50) throw new Error('zip 目录签名不对')
+    const flags = buffer.readUInt16LE(cursor + 8)
+    const method = buffer.readUInt16LE(cursor + 10)
+    const compressedSize = buffer.readUInt32LE(cursor + 20)
+    const uncompressedSize = buffer.readUInt32LE(cursor + 24)
+    const nameLength = buffer.readUInt16LE(cursor + 28)
+    const extraLength = buffer.readUInt16LE(cursor + 30)
+    const commentLength = buffer.readUInt16LE(cursor + 32)
+    const localOffset = buffer.readUInt32LE(cursor + 42)
+    if (flags & 1) throw new Error('zip 已加密，无法安装')
+    if (method !== 0 && method !== 8) throw new Error('zip 使用了不支持的压缩方式')
+    if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff) throw new Error('不支持 zip64 安装包')
+    if (uncompressedSize > SKILLHUB_ZIP_MAX_TOTAL - totalUncompressed) throw new Error('zip 解压后体积超过上限')
+    need(cursor + 46, nameLength + extraLength + commentLength, 'zip 文件名越界')
+    const entryName = buffer.slice(cursor + 46, cursor + 46 + nameLength).toString('utf8')
+    // 路径只允许 POSIX 相对路径：反斜杠、绝对路径、盘符、.. 一律拒绝。
+    if (entryName.indexOf(String.fromCharCode(0)) >= 0 || entryName.indexOf(String.fromCharCode(92)) >= 0) {
+      throw new Error('zip 里有不合法的路径')
+    }
+    let rel = entryName
+    if (rel.startsWith('/') || /^[A-Za-z]:/.test(rel) || rel.split('/').some((part) => !part || part === '.' || part === '..')) {
+      throw new Error('zip 里有不合法的路径：' + rel)
+    }
+    if (seen.has(rel)) throw new Error('zip 里有重复路径：' + rel)
+    need(localOffset, 30, 'zip 本地头越界')
+    if (buffer.readUInt32LE(localOffset) !== 0x04034b50) throw new Error('zip 本地头签名不对')
+    const localNameLength = buffer.readUInt16LE(localOffset + 26)
+    const localExtraLength = buffer.readUInt16LE(localOffset + 28)
+    const dataOffset = localOffset + 30 + localNameLength + localExtraLength
+    need(dataOffset, compressedSize, 'zip 数据越界')
+    const packed = buffer.slice(dataOffset, dataOffset + compressedSize)
+    let data
+    try {
+      data = method === 0 ? packed : inflateRawSync(packed)
+    } catch {
+      throw new Error('zip 解压失败：' + rel)
+    }
+    if (data.length !== uncompressedSize) throw new Error('zip 文件大小不符：' + rel)
+    seen.add(rel)
+    out.push({ path: rel, data })
+    totalUncompressed += uncompressedSize
+    cursor += 46 + nameLength + extraLength + commentLength
+  }
+  // 有些发布包会把技能放进一层顶层目录；只要 SKILL.md 唯一，就把这层前缀剥掉。
+  if (!out.some((file) => file.path === 'SKILL.md')) {
+    const candidates = out.filter((file) => file.path.endsWith('/SKILL.md'))
+    if (candidates.length !== 1) throw new Error('zip 里没有根目录 SKILL.md')
+    const prefix = candidates[0].path.slice(0, -'SKILL.md'.length)
+    for (const file of out) {
+      if (!file.path.startsWith(prefix)) throw new Error('zip 目录层级不一致')
+      file.path = file.path.slice(prefix.length)
+    }
+    if (!out.some((file) => file.path === 'SKILL.md')) throw new Error('zip 里没有 SKILL.md')
+  }
+  return out
+}
+
+/**
  * 从 skillhub 安装技能。
  *
- * 与 GitHub 安装的差别：内容来自 HTTP 逐文件接口，所以必须自己保证「取到的就是清单上的」。
- * 做法：先取清单 → 全部文件下载并逐个比对 sha256 → 全部通过才落到临时目录 → 再走原子安装。
+ * 与 GitHub 安装的差别：内容来自 zip 包。做法：先取文件清单 → 下载 zip →
+ * 解包 → 逐文件比对 sha256 → 全部通过才落到临时目录 → 再走原子安装。
  * 任一文件不符就中止，绝不让半套内容进技能目录。
  */
 async function installSkillhubSkill(ctx, body) {
@@ -1863,46 +2024,46 @@ async function installSkillhubSkill(ctx, body) {
   if (!slug) return { status: 400, body: { ok: false, error: '缺少 slug' } }
   const manifest = await skillhubFiles(slug)
   if (manifest.status !== 200) return manifest
-  const files = manifest.body.files ?? []
-  if (files.length === 0) return { status: 502, body: { ok: false, error: '这个技能没有文件清单，无法安装' } }
-  if (!files.some((f) => f.path === 'SKILL.md')) {
+  const expectedFiles = manifest.body.files ?? []
+  if (expectedFiles.length === 0) return { status: 502, body: { ok: false, error: '这个技能没有文件清单，无法安装' } }
+  if (!expectedFiles.some((file) => file.path === 'SKILL.md')) {
     return { status: 502, body: { ok: false, error: '这个技能缺少 SKILL.md，不是合法技能包' } }
   }
-  const work = mkdtempSync(join(tmpdir(), 'zhiyin-skillhub-'))
-  const bad = []
+  let archive
   try {
-    for (const file of files) {
-      // 路径穿越防护：上游清单也是外部输入，不能直接当本地路径用。
-      const rel = String(file.path).replace(/\\/g, '/')
-      if (rel.startsWith('/') || rel.split('/').some((part) => part === '..' || part === '')) {
-        bad.push(file.path + '（路径不合法）')
-        continue
-      }
-      const dest = join(work, rel)
+    archive = await httpGetBuffer(SKILLHUB_BASE + '/api/v1/download?slug=' + encodeURIComponent(slug))
+  } catch (error) {
+    return { status: 502, body: { ok: false, error: '下载 zip 失败：' + String(error?.message ?? error).slice(0, 160) } }
+  }
+  let unpacked
+  try {
+    unpacked = unzipSkillhubPackage(archive)
+  } catch (error) {
+    return { status: 502, body: { ok: false, error: '解析 zip 失败：' + String(error?.message ?? error).slice(0, 160) } }
+  }
+  const expected = new Map(expectedFiles.map((file) => [file.path, file]))
+  const bad = []
+  for (const file of unpacked) {
+    const meta = expected.get(file.path)
+    if (!meta) { bad.push(file.path + '（清单里没有）'); continue }
+    const actual = createHash('sha256').update(file.data).digest('hex')
+    if (meta.sha256 && actual !== meta.sha256) bad.push(file.path + '（校验不符）')
+  }
+  for (const meta of expectedFiles) {
+    if (!unpacked.some((file) => file.path === meta.path)) bad.push(meta.path + '（zip 里缺失）')
+  }
+  if (bad.length > 0) {
+    return { status: 502, body: { ok: false, error: 'zip 校验未通过，已放弃安装：' + bad.slice(0, 3).join('；') } }
+  }
+  const work = mkdtempSync(join(tmpdir(), 'zhiyin-skillhub-'))
+  try {
+    for (const file of unpacked) {
+      const dest = join(work, file.path)
       mkdirSync(dirname(dest), { recursive: true })
-      let buffer
-      try {
-        const text = await httpGetText(
-          SKILLHUB_BASE + '/api/v1/skills/' + encodeURIComponent(slug) + '/file?path=' + encodeURIComponent(file.path),
-          30000,
-        )
-        buffer = Buffer.from(text, 'utf8')
-      } catch (error) {
-        bad.push(file.path + '（下载失败：' + String(error?.message ?? error).slice(0, 80) + '）')
-        continue
-      }
-      const actual = createHash('sha256').update(buffer).digest('hex')
-      if (file.sha256 && actual !== file.sha256) {
-        bad.push(file.path + '（校验不符）')
-        continue
-      }
-      writeFileSync(dest, buffer)
-    }
-    if (bad.length > 0) {
-      return { status: 502, body: { ok: false, error: '内容校验未通过，已放弃安装：' + bad.slice(0, 3).join('；') } }
+      writeFileSync(dest, file.data)
     }
     const installed = installDirectory(ctx, { target, overwrite: body?.overwrite === true }, work, slug)
-    if (installed.status === 200) note('skillhub-installed', { slug, name: installed.body?.name, files: files.length })
+    if (installed.status === 200) note('skillhub-zip-installed', { slug, name: installed.body?.name, files: unpacked.length })
     return installed
   } finally {
     try { rmSync(work, { recursive: true, force: true }) } catch { /* 临时目录清不掉不影响结果 */ }
@@ -3211,7 +3372,7 @@ function shadowCandidates() {
   return out
 }
 
-export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, skillhubSearch, skillhubDetail, skillhubFiles, skillhubFile, skillhubCard, skillhubCapabilities, installSkillhubSkill, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
+export const __test = { hiddenReason, shadowCandidates, agentKey, resolveGithubSource, findSkillDirs, skillFrontmatterName, marketSearch, marketDescription, extractLdDescription, skillhubSearch, skillhubCategories, skillhubDetail, skillhubFiles, skillhubFile, skillhubCard, skillhubCapabilities, httpGetBuffer, unzipSkillhubPackage, installSkillhubSkill, listArchive, restoreArchive, parseArchiveKey, rememberArchiveOrigin, readArchiveOrigins, skillDirectory, deleteArchive, gitUsable, blobSha1, treeDigest, localSkillDigest, upstreamRefSha, upstreamTreeDigest, backfillProvenance, runUpdateCheck, suggestUpstreamPath, updateSkillFromUpstream, scheduleUpdateCheck, prepareRepo, treeDigestFromOutput }
 
 function invalidateAll() {
   for (const entry of registrations) {

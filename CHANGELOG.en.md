@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **New SkillHub (skillhub.cn) market tab**: sits beside SKILLS.SH and targets users in China. Supports trending (by downloads), keyword search, paged loading and one-click install
 - Cards show upstream source, download count, version and summary, and flag "paid" / "needs key" when the upstream says so
-- Installs download each file from the upstream manifest and verify its sha256; nothing is written unless every file matches, with path-traversal protection
+- Filter by 13 categories and sort by downloads / relevance / recently updated / stars / installs
+- Installs now use a **single zip package**: each extracted file is checked against the upstream sha256 manifest; encrypted, zip64, path-traversal and oversized packages are rejected
 - **SkillHub detail dialog**: click a skill name to review security scans (Tencent keen/sanbu), latest changes, file list, SKILL.md preview and version history before installing
 
 ### Fixed

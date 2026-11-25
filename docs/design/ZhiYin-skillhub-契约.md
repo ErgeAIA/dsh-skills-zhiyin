@@ -33,7 +33,7 @@ skillhub.cn **可接**，而且比 skills.sh 更可控：有逐文件 sha256 清
 ### 3.1 列表 / 搜索
 
 ```
-GET /api/skills?page=1&pageSize=100&keyword=<词>&category=<分类>&sort=<排序>
+GET /api/skills?page=1&pageSize=100&keyword=<词>&category=<分类>&sortBy=<排序>
 ```
 
 - 返回：`{ code: 0, data: { skills: [...], total: N } }`
@@ -81,7 +81,23 @@ GET /api/v1/skills/{slug}/file?path=<相对路径>
 
 返回纯文本/二进制内容。**实测 5/5 文件的 sha256 与清单完全一致。**
 
-### 3.6 平台签名（可选增强）
+### 3.6 分类
+
+```
+GET /api/v1/categories
+```
+
+实测返回 `{ count: 13, items: [...] }`，每个类目含 `key/name/nameEn/level/sortOrder`，均为一级类目。
+
+### 3.7 整包 zip（安装用）
+
+```
+GET /api/v1/download?slug=<slug>
+```
+
+实测返回 `application/zip`，magic `504b0304`。**该端点不接受 namespace**（传了返回 404），所以同名 slug 的安装仍按 slug 取，这是上游限制。
+
+### 3.8 平台签名（可选增强）
 
 ```
 GET /api/v1/open/skills/{slug}/versions/{version}/signature
@@ -96,7 +112,7 @@ payload 内含 `package_md5, file_count, publisher_id, publisher_real_name_verif
 | --- | --- |
 | `GET /api/skills/{slug}`（无 v1） | 405 |
 | `GET /api/v1/skills`（无 slug，带 keyword） | 405（列表只在 `/api/skills`） |
-| `…/{slug}/download` / `/package` / `/zip` / `/content` | 全部 405 |
+| `…/{slug}/download` / `/package` / `/zip` / `/content` | 这些子路径全部 405；但 `/api/v1/download?slug=` 可用（见 3.7） |
 | `…/{slug}.zip` | 405；`skillhub.cn/skills/{slug}.zip` 返回 200 但是 HTML 404 页 |
 | 打包 zip 下载 | **不存在公开端点**——只能逐文件取 |
 | `POST /api/skills` | 401（需登录） |
@@ -129,16 +145,20 @@ payload 内含 `package_md5, file_count, publisher_id, publisher_real_name_verif
 
 | 位置 | 内容 |
 | --- | --- |
-| `index.js` | `skillhubSearch / skillhubDetail / skillhubFiles / skillhubFile / skillhubCard / skillhubCapabilities / installSkillhubSkill` |
-| 路由 | `GET /zhiyin/skillhub/{search,detail,files,file}`、`POST /zhiyin/skillhub/install`，全部过 `refuseUnadmitted` 准入 |
-| `client.js` | 新增 `SkillHub` Tab（原「技能市场」更名 `SKILLS.SH`），独立搜索/分页/安装状态，中英词条各 14 条 |
-| 安装 | 按清单逐文件下载 → 逐个比 sha256 → 全通过才原子落盘；路径穿越防护；任一不符即中止 |
+| `index.js` | `skillhubSearch / skillhubCategories / skillhubDetail / skillhubFiles / skillhubFile / skillhubCard / skillhubCapabilities / httpGetBuffer / unzipSkillhubPackage / installSkillhubSkill` |
+| 路由 | `GET /zhiyin/skillhub/{search,categories,detail,files,file}`、`POST /zhiyin/skillhub/install`，全部过 `refuseUnadmitted` 准入 |
+| `client.js` | 新增 `SkillHub` Tab（原「技能市场」更名 `SKILLS.SH`），独立搜索/分类/排序/分页/安装状态，详情弹窗（安全扫描/变更/文件清单/SKILL.md 预览/版本历史） |
+| 安装 | 改为**整包 zip**：取清单 → 下载 zip → 自研最小解析器解包 → 逐文件比 sha256 → 全通过才原子落盘；store/deflate；加密/zip64/路径穿越/大小上限全部拒绝 |
 
 **实测证据**（2026-11-25，隔离 `USERPROFILE`/`HOME`/`DSH_HOME`/`DSH_AGENTS_HOME`）：
 - 搜索 `keyword=seedance` → total 974；空关键词 → total 239,241，首条下载 12.28M
 - 详情 → 版本 2.1.7、腾讯 keen/sanbu 双引擎 `benign`
-- 文件清单 5 个，逐文件 sha256 **5/5 全部匹配**
+- 文件清单 5 个；zip 解包 5 个，sha256 **5/5 全部匹配**
+- 手写含 `../SKILL.md` / 绝对路径 / 盘符 / 多点穿越 / 正常路径的 zip：前四个全部拒绝，正常路径接受
 - 安装 → 5 文件落盘、`SKILL.md` 23,564 字节、软链建在隔离 `.dsh/skills`
+- UI 点安装 → 技能总数 9 → 10，出现「已安装」，无错误
+- 分类 13 项、排序 5 项均实测有效；无效排序值上游返 400
+- 详情弹窗实测：安全扫描、版本历史、文件清单、SKILL.md 预览均显示
 - 真实 `~/.dsh/skills` 前后均为 96 条（未受影响）
 - 无 cookie 请求 → 401（准入闸门生效）
 
@@ -167,10 +187,11 @@ payload 内含 `package_md5, file_count, publisher_id, publisher_real_name_verif
 1. **slug 不唯一**：同一 slug 会以不同命名空间各存一条（`video-generation`、`seedance-prompt-expert` 在搜索结果里各出现两次）。直接当 React key 会撞车，导致列表渲染错乱。已改为 `slug@namespace`。
 2. **测试隔离不全导致泄漏**：见 BUG-018——`dshSkillsRoot()` 用 `homedir()`，只设 `DSH_HOME` 不够，必须同时改 `USERPROFILE`/`HOME`。
 3. **工具条条件漏排除**：技能列表的搜索框一度渲染到 SkillHub 页，因为 `tab !== 'market'` 没带上 `'skillhub'`。
+4. **排序参数**：`sort` 被静默忽略，必须用 `sortBy`；无效值会 400。
+5. **zip 不支持 namespace**：详情支持 `?namespace=handle` 区分同名 slug，但 `/api/v1/download` 传 namespace 会 404，只能按 slug 安装。
 
 ## 9. 未验证 / 风险
 
-- **未验证**：`/file?path=` 对二进制（图片、字体）是否原样返回（本次样本全是文本）。
-- **未验证**：大技能（数百文件）逐文件下载的耗时；需要并发与进度反馈。
-- **未验证**：ToS 是否允许第三方客户端读取 `/api/v1`。**上线前必须确认**，这是合规红线。
+- **未验证**：`/file?path=` 对二进制（图片、字体）是否原样返回；现在安装走 zip，预览仍走这个接口。
+- **未验证**：ToS 是否允许第三方客户端读取 `/api/v1`。已有公开插件按"独立客户端 + 公开目录 + 收录非背书 + 技能不可信"口径接入，但没有书面许可。
 - **风险**：接口无版本承诺，`/api/v1` 可能变；需要超时/缓存/降级，且失败不影响 skills.sh 那条路。
