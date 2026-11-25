@@ -23,6 +23,12 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
+- **最后更新**：2026-11-25 21:3x 0.1.9 已发布（取消真中止 + skillhub.cn 市场）
+  - npm latest=0.1.9，shasum f55be3ee、provenance 正常、22 文件；GitHub Release v0.1.9 触发 OIDC 发布，25 秒完成，全程无令牌。
+  - 隔离安装实测：clean cache + 显式 0.1.9 → 下载并装成 0.1.9，dump-config 含 zhiyin。**注意**：同一台机器若 pnpm 本地 store 已有旧版本，未指定版本号时可能装到缓存里的旧版（首次实测拿到 0.1.4）；用户侧以市场给出的版本号为准，必要时显式指定版本。
+  - 分支已按纪律收口：feat/0.1.9-cancel-abort 确认全量合入 main（无未合提交）后删除本地分支；远端本就无此分支。
+  - 本次范围：① 取消改 AbortController 真中止（500ms 内生效）；② 新增 SkillHub Tab（原市场更名 SKILLS.SH），13 分类 + 5 排序 + 分页；③ 详情弹窗（安全扫描/变更/SKILL.md 渲染预览/版本历史/文件清单手风琴）；④ 安装改整包 zip + 逐文件 sha256 校验；⑤ 修深色主题下拉不可见、弹窗对比度、重复关闭按钮。
+  - 未验证：desktop 端需等市场刷新（约次日 10:23 北京）才能装到 0.1.9。
 - **最后更新**：2026-11-25 18:1x 0.1.9 续：skillhub.cn 第二个市场接入（B0 契约侦察 → 适配层 → 安装校验 → 前端 Tab）
   - B0 契约（docs/design/ZhiYin-skillhub-契约.md）：总量 239,241；pageSize 上限 100；**搜索参数是 keyword、排序参数是 sortBy**（写成 q/sort 会被静默忽略，返回默认序——最坑的一处）；详情/版本/文件清单/逐文件内容全部走 /api/v1；无公开 zip 端点，只能逐文件取。
   - 安装模型与 skills.sh 根本不同：skillhub 有逐文件 sha256 清单，所以「安装 = 按清单下载 + 逐个校验 + 全通过才原子落盘」，不需要 bash/CLI/登录（官方 install.sh 是 macOS/Linux 脚本，Windows 桌面不可用）。
