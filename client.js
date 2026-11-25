@@ -1953,6 +1953,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [hubPreview, setHubPreview] = React.useState('')
       const [hubPreviewLoading, setHubPreviewLoading] = React.useState(false)
       const [hubPreviewError, setHubPreviewError] = React.useState('')
+      // 文件清单默认收起：长清单（实测有 72 个文件）会把预览挤出屏幕。
+      const [hubFilesOpen, setHubFilesOpen] = React.useState(false)
       const [marketMore, setMarketMore] = React.useState(false)  // 正在加载更多
       const [marketRefreshing, setMarketRefreshing] = React.useState(false) // 刷新按钮自己的执行态
       /**
@@ -2362,6 +2364,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setHubDetail(null)
         setHubDetailError('')
         setHubFiles([])
+        setHubFilesOpen(false)
         setHubPreview('')
         setHubPreviewError('')
         setHubDetailLoading(true)
@@ -2400,6 +2403,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
         setHubDetail(null)
         setHubDetailError('')
         setHubFiles([])
+        setHubFilesOpen(false)
         setHubPreview('')
         setHubPreviewError('')
         setHubDetailLoading(false)
@@ -3645,22 +3649,36 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                                   h('div', { style: { ...css.costBullet, whiteSpace: 'pre-wrap' } }, hubDetail.latestVersion.changelog),
                                 )
                               : null,
-                            hubFiles.length > 0
-                              ? h(
-                                  'div',
-                                  { style: { marginBottom: 12 } },
-                                  h('div', { style: css.costHead }, say('hubFilesHead', '文件清单') + '（' + hubFiles.length + '）'),
-                                  ...hubFiles.map((file) =>
-                                    h('div', { key: file.path, style: { ...css.costBullet, fontFamily: 'monospace', fontSize: fs.meta } }, file.path),
-                                  ),
-                                )
-                              : null,
                             h('div', { style: css.costHead }, say('hubPreviewHead', 'SKILL.md 预览')),
                             hubPreviewLoading
                               ? h('div', { style: css.hint }, say('hubPreviewLoading', '正在读取 SKILL.md…'))
                               : hubPreviewError
                                 ? h('div', { style: css.errorBox }, hubPreviewError)
-                                : h('pre', { style: css.guidePre }, hubPreview.slice(0, 12000)),
+                                : h('pre', { style: { ...css.guidePre, maxHeight: 280, overflowY: 'auto' } }, hubPreview.slice(0, 12000)),
+                            // 文件清单默认收起：它是参考材料，不该抢在预览前面占满弹窗。
+                            hubFiles.length > 0
+                              ? h(
+                                  'div',
+                                  { style: { marginTop: 12 } },
+                                  h('button', {
+                                    type: 'button',
+                                    'aria-expanded': hubFilesOpen,
+                                    onClick: () => setHubFilesOpen((open) => !open),
+                                    style: { ...css.costHead, display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' },
+                                  },
+                                    h('span', { style: { display: 'inline-flex', transform: hubFilesOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' } },
+                                      h(Icon, { name: 'chevronDown', size: 13 })),
+                                    say('hubFilesHead', '文件清单') + '（' + hubFiles.length + '）',
+                                  ),
+                                  hubFilesOpen
+                                    ? h('div', { style: { marginTop: 6 } },
+                                        ...hubFiles.map((file) =>
+                                          h('div', { key: file.path, style: { ...css.costBullet, fontFamily: 'monospace', fontSize: fs.meta } }, file.path),
+                                        ),
+                                      )
+                                    : null,
+                                )
+                              : null,
                             (hubDetail.versions ?? []).length > 1
                               ? h(
                                   'div',

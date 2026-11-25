@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cards show upstream source, download count, version and summary, and flag "paid" / "needs key" when the upstream says so
 - Filter by 13 categories and sort by downloads / relevance / recently updated / stars / installs
 - Installs now use a **single zip package**: each extracted file is checked against the upstream sha256 manifest; encrypted, zip64, path-traversal and oversized packages are rejected
-- **SkillHub detail dialog**: click a skill name to review security scans (Tencent keen/sanbu), latest changes, file list, SKILL.md preview and version history before installing
+- **SkillHub detail dialog**: click a skill name to review security scans (Tencent keen/sanbu), latest changes, SKILL.md preview and version history before installing
+- SKILL.md preview now sits above the file list, and the file list is a collapsed accordion by default
 
 ### Fixed
 

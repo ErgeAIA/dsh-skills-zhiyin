@@ -31,7 +31,7 @@ description: >
   - 修掉三个实施问题：① slug 上游不唯一（同 slug 多命名空间各一条）导致 React key 撞车、列表渲染错乱 → 改 slug@namespace；② 技能列表工具条泄漏到 SkillHub 页（tab 判断漏排除）；③ 测试隔离不全把技能装进真实 ~/.dsh/skills（BUG-018，已清理，真实目录回到 96 条）。
   - 隔离纪律：测试必须同时改 USERPROFILE/HOME/DSH_HOME/DSH_AGENTS_HOME 四个变量，前后各数一次真实目录条目数。
   - 参考实现核实（读源码，不抄）：vonweller 接公开目录、安装走 /api/v1/download?slug 整包 zip、NOTICE/SECURITY 有"独立客户端/公开目录/收录非背书/技能不可信"口径；aa2246740 不连远程目录，仅本地可见性。ToS 无书面授权，但公开可读 + 第三方按独立客户端接入两事实成立。
-  - 详情弹窗（0.1.9）：点技能名打开；展示安全扫描（keen/sanbu）、最新变更、文件清单、SKILL.md 预览、版本历史；详情支持 namespace 区分同名 slug；修掉浅色主题下弹窗深底继承暗字对比度不足的问题（css.modal 补 foreground token）。实测浏览器弹窗各区块正常显示。左下角重复「关闭」已按用户反馈删掉，只留右上角 ×。
+  - 详情弹窗（0.1.9）：点技能名打开；展示安全扫描（keen/sanbu）、最新变更、SKILL.md 预览、版本历史；文件清单改为手风琴（默认收起，点标题展开）。预览排在清单上方并限高 280px 内部滚动，避免长清单把预览挤出屏幕。详情支持 namespace 区分同名 slug；修掉浅色主题下深底继承暗字对比度不足（css.modal 补 foreground token）。实测：预览在清单前；手风琴默认 aria-expanded=false / 0 行，点开后 72 行。左下角重复「关闭」已删，只留右上角 ×。
   - zip 安装（0.1.9）：按参考插件思路改用 `/api/v1/download?slug=` 整包 zip（上游不支持 namespace 参数）；宿主自研最小 zip 解析器（store/deflate + EOCD/中央目录），逐文件按 `/files` 清单校验 sha256；拒绝加密/zip64/路径穿越/超大包。实测：手写恶意路径 zip 四种全部拒绝；真实包装 5 文件、SKILL.md 23564 字节；UI 安装技能总数 9→10；真实目录 96→96。
   - 分类/排序（0.1.9）：新增 `/zhiyin/skillhub/categories` 只读路由；前端 13 类下拉 + 5 种排序（downloads/score/updated_at/stars/installs，均实测有效）。修复标题写死「按下载量排序」的问题，现在显示当前分类与排序。
 - **最后更新**：2026-11-25 16:2x 0.1.9 分支 feat/0.1.9-cancel-abort——三处边界修复 + 隔离验收实例（待用户验收，未合并/未发版）
