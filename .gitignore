@@ -70,3 +70,6 @@ _temp/
 # 打包与本地验证输出
 *.zip
 pack-out/
+
+# 临时验收实例（隔离 DSH_HOME + 假数据，不入库）
+.verify-tmp/

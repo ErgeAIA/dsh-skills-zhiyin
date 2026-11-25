@@ -63,11 +63,14 @@ window.__ModuleLoader__.load({
         checkNow: '立即检查',
         checkUpdatesHint: '按上游仓库检查技能是否有新版本；每天启动后会自动检查一次',
         checkUpdatesFound: '有 {n} 个更新',
+        recheckUpdates: '重新检查（有 {n} 个更新）',
         updateBadge: '有更新',
         updateLocalOnly: '本地已改',
         updateApplyHint: '更新到上游当前版本；本地没改过才允许',
         updateAsk: '把「{name}」更新到上游当前版本？会原子替换技能文件，软链接保持不动。',
         cancelUpdate: '取消更新',
+        updateCancelled: '已取消更新，技能未改动',
+        dismiss: '知道了',
         updatingSkill: '正在更新 {name}…',
         updateBlockedHint: '本地内容被改过：点一下可先备份到归档再强制更新',
         forceUpdateAsk: '本地内容被改过。先把当前版本整份备份到归档，再用上游版本覆盖？',
@@ -362,11 +365,14 @@ window.__ModuleLoader__.load({
         checkNow: 'Check now',
         checkUpdatesHint: 'Check each upstream repo for a newer version; also runs once a day after startup',
         checkUpdatesFound: '{n} updates',
+        recheckUpdates: 'Check again ({n} updates)',
         updateBadge: 'Update',
         updateLocalOnly: 'Edited',
         updateApplyHint: 'Update to the current upstream version (only when the local copy is unedited)',
         updateAsk: 'Update {name} to the current upstream version? Skill files are replaced atomically; symlinks stay untouched.',
         cancelUpdate: 'Cancel update',
+        updateCancelled: 'Update cancelled; the skill was not changed',
+        dismiss: 'Got it',
         updatingSkill: 'Updating {name}…',
         updateBlockedHint: 'Local files were edited; click to back up and force the update',
         forceUpdateAsk: 'The local copy was edited. Back it up to the archive first, then overwrite with the upstream version?',
@@ -1951,6 +1957,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       // 更新动作独立于全局 busy：检查一轮要一两分钟，不该把整页按钮都锁死。
       const [updateBusy, setUpdateBusy] = React.useState('')
+      // 用户主动取消后给一句中性提示（不是错误）；下次发起更新时清掉。
+      const [cancelNotice, setCancelNotice] = React.useState('')
       const [intervalOpen, setIntervalOpen] = React.useState(false)
       const [openInfo, setOpenInfo] = React.useState('')
       const cancelUpdates = React.useCallback(() => {
@@ -2015,13 +2023,19 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           if (!ok) return
         }
         setUpdateBusy(name)
+        setCancelNotice('')
         fetch('/zhiyin/updates/apply', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(force === true ? { name, force: true } : { name }),
         })
-          .then((response) => response.json())
-          .then((result) => {
+          .then((response) => response.json().then((result) => ({ result, status: response.status })))
+          .then(({ result, status }) => {
+            // 用户自己点取消不是错误：不该弹红字，给一句中性说明就好。
+            if (status === 499 || result?.cancelled === true) {
+              setCancelNotice(say('updateCancelled', '已取消更新，技能未改动'))
+              return null
+            }
             if (!result || result.ok !== true) throw new Error(result?.error ?? '更新失败')
             return null
           })
@@ -3092,7 +3106,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     }, updateBusy === 'check'
                       ? h(Spinner, { size: 14 })
                       : updateCount > 0
-                        ? say('checkUpdatesFound', '有 {n} 个更新').replace('{n}', String(updateCount))
+                        // 文案必须说清这是「再查一次」：和上方信息区的「有 N 个更新」是筛选，点错了会以为筛选坏了。
+                        ? say('recheckUpdates', '重新检查（有 {n} 个更新）').replace('{n}', String(updateCount))
                         : say('checkUpdates', '检查更新')),
                     tab === 'list'
                       ? h(
@@ -3107,7 +3122,16 @@ function Switch({ label, hint, checked, disabled, onChange }) {
           : null,
 
         // 更新中的进度提示：明确告诉用户正在写哪个技能，并可中断。
-        updateBusy && updateBusy !== 'check' && tab === 'list'
+        // 取消后的中性回执：说明技能没被动过，并允许用户自己关掉。
+        cancelNotice && updateBusy === ''
+          ? h('div', { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 0' } },
+              h('span', null, cancelNotice),
+              h('button', { type: 'button', style: { ...css.btn, padding: '4px 10px' }, onClick: () => setCancelNotice('') }, say('dismiss', '知道了')),
+            )
+          : null,
+
+        // 更新中切到别的标签页也要能看到进度和「取消更新」，否则取消入口会凭空消失。
+        updateBusy && updateBusy !== 'check'
           ? h('div', { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 0', color: 'var(--zhiyin-accent, #e0743c)' } },
               h(Spinner, { size: 14 }),
               h('span', null, say('updatingSkill', '正在更新 {name}…').replace('{name}', updateBusy)),

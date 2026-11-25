@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-25
+
+### Fixed
+
+- **"Cancel update" did nothing during the fetch phase**: cancelling only set a flag while the git child process kept running, so on a slow network the cancel appeared unresponsive for tens of seconds. Cancellation now uses a real AbortController that kills the running git process — measured to return "update cancelled" within 500 ms
+- Cancelling no longer surfaces a red error; it shows a neutral "Update cancelled; the skill was not changed" notice
+
+### Changed
+
+- The toolbar button now reads "Check again (N updates)" when updates exist, distinguishing it from the info-row "N updates" (which only filters) — both previously shared a label while behaving differently
+- Update progress and "Cancel update" are no longer limited to the skills tab; they stay visible on other tabs
+
+### Notes
+
+- Cancellation takes precedence over the "locally modified" verdict: once the user has cancelled, the panel no longer answers with a local-edit warning
+
 ## [0.1.8] - 2026-11-25
 
 ### Added

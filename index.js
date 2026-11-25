@@ -799,15 +799,25 @@ export function apply(ctx) {
   })
 
   post(ctx, '/zhiyin/updates/apply', async (body) => {
-    updateApplyCancelled = false
-    const result = await updateSkillFromUpstream(ctx, body?.name, { force: body?.force === true })
-    updateApplyCancelled = false
-    return result
+    // 一次更新一个令牌：新的 apply 顶掉旧的，避免上一次的取消信号串到这一次。
+    const controller = new AbortController()
+    updateApplyRun = controller
+    try {
+      return await updateSkillFromUpstream(ctx, body?.name, {
+        force: body?.force === true,
+        signal: controller.signal,
+      })
+    } finally {
+      if (updateApplyRun === controller) updateApplyRun = null
+    }
   })
 
   post(ctx, '/zhiyin/updates/cancel', async () => {
-    updateApplyCancelled = true
-    return { status: 200, body: { ok: true } }
+    // 没有在跑的更新也要回 ok：界面可能刚好错过那一帧，不该报错。
+    const run = updateApplyRun
+    if (!run) return { status: 200, body: { ok: true, cancelled: false } }
+    run.abort()
+    return { status: 200, body: { ok: true, cancelled: true } }
   })
 
   post(ctx, '/zhiyin/provenance/backfill', async () => {
@@ -1860,7 +1870,9 @@ const execFileAsync = promisify(execFile)
 // 同一仓库+同一 HEAD 的 ls-tree 全树输出缓存：只在单轮检查内有效，避免重复 git 调用。
 let treeCache = { key: null, out: null }
 let updateCheckRunning = null
-let updateApplyCancelled = false
+// 取消必须能真正打断在跑的 git：只置一个布尔量时命令还在跑，用户在拉取阶段点取消会像「没反应」。
+// 用 AbortController 让子进程立刻收到中止；下面的 checkpoint 只是兜底，不是唯一生效点。
+let updateApplyRun = null
 
 /**
  * 异步跑 git：网络与克隆可能几十秒到几分钟，用同步调用会把 DSH 主进程整个卡住。
@@ -1873,10 +1885,16 @@ async function gitRun(args, options) {
       timeout: opts.timeout ?? UPDATE_GIT_TIMEOUT,
       maxBuffer: 64 * 1024 * 1024,
       windowsHide: true,
+      // 传了 signal 就由它中止：Node 会杀掉子进程，不必等命令自己跑完。
+      ...(opts.signal ? { signal: opts.signal } : {}),
       ...(opts.cwd ? { cwd: opts.cwd } : {}),
     })
     return { ok: true, out: stdout }
   } catch (error) {
+    // 中止与失败要分开报：中止是用户意图，不该被当成网络错误重试或提示「检查失败」。
+    if (opts.signal?.aborted || error?.name === 'AbortError' || error?.code === 'ABORT_ERR') {
+      return { ok: false, aborted: true, error: '已取消' }
+    }
     return {
       ok: false,
       error: String(error?.stderr ?? error?.message ?? error).split('\n').slice(0, 2).join(' ').slice(0, 300),
@@ -1903,6 +1921,8 @@ async function gitRetry(args, options) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const result = await gitRun(args, options)
     if (result.ok) return result
+    // 用户取消不是网络抖动：立刻返回，绝不重试。
+    if (result.aborted) return result
     last = result
     const retryable = /handshake|SSL|TLS|Could not resolve|timed out|Connection|fetch-pack|RPC failed|early EOF|reset by peer/i.test(result.error)
     if (!retryable) return result
@@ -1971,9 +1991,9 @@ function repoCacheDir(repo) {
 }
 
 /** 上游分支当前 HEAD。ls-remote 不消耗 GitHub API 配额。 */
-async function upstreamRefSha(repo, branch) {
-  const result = await gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'])
-  if (!result.ok) return { ok: false, error: result.error }
+async function upstreamRefSha(repo, branch, signal) {
+  const result = await gitRetry(['ls-remote', '--heads', 'https://github.com/' + repo + '.git'], signal ? { signal } : {})
+  if (!result.ok) return { ok: false, aborted: result.aborted === true, error: result.error }
   const heads = new Map()
   for (const row of result.out.split('\n')) {
     const match = /^([0-9a-f]{40})\s+refs\/heads\/(.+)$/.exec(row.trim())
@@ -2179,12 +2199,21 @@ async function backfillProvenance(ctx) {
 async function updateSkillFromUpstream(ctx, name, options) {
   const wanted = typeof name === 'string' ? name.trim() : ''
   const force = options?.force === true
+  const signal = options?.signal
+  /** 取消检查：AbortController 已中止就立刻退出，不再往下写盘。 */
+  const aborted = () => {
+    if (signal?.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    return null
+  }
   if (!wanted) return { status: 400, body: { ok: false, error: '缺少技能名' } }
   const state = readState()
   const record = state.provenance?.[wanted]
   if (!record || !record.repo) {
     return { status: 404, body: { ok: false, error: '这个技能没有来源记录，先做一次「检查更新」' } }
   }
+  // 取消优先于一切判定：用户已经点了取消，再回「本地被改过」会让人以为取消没生效。
+  const stopFirst = aborted()
+  if (stopFirst) return stopFirst
   const current = state.updates?.results?.[wanted]?.status
   if (!force && (current === 'locally-modified' || current === 'both-changed')) {
     return {
@@ -2233,32 +2262,48 @@ async function updateSkillFromUpstream(ctx, name, options) {
       return { status: 500, body: { ok: false, error: '备份失败，已放弃更新：' + String(error?.message ?? error).slice(0, 160) } }
     }
   }
-  if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
-  const head = await upstreamRefSha(record.repo, record.branch || 'main')
-  if (!head.ok) return { status: 502, body: { ok: false, error: head.error } }
-  if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
+  const stopBeforeFetch = aborted()
+  if (stopBeforeFetch) return stopBeforeFetch
+  const head = await upstreamRefSha(record.repo, record.branch || 'main', signal)
+  if (!head.ok) {
+    if (head.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    return { status: 502, body: { ok: false, error: head.error } }
+  }
+  const stopBeforeClone = aborted()
+  if (stopBeforeClone) return stopBeforeClone
   const cache = repoCacheDir(record.repo)
   mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
   if (!existsSync(join(cache, '.git'))) {
     const clone = await gitRetry(
       ['clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--branch', record.branch || 'main', 'https://github.com/' + record.repo + '.git', cache],
-      { timeout: UPDATE_CLONE_TIMEOUT },
+      { timeout: UPDATE_CLONE_TIMEOUT, signal },
     )
-    if (!clone.ok) return { status: 502, body: { ok: false, error: clone.error } }
+    if (!clone.ok) {
+      if (clone.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+      return { status: 502, body: { ok: false, error: clone.error } }
+    }
   }
-  const fetch = await gitRetry(['-C', cache, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', head.branch || record.branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT })
-  if (!fetch.ok) return { status: 502, body: { ok: false, error: fetch.error } }
+  const fetch = await gitRetry(['-C', cache, 'fetch', '--filter=blob:none', '--depth', '1', 'origin', head.branch || record.branch || 'main'], { timeout: UPDATE_CLONE_TIMEOUT, signal })
+  if (!fetch.ok) {
+    if (fetch.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    return { status: 502, body: { ok: false, error: fetch.error } }
+  }
   const work = mkdtempSync(join(tmpdir(), 'zhiyin-update-'))
   try {
     const args = ['-C', cache, '--work-tree', work, 'checkout', '-f', 'FETCH_HEAD']
     if (record.subpath) args.push('--', record.subpath)
-    const checkout = await gitRun(args, { timeout: UPDATE_CLONE_TIMEOUT })
-    if (!checkout.ok) return { status: 502, body: { ok: false, error: '取上游内容失败：' + checkout.error } }
+    const checkout = await gitRun(args, { timeout: UPDATE_CLONE_TIMEOUT, signal })
+    if (!checkout.ok) {
+      if (checkout.aborted) return { status: 499, body: { ok: false, error: '更新已取消' } }
+      return { status: 502, body: { ok: false, error: '取上游内容失败：' + checkout.error } }
+    }
     const source = record.subpath ? join(work, record.subpath) : work
     if (!existsSync(join(source, 'SKILL.md'))) {
       return { status: 502, body: { ok: false, error: '上游这个位置没有 SKILL.md，可能已经改结构' } }
     }
-    if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
+    // 写盘前最后一道闸：到这里取消就绝不覆盖用户文件。
+    const stopBeforeWrite = aborted()
+    if (stopBeforeWrite) return stopBeforeWrite
     const upstreamDigest = localSkillDigest(source)
     const result = installDirectory(ctx, { target, overwrite: true }, source, wanted)
     if (result.status !== 200) return result
