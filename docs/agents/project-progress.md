@@ -2,7 +2,7 @@
 title: Project Progress
 type: project-progress
 project: dsh-skills-zhiyin
-updated: 2026-11-23
+updated: 2026-11-25
 description: >
   项目开发进度实时记录：阶段、分支、代码状态、最近进展。每次会话更新。
   AI 在本文件新增进展或修改当前状态后，必须同步更新 frontmatter 的 updated 字段为当日日期（YYYY-MM-DD）。
@@ -23,6 +23,13 @@ description: >
 - **代码**：prototype/ 两半边已就位（index.js 宿主：/zhiyin/state、/zhiyin/skill、/zhiyin/settings + 按 Agent 策略 provider；client.js 设置页含单个技能开关与「加载 ~/.agents/skills」总开关）；consumer.js 为已废弃的预设级消费者，仅作参考
 - **版本**：prototype/package.json 锁定 0.1.0（开发期不升版）
 - **工具链**：Node v24.22.1；插件包依赖 @deepseek-ai/dsh-skill / dsh-tools / dsh-llm 均 0.2.2-rc.3（prototype/package.json）
+- **最后更新**：2026-11-25 15:3x 0.1.6–0.1.8 连续发版，技能更新检测落地上线；会话收尾交接
+  - 0.1.6 修 BUG-017（skill.path 指向 SKILL.md 被当目录 scandir，162 条假失败），每仓库 fetch 从多次降为一次。
+  - 0.1.7 检查从 577 秒降到 33–43 秒：ls-remote 拿 HEAD 后已验证版本整组跳过；并发 2→6。
+  - 0.1.8 更新交互改为「筛选 → 确认 → 可中断」三步；明确写 SSOT（~/.agents/skills）不动软链。
+  - 信息区合并为单个折叠行（右侧摘要）；README 补发版等待期说明并修正重启口径。
+  - 市场 PR #18428 已 MERGED；npm 下载 428 次实测为自动化流量（0.0.0-stage 占位包 134 次）。
+  - 用户以 desktop 为主；发版后约 24 小时才可在市场装，不改配置。
 - **最后更新**：2026-11-25 00:0x 0.1.5 已发布（自动刷新 + 单行折叠 + BUG-016 修复）；验收实例与临时 profile 已清理
   - registry latest=0.1.5、shasum 53223494、provenance slsa v1；隔离安装成功；华为云镜像 0.1.5。
   - 检查完成自动刷新实测：23:38 → 23:51 自动更新，无需手动 F5（111 秒）。

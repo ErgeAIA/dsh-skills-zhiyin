@@ -1,0 +1,15 @@
+[
+  {
+    "range": "e43e9aa..7a83a7a",
+    "head": "7a83a7a",
+    "at": "2026-11-25",
+    "produced": [
+      "devops-R1",
+      "architecture-R1"
+    ],
+    "skipped": [
+      "project-param",
+      "single-occurrence"
+    ]
+  }
+]
