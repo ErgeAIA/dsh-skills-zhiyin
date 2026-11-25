@@ -798,7 +798,17 @@ export function apply(ctx) {
     return { status: summary.ok ? 200 : 409, body: summary }
   })
 
-  post(ctx, '/zhiyin/updates/apply', async (body) => updateSkillFromUpstream(ctx, body?.name, { force: body?.force === true }))
+  post(ctx, '/zhiyin/updates/apply', async (body) => {
+    updateApplyCancelled = false
+    const result = await updateSkillFromUpstream(ctx, body?.name, { force: body?.force === true })
+    updateApplyCancelled = false
+    return result
+  })
+
+  post(ctx, '/zhiyin/updates/cancel', async () => {
+    updateApplyCancelled = true
+    return { status: 200, body: { ok: true } }
+  })
 
   post(ctx, '/zhiyin/provenance/backfill', async () => {
     const summary = await backfillProvenance(ctx)
@@ -1850,6 +1860,7 @@ const execFileAsync = promisify(execFile)
 // 同一仓库+同一 HEAD 的 ls-tree 全树输出缓存：只在单轮检查内有效，避免重复 git 调用。
 let treeCache = { key: null, out: null }
 let updateCheckRunning = null
+let updateApplyCancelled = false
 
 /**
  * 异步跑 git：网络与克隆可能几十秒到几分钟，用同步调用会把 DSH 主进程整个卡住。
@@ -2222,8 +2233,10 @@ async function updateSkillFromUpstream(ctx, name, options) {
       return { status: 500, body: { ok: false, error: '备份失败，已放弃更新：' + String(error?.message ?? error).slice(0, 160) } }
     }
   }
+  if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
   const head = await upstreamRefSha(record.repo, record.branch || 'main')
   if (!head.ok) return { status: 502, body: { ok: false, error: head.error } }
+  if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
   const cache = repoCacheDir(record.repo)
   mkdirSync(join(stateDir(), 'update-cache'), { recursive: true })
   if (!existsSync(join(cache, '.git'))) {
@@ -2245,6 +2258,7 @@ async function updateSkillFromUpstream(ctx, name, options) {
     if (!existsSync(join(source, 'SKILL.md'))) {
       return { status: 502, body: { ok: false, error: '上游这个位置没有 SKILL.md，可能已经改结构' } }
     }
+    if (updateApplyCancelled) return { status: 499, body: { ok: false, error: '更新已取消' } }
     const upstreamDigest = localSkillDigest(source)
     const result = installDirectory(ctx, { target, overwrite: true }, source, wanted)
     if (result.status !== 200) return result

@@ -50,6 +50,10 @@ window.__ModuleLoader__.load({
         infoUpdate: '更新设置',
         infoSource: '来源与版本',
         updatesBadge: '有 {n} 个更新',
+        filterUpdates: '点一下只显示有更新的技能',
+        showAllSkills: '显示全部',
+        filteringUpdates: '正在只看有更新的技能（{n} 个）',
+        clearFilter: '退出筛选',
         costInfoOpen: '查看计算方式与建议',
         everyDay: '每天',
         autoCheckHint: '开启后按所选周期在后台检查，不会卡住界面',
@@ -62,6 +66,9 @@ window.__ModuleLoader__.load({
         updateBadge: '有更新',
         updateLocalOnly: '本地已改',
         updateApplyHint: '更新到上游当前版本；本地没改过才允许',
+        updateAsk: '把「{name}」更新到上游当前版本？会原子替换技能文件，软链接保持不动。',
+        cancelUpdate: '取消更新',
+        updatingSkill: '正在更新 {name}…',
         updateBlockedHint: '本地内容被改过：点一下可先备份到归档再强制更新',
         forceUpdateAsk: '本地内容被改过。先把当前版本整份备份到归档，再用上游版本覆盖？',
         tabList: '技能列表',
@@ -342,6 +349,10 @@ window.__ModuleLoader__.load({
         infoUpdate: 'Update settings',
         infoSource: 'Source and version',
         updatesBadge: '{n} updates',
+        filterUpdates: 'Click to show only skills with updates',
+        showAllSkills: 'Show all',
+        filteringUpdates: 'Showing only skills with updates ({n})',
+        clearFilter: 'Clear filter',
         costInfoOpen: 'View calculation and guidance',
         everyDay: 'Daily',
         autoCheckHint: 'Checks in the background at the chosen interval without blocking the interface',
@@ -354,6 +365,9 @@ window.__ModuleLoader__.load({
         updateBadge: 'Update',
         updateLocalOnly: 'Edited',
         updateApplyHint: 'Update to the current upstream version (only when the local copy is unedited)',
+        updateAsk: 'Update {name} to the current upstream version? Skill files are replaced atomically; symlinks stay untouched.',
+        cancelUpdate: 'Cancel update',
+        updatingSkill: 'Updating {name}…',
         updateBlockedHint: 'Local files were edited; click to back up and force the update',
         forceUpdateAsk: 'The local copy was edited. Back it up to the archive first, then overwrite with the upstream version?',
         tabList: 'Skills',
@@ -1785,6 +1799,8 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [queryInput, setQueryInput] = React.useState('')
       const [query, setQuery] = React.useState('')
       const [filter, setFilter] = React.useState('all')
+      // 更新筛选：点「有 N 个更新」只显示待更新技能，再点一次恢复。
+      const [updatesOnly, setUpdatesOnly] = React.useState(false)
       const [busy, setBusy] = React.useState(false)
       const [tab, setTab] = React.useState('list')
       const [editing, setEditing] = React.useState(null)
@@ -1937,6 +1953,11 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       const [updateBusy, setUpdateBusy] = React.useState('')
       const [intervalOpen, setIntervalOpen] = React.useState(false)
       const [openInfo, setOpenInfo] = React.useState('')
+      const cancelUpdates = React.useCallback(() => {
+        fetch('/zhiyin/updates/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+          .catch(() => {})
+      }, [])
+
       // 检查一轮要一两分钟：发起后不阻塞界面，改用轮询读取进度，跑完自动刷新。
       const [polling, setPolling] = React.useState(false)
       const checkUpdates = React.useCallback(() => {
@@ -1989,6 +2010,10 @@ function Switch({ label, hint, checked, disabled, onChange }) {
 
       const applyUpdate = React.useCallback((name, force) => {
         if (updateBusy) return
+        if (force !== true) {
+          const ok = window.confirm(say('updateAsk', '把「{name}」更新到上游当前版本？会先原子替换技能文件，软链接保持不动。').replace('{name}', name))
+          if (!ok) return
+        }
         setUpdateBusy(name)
         fetch('/zhiyin/updates/apply', {
           method: 'POST',
@@ -2508,6 +2533,7 @@ function Switch({ label, hint, checked, disabled, onChange }) {
       if (filter === 'internal' && (skill.enabled === false || skill.model || skill.user)) return false
           if (filter === 'bundled' && skill.source !== 'bundled') return false
           if (filter === 'favorite' && !(skill.favorite === true)) return false
+        if (updatesOnly && updateResults[skill.name]?.status !== 'update-available') return false
           if (needle === '') return true
           return (
             skill.name.toLowerCase().includes(needle) ||
@@ -2937,7 +2963,12 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                     h('span', null, say('budget', '目录字符数') + ' ' + String(data.catalogChars)),
                     state.updates?.checkedAt ? h('span', null, say('lastCheckedShort', '检查于 ') + fmtTime(state.updates.checkedAt)) : null,
                     updateCount > 0
-                      ? h('span', { style: css.infoAlert }, say('updatesBadge', '有 {n} 个更新').replace('{n}', String(updateCount)))
+                      ? h('button', {
+                          type: 'button',
+                          style: { ...css.infoAlert, border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 },
+                          onClick: () => setUpdatesOnly((v) => !v),
+                          title: updatesOnly ? say('showAllSkills', '点一下恢复显示全部技能') : say('filterUpdates', '点一下只显示有更新的技能'),
+                        }, updatesOnly ? say('showAllSkills', '显示全部') : say('updatesBadge', '有 {n} 个更新').replace('{n}', String(updateCount)))
                       : null,
                   ),
                 ),
@@ -3072,6 +3103,23 @@ function Switch({ label, hint, checked, disabled, onChange }) {
                         )
                       : null,
                   ),
+            )
+          : null,
+
+        // 更新中的进度提示：明确告诉用户正在写哪个技能，并可中断。
+        updateBusy && updateBusy !== 'check' && tab === 'list'
+          ? h('div', { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 0', color: 'var(--zhiyin-accent, #e0743c)' } },
+              h(Spinner, { size: 14 }),
+              h('span', null, say('updatingSkill', '正在更新 {name}…').replace('{name}', updateBusy)),
+              h('button', { type: 'button', style: { ...css.btn, padding: '4px 10px' }, onClick: cancelUpdates }, say('cancelUpdate', '取消更新')),
+            )
+          : null,
+
+        // 更新筛选提示：说明当前只看待更新，并给出退出入口。
+        updatesOnly && tab === 'list'
+          ? h('div', { style: { ...css.hint, display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0 0' } },
+              h('span', null, say('filteringUpdates', '正在只看有更新的技能（{n} 个）').replace('{n}', String(updateCount))),
+              h('button', { type: 'button', style: { ...css.btn, padding: '4px 10px' }, onClick: () => setUpdatesOnly(false) }, say('clearFilter', '退出筛选')),
             )
           : null,
 

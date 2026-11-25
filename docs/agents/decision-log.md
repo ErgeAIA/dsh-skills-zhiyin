@@ -727,3 +727,21 @@ description: >
   2. 修正 FAQ 矛盾：原文说「安装后刷新即可」，与安装章节「必须完全重开 DSH」冲突。改为「开关不用重启，安装/升级插件本身必须完全退出重开」。
 - **当前检查状态**：`locally-modified` / `both-changed` = 0（此前 0.1.6 那轮出现的 3 个已消失）；9 个 `check-failed` 全是上游真搬家，按用户要求只提示不改。
 - **市场条目**：PR #18428 已 MERGED，中文名、价值描述、去掉安全提示均已生效。
+
+## DEC-055: 更新写的是 SSOT 本体，软链不动；AI Vault 的"未更新"来自它自己的 HEAD 缓存
+
+- **日期**：2026-11-25
+- **用户疑问**：织音更新后 AI Vault 仍显示未更新；是不是没写到上游 SSOT、而是动了软链？
+- **确认写盘位置**：本机 `~/.dsh/skills/impeccable` 是 SymbolicLink → `~/.agents/skills/impeccable`（目录，SSOT）。AI Vault `settings.skill_storage_location = unified`，其 SSOT 也是 `~/.agents/skills`。织音 `updateSkillFromUpstream` 的查找顺序 `agents → user → project` 中 `agents` 优先，写的是 `~/.agents/skills/<name>`，即 SSOT 本体；软链不会被替换。沙盒验证软链在原子替换后仍是 SymbolicLink 且读到新内容。
+- **AI Vault 为何仍报未更新（真因）**：AI Vault `skill_update_service.rs` 把探测到的 HEAD 缓存在 `settings` 表键 `update_head_<owner>/<repo>/<branch>`；阶段 2 若 `cached_head == current` 就整组跳过下载。织音更新了磁盘文件，但**没有同步这个缓存**，AI Vault 仍认为"仓库未变"，于是跳过、报告未更新。这是跨应用缓存不一致，不是文件写错位置。
+- **结论**：不修改 AI Vault 数据库（不是我们的数据，不该写）。用户若以 AI Vault 为主，在 AI Vault 里点更新；若以织音为主，以织音的检测为准。
+
+## DEC-056: 更新交互改为「筛选 → 确认 → 可中断」三步
+
+- **日期**：2026-11-25
+- **用户要求**：检测出更新后点「19 个待更新」直接进入更新是错的；正确流程是先筛选，再点才更新；要有确认状态和中断措施。
+- **实现**：
+  1. 折叠行右侧「有 N 个更新」改为按钮：点击切换 `updatesOnly` 筛选，列表只显示 `update-available` 技能；列表上方显示筛选提示与「退出筛选」。
+  2. 技能卡「有更新」徽标点击先弹 `window.confirm`（说明原子替换、软链不动），确认后才调用 `applyUpdate`。
+  3. 后端新增 `POST /zhiyin/updates/cancel`，在 fetch 前、install 前检查 `updateApplyCancelled`，可中断进行中的更新；前端显示「正在更新 {name}…」进度与「取消更新」按钮。
+- **未验证**：真实浏览器里的确认弹窗与取消按钮交互（需用户验收）。
