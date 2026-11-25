@@ -1839,7 +1839,7 @@ function backupState() {
 /* ---------------------------------------------------- 技能更新检测（阶段 1+2） */
 
 const UPDATE_DAILY_MS = 24 * 60 * 60 * 1000
-const UPDATE_CONCURRENCY = 2
+const UPDATE_CONCURRENCY = 6
 const UPDATE_GIT_TIMEOUT = 45000
 const UPDATE_CLONE_TIMEOUT = 240000
 const UPDATE_SKIP_DIRS = new Set(['.git', 'node_modules'])
@@ -2349,10 +2349,15 @@ async function runUpdateCheck(ctx) {
         const group = queue[cursor++]
         requests += 1
         const head = await upstreamRefSha(group.repo, group.branch)
-        // 同一仓库只 fetch 一次、只读一次全树；子树指纹在本地切片。
+        // 只拿 SHA 的检查是快的：若每个成员都已用这个 SHA 验证过，就不必 fetch。
+        // 这是「检查」与「更新」的关键区别——检查只需要知道上游有没有变。
+        const verified = head.ok && group.items.every((item) => {
+          const r = item.record
+          return (r.headSha ?? r.remoteSha) === head.sha && r.digest
+        })
         let prepared = null
         let fullTree = null
-        if (head.ok) {
+        if (head.ok && !verified) {
           prepared = await prepareRepo(group.repo, head.branch || group.branch)
           if (prepared.ok) {
             fullTree = await gitRun(['-C', prepared.dir, 'ls-tree', '-r', 'FETCH_HEAD'])
@@ -2375,7 +2380,7 @@ async function runUpdateCheck(ctx) {
           }
           const resolvedBranch = head.branch || group.branch
           // 已装基线就是当前上游：什么都不用下载。
-          if (record.headSha && record.headSha === head.sha && record.digest) {
+          if ((record.headSha ?? record.remoteSha) && (record.headSha ?? record.remoteSha) === head.sha && record.digest) {
             results[name] = {
               status: local.digest === record.localDigest ? 'up-to-date' : 'locally-modified',
               checkedAt: now,
@@ -2388,6 +2393,7 @@ async function runUpdateCheck(ctx) {
           let upstream = null
           if (record.remoteSha && record.remoteSha === head.sha && record.remoteDigest) {
             upstream = { ok: true, digest: record.remoteDigest }
+            provenance[name] = { ...record, headSha: head.sha, digest: record.remoteDigest, verifiedAt: now }
           } else if (digestCache.has(subpathKey)) {
             upstream = digestCache.get(subpathKey)
           } else if (fullTree) {
@@ -2409,7 +2415,16 @@ async function runUpdateCheck(ctx) {
             }
             continue
           }
-          const remoteRecord = { ...record, branch: resolvedBranch, remoteSha: head.sha, remoteDigest: upstream.digest }
+          // 已确认这个 HEAD 的上游内容：它同时也是新的基线，下次同 SHA 直接短路。
+          const remoteRecord = {
+            ...record,
+            branch: resolvedBranch,
+            headSha: head.sha,
+            digest: upstream.digest,
+            remoteSha: head.sha,
+            remoteDigest: upstream.digest,
+            verifiedAt: now,
+          }
           if (upstream.digest === local.digest) {
             results[name] = { status: 'up-to-date', checkedAt: now, upstreamSha: head.sha }
             provenance[name] = { ...remoteRecord, headSha: head.sha, digest: upstream.digest, localDigest: local.digest, verifiedAt: now }
